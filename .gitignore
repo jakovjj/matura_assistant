@@ -1,0 +1,6 @@
+.env
+node_modules/
+var/
+files/ncvvo/
+scripts/__pycache__/
+*.pyc

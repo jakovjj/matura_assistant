@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="hr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Asistent za Mature pomaže u vježbi državne mature po predmetima, rokovima i godinama uz lokalno spremljen napredak i preuzimanje službenih materijala."
+    />
+    <title>Asistent za Mature - interaktivni ispiti za vježbu</title>
+    <link rel="icon" type="image/webp" href="./assets/asistent_za_maturu.webp" />
+    <link rel="stylesheet" href="./styles.css?v=20260601" />
+    <script type="text/javascript">
+      (function (c, l, a, r, i, t, y) {
+        c[a] =
+          c[a] ||
+          function () {
+            (c[a].q = c[a].q || []).push(arguments);
+          };
+        t = l.createElement(r);
+        t.async = 1;
+        t.src = "https://www.clarity.ms/tag/" + i;
+        y = l.getElementsByTagName(r)[0];
+        y.parentNode.insertBefore(t, y);
+      })(window, document, "clarity", "script", "x0a1kkmiqz");
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Preskoči na sadržaj</a>
+
+    <div data-site-header data-active-page="home"></div>
+    <script src="./site-header.js"></script>
+
+    <main id="main">
+      <section class="page-heading home-heading">
+        <div class="container">
+          <div class="page-heading__grid">
+            <div>
+              <h1>Interaktivni ispiti za vježbu</h1>
+              <p class="lead">
+                Odaberi predmet, otvori rok i preuzmi službene materijale iz
+                NCVVO arhive. Dostupne interaktivne cjeline spremaju odgovore
+                samo u ovom pregledniku.
+              </p>
+            </div>
+            <aside class="source-note">
+              <p>
+                <strong>Neslužbeni projekt.</strong> Materijali su lokalne
+                preslike javno objavljenih NCVVO ZIP paketa za 2013.-2025.
+              </p>
+              <a
+                href="https://www.ncvvo.hr/kategorija/drzavna-matura/provedeni-ispiti/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Otvori arhivu NCVVO-a
+                <svg aria-hidden="true" viewBox="0 0 16 16">
+                  <path d="M6 3h7v7M13 3 5 11M3 6v7h7" />
+                </svg>
+              </a>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace-section" id="predmeti" aria-label="Vježba mature">
+        <div class="container" id="app-root"></div>
+      </section>
+
+    </main>
+
+    <footer class="site-footer">
+      <div class="container site-footer__inner">
+        <div class="footer-brand">
+          <img
+            class="footer-brand__mark"
+            src="./assets/asistent_za_maturu.webp"
+            alt=""
+            width="40"
+            height="40"
+            loading="lazy"
+            decoding="async"
+          />
+          <div>
+            <strong>Asistent za Mature</strong>
+            <p>Neslužbeni alat za pripremu državne mature.</p>
+          </div>
+        </div>
+        <div class="footer-meta">
+          <p>Copyright &copy; 2026 Asistent za Mature. Odgovorna osoba: Jakov Jandrić.</p>
+          <p>
+            Ispitni materijali:
+            <a
+              href="https://www.ncvvo.hr/kategorija/drzavna-matura/provedeni-ispiti/"
+              target="_blank"
+              rel="noreferrer"
+              >NCVVO</a
+            >
+          </p>
+        </div>
+      </div>
+    </footer>
+
+    <script src="./data/exams.js"></script>
+    <script src="./data/english-reading.js"></script>
+    <script src="./app.js?v=20260601"></script>
+    <script src="./auth-client.js"></script>
+  </body>
+</html>

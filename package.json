@@ -1,0 +1,11 @@
+{
+  "name": "asistent-za-mature",
+  "private": true,
+  "scripts": {
+    "check": "node --check app.js && node --check auth-client.js && node --check english-reading.js && node --check server.js && node --check site-header.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "nodemailer": "^7.0.0"
+  }
+}
