@@ -4,6 +4,11 @@
   if (!siteHeaderRoot) return;
 
   const activePage = siteHeaderRoot.dataset.activePage || "";
+  if (activePage !== "home") {
+    siteHeaderRoot.remove();
+    return;
+  }
+
   const navClass = activePage ? "main-nav" : "main-nav main-nav--no-active";
   const navItems = [
     {

@@ -4,3 +4,4 @@ var/
 files/ncvvo/
 scripts/__pycache__/
 *.pyc
+AGENTS.md

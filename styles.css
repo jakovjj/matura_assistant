@@ -1276,6 +1276,28 @@ a:focus-visible {
   border-bottom: 1px solid var(--line);
 }
 
+.subpage-context {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.subpage-context a {
+  color: var(--blue);
+}
+
+.subpage-context span {
+  color: var(--navy);
+}
+
 .component-tabs {
   display: flex;
   gap: 4px;
