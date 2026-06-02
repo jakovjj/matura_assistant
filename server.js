@@ -5,7 +5,6 @@ const fs = require("node:fs");
 const fsp = require("node:fs/promises");
 const http = require("node:http");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
 
 const rootDir = __dirname;
 loadEnvFile(path.join(rootDir, ".env"));
@@ -18,28 +17,23 @@ const config = {
     process.env.NODE_ENV === "production" ||
     /^https:\/\//i.test(process.env.PUBLIC_BASE_URL || ""),
   host: process.env.HOST || "0.0.0.0",
-  magicLinkTtlMs: readPositiveNumber(process.env.MAGIC_LINK_TTL_MINUTES, 15) * 60 * 1000,
-  mailFrom: process.env.MAIL_FROM || "Asistent za Mature <noreply@localhost>",
-  mailTransport: process.env.MAIL_TRANSPORT || (process.env.SMTP_HOST ? "smtp" : "log"),
   port: Number(process.env.PORT || 8080),
-  publicBaseUrl: process.env.PUBLIC_BASE_URL || "",
   sessionTtlMs: readPositiveNumber(process.env.SESSION_TTL_DAYS, 30) * 24 * 60 * 60 * 1000,
   storeFile: path.resolve(rootDir, process.env.AUTH_STORE_FILE || "var/auth-store.json"),
 };
 
 const rateLimit = {
-  email: createRateLimiter({
-    max: Number(process.env.AUTH_EMAIL_LIMIT_PER_HOUR || 5),
+  account: createRateLimiter({
+    max: Number(process.env.AUTH_ACCOUNT_LIMIT_PER_HOUR || 20),
     windowMs: 60 * 60 * 1000,
   }),
   ip: createRateLimiter({
-    max: Number(process.env.AUTH_IP_LIMIT_PER_HOUR || 25),
+    max: Number(process.env.AUTH_IP_LIMIT_PER_HOUR || 80),
     windowMs: 60 * 60 * 1000,
   }),
 };
 
 let store = {
-  magicLinks: {},
   sessions: {},
   users: {},
 };
@@ -68,18 +62,20 @@ async function main() {
 
   server.listen(config.port, config.host, () => {
     console.log(`Asistent za Mature radi na http://${config.host}:${config.port}`);
-    console.log(`Mail transport: ${config.mailTransport}`);
-    if (config.mailTransport === "log") {
-      console.log("Magic linkovi se ispisuju u ovaj log. To nije produkcijski način slanja.");
-    }
+    console.log(`Auth store: ${config.storeFile}`);
   });
 }
 
 async function handleRequest(request, response) {
   const url = new URL(request.url, requestBaseUrl(request));
 
-  if (url.pathname === "/api/auth/magic-link") {
-    await handleMagicLinkRequest(request, response);
+  if (url.pathname === "/api/auth/signup") {
+    await handleSignup(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/auth/login") {
+    await handleLogin(request, response);
     return;
   }
 
@@ -93,15 +89,10 @@ async function handleRequest(request, response) {
     return;
   }
 
-  if (url.pathname === "/auth/verify") {
-    await handleVerifyMagicLink(request, response, url);
-    return;
-  }
-
   await serveStaticFile(request, response, url);
 }
 
-async function handleMagicLinkRequest(request, response) {
+async function handleSignup(request, response) {
   if (request.method !== "POST") {
     sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
     return;
@@ -117,12 +108,18 @@ async function handleMagicLinkRequest(request, response) {
 
   const email = normalizeSkoleEmail(body.email);
   if (!email) {
-    sendJson(response, 400, { error: "Za prijavu koristi adresu oblika ime.prezime@skole.hr." });
+    sendJson(response, 400, { error: "Za račun koristi adresu koja završava s @skole.hr." });
+    return;
+  }
+
+  const password = normalizePassword(body.password);
+  if (!password) {
+    sendJson(response, 400, { error: "Upiši lozinku za ovaj prototip." });
     return;
   }
 
   const ipAddress = clientIp(request);
-  if (!rateLimit.ip.check(ipAddress) || !rateLimit.email.check(email)) {
+  if (!rateLimit.ip.check(ipAddress) || !rateLimit.account.check(email)) {
     sendJson(response, 429, {
       error: "Poslano je previše zahtjeva. Pričekaj nekoliko minuta i pokušaj ponovno.",
     });
@@ -131,77 +128,67 @@ async function handleMagicLinkRequest(request, response) {
 
   pruneExpiredRecords();
 
-  const token = randomToken();
-  const magicLink = {
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-    email,
-    expiresAt: new Date(Date.now() + config.magicLinkTtlMs).toISOString(),
-    ipAddress,
-    returnTo: safeReturnTo(body.returnTo),
-    tokenHash: hashToken(token),
-    usedAt: null,
-    userAgent: String(request.headers["user-agent"] || "").slice(0, 500),
-  };
+  if (findUserByEmail(email)) {
+    sendJson(response, 409, { error: "Račun već postoji. Prijavi se istom adresom i lozinkom." });
+    return;
+  }
 
-  store.magicLinks[magicLink.id] = magicLink;
+  const user = await createUser({ email, password });
+  user.lastLoginAt = new Date().toISOString();
+  const { cookie, session } = createSession(user, request);
+  store.sessions[session.id] = session;
   await persistStore();
 
-  const link = new URL("/auth/verify", externalBaseUrl(request));
-  link.searchParams.set("token", token);
+  sendJson(response, 201, authenticatedPayload(user, "Račun je napravljen."), {
+    "Set-Cookie": cookie,
+  });
+}
 
+async function handleLogin(request, response) {
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
+    return;
+  }
+
+  let body;
   try {
-    await sendMagicLinkEmail({ email, link: link.toString() });
-  } catch (error) {
-    console.error("Slanje magic linka nije uspjelo:", error);
-    sendJson(response, 502, {
-      error: "Prijava je pripremljena, ali slanje e-maila trenutno nije uspjelo.",
+    body = await readJsonBody(request);
+  } catch {
+    sendJson(response, 400, { error: "Zahtjev nije ispravan." });
+    return;
+  }
+
+  const email = normalizeSkoleEmail(body.email);
+  const password = normalizePassword(body.password);
+  if (!email || !password) {
+    sendJson(response, 400, { error: "Upiši @skole.hr adresu i lozinku." });
+    return;
+  }
+
+  const ipAddress = clientIp(request);
+  if (!rateLimit.ip.check(ipAddress) || !rateLimit.account.check(email)) {
+    sendJson(response, 429, {
+      error: "Poslano je previše zahtjeva. Pričekaj nekoliko minuta i pokušaj ponovno.",
     });
     return;
   }
 
-  sendJson(response, 200, {
-    ok: true,
-    message: "Ako je adresa ispravna, poveznica za prijavu poslana je na @skole.hr e-mail.",
-  });
-}
-
-async function handleVerifyMagicLink(request, response, url) {
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    redirect(response, "/", 303);
-    return;
-  }
-
-  const tokenHash = hashToken(url.searchParams.get("token") || "");
-  const now = Date.now();
-  const magicLink = Object.values(store.magicLinks).find((item) => {
-    return item.tokenHash === tokenHash && !item.usedAt && Date.parse(item.expiresAt) > now;
-  });
-
-  if (!magicLink) {
-    redirect(response, "/?prijava=neuspjela#predmeti", 303);
-    return;
-  }
-
-  magicLink.usedAt = new Date().toISOString();
-  const user = findOrCreateUser(magicLink.email);
-  user.lastLoginAt = new Date().toISOString();
-
-  const sessionToken = randomToken();
-  const session = {
-    id: crypto.randomUUID(),
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + config.sessionTtlMs).toISOString(),
-    lastSeenAt: new Date().toISOString(),
-    tokenHash: hashToken(sessionToken),
-    userId: user.id,
-  };
-  store.sessions[session.id] = session;
   pruneExpiredRecords();
+
+  const user = findUserByEmail(email);
+  const isValid = user ? await verifyPassword(user, password) : false;
+  if (!user || !isValid) {
+    sendJson(response, 401, { error: "Račun ne postoji ili lozinka nije točna." });
+    return;
+  }
+
+  user.lastLoginAt = new Date().toISOString();
+  const { cookie, session } = createSession(user, request);
+  store.sessions[session.id] = session;
   await persistStore();
 
-  redirect(response, magicLink.returnTo || "/", 303, {
-    "Set-Cookie": sessionCookie(sessionToken, config.sessionTtlMs),
+  sendJson(response, 200, authenticatedPayload(user, "Prijavljen si."), {
+    "Set-Cookie": cookie,
   });
 }
 
@@ -230,10 +217,7 @@ async function handleCurrentUser(request, response) {
 
   sendJson(response, 200, {
     authenticated: true,
-    user: {
-      email: user.email,
-      id: user.id,
-    },
+    user: publicUser(user),
   });
 }
 
@@ -252,18 +236,59 @@ async function handleLogout(request, response) {
   sendJson(response, 200, { ok: true }, { "Set-Cookie": expiredSessionCookie() });
 }
 
-function findOrCreateUser(email) {
-  const existing = Object.values(store.users).find((user) => user.email === email);
-  if (existing) return existing;
+function findUserByEmail(email) {
+  return Object.values(store.users).find((user) => user.email === email) || null;
+}
 
+async function createUser({ email, password }) {
+  const passwordRecord = await hashPassword(password);
   const user = {
     createdAt: new Date().toISOString(),
     email,
     id: crypto.randomUUID(),
     lastLoginAt: null,
+    passwordHash: passwordRecord.hash,
+    passwordSalt: passwordRecord.salt,
+    passwordUpdatedAt: new Date().toISOString(),
   };
   store.users[user.id] = user;
   return user;
+}
+
+function createSession(user, request) {
+  const sessionToken = randomToken();
+  const now = new Date().toISOString();
+  const session = {
+    createdAt: now,
+    expiresAt: new Date(Date.now() + config.sessionTtlMs).toISOString(),
+    id: crypto.randomUUID(),
+    ipAddress: clientIp(request),
+    lastSeenAt: now,
+    tokenHash: hashToken(sessionToken),
+    userAgent: String(request.headers["user-agent"] || "").slice(0, 500),
+    userId: user.id,
+  };
+
+  return {
+    cookie: sessionCookie(sessionToken, config.sessionTtlMs),
+    session,
+  };
+}
+
+function authenticatedPayload(user, message) {
+  return {
+    authenticated: true,
+    message,
+    ok: true,
+    user: publicUser(user),
+  };
+}
+
+function publicUser(user) {
+  return {
+    email: user.email,
+    id: user.id,
+  };
 }
 
 function currentSession(request) {
@@ -346,112 +371,6 @@ async function serveStaticFile(request, response, url) {
   fs.createReadStream(filePath).pipe(response);
 }
 
-async function sendMagicLinkEmail({ email, link }) {
-  const subject = "Prijava u Asistent za Mature";
-  const text = [
-    "Pozdrav,",
-    "",
-    "Za prijavu u Asistent za Mature otvori ovu poveznicu:",
-    link,
-    "",
-    "Poveznica vrijedi kratko i može se iskoristiti samo jednom.",
-    "Ovo je neslužbeni projekt i nije AAI@EduHr prijava.",
-  ].join("\n");
-  const html = `
-    <p>Pozdrav,</p>
-    <p>Za prijavu u Asistent za Mature otvori ovu poveznicu:</p>
-    <p><a href="${escapeHtml(link)}">Prijavi se u Asistent za Mature</a></p>
-    <p>Poveznica vrijedi kratko i može se iskoristiti samo jednom.</p>
-    <p>Ovo je neslužbeni projekt i nije AAI@EduHr prijava.</p>
-  `;
-
-  if (config.mailTransport === "log") {
-    console.log("");
-    console.log("=== MAGIC LINK ZA TESTIRANJE ===");
-    console.log(`Za: ${email}`);
-    console.log(link);
-    console.log("================================");
-    console.log("");
-    return;
-  }
-
-  if (config.mailTransport === "sendmail") {
-    await sendWithSendmail({ email, subject, text });
-    return;
-  }
-
-  if (config.mailTransport === "smtp") {
-    await sendWithSmtp({ email, html, subject, text });
-    return;
-  }
-
-  throw new Error(`Nepoznat MAIL_TRANSPORT: ${config.mailTransport}`);
-}
-
-async function sendWithSmtp({ email, html, subject, text }) {
-  let nodemailer;
-  try {
-    nodemailer = await import("nodemailer");
-  } catch {
-    throw new Error("SMTP traži nodemailer. Pokreni `npm install` ili koristi MAIL_TRANSPORT=sendmail.");
-  }
-
-  const mailer = nodemailer.default || nodemailer;
-  const transporter = mailer.createTransport({
-    auth:
-      process.env.SMTP_USER || process.env.SMTP_PASS
-        ? {
-            pass: process.env.SMTP_PASS || "",
-            user: process.env.SMTP_USER || "",
-          }
-        : undefined,
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === "1",
-  });
-
-  await transporter.sendMail({
-    from: config.mailFrom,
-    html,
-    subject,
-    text,
-    to: email,
-  });
-}
-
-function sendWithSendmail({ email, subject, text }) {
-  const sendmailPath = process.env.SENDMAIL_PATH || "/usr/sbin/sendmail";
-  const message = [
-    `From: ${config.mailFrom}`,
-    `To: ${email}`,
-    `Subject: ${subject}`,
-    "Content-Type: text/plain; charset=UTF-8",
-    "",
-    text,
-  ].join("\n");
-
-  return new Promise((resolve, reject) => {
-    const child = spawn(sendmailPath, ["-t"], {
-      stdio: ["pipe", "ignore", "pipe"],
-    });
-
-    let stderr = "";
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-    child.on("error", reject);
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`sendmail je završio s kodom ${code}: ${stderr}`));
-      }
-    });
-
-    child.stdin.end(message);
-  });
-}
-
 async function readJsonBody(request) {
   const chunks = [];
   let size = 0;
@@ -476,22 +395,47 @@ function sendJson(response, statusCode, payload, headers = {}) {
   response.end(body);
 }
 
-function redirect(response, location, statusCode = 303, headers = {}) {
-  response.writeHead(statusCode, { Location: location, ...headers });
-  response.end();
-}
-
 function normalizeSkoleEmail(value) {
   const email = String(value || "").trim().toLowerCase();
   if (!/^[^\s@]+@skole\.hr$/.test(email)) return null;
   return email;
 }
 
-function safeReturnTo(value) {
-  const raw = String(value || "").trim();
-  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/";
-  if (/[\r\n]/.test(raw)) return "/";
-  return raw.slice(0, 700);
+function normalizePassword(value) {
+  if (typeof value !== "string") return null;
+  if (!value || value.length > 200) return null;
+  return value;
+}
+
+async function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("base64url");
+  const hash = await scrypt(password, salt);
+  return { hash, salt };
+}
+
+async function verifyPassword(user, password) {
+  if (!user.passwordHash || !user.passwordSalt) return false;
+  const hash = await scrypt(password, user.passwordSalt);
+  return timingSafeEqual(hash, user.passwordHash);
+}
+
+function scrypt(password, salt) {
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(String(password), String(salt), 64, (error, key) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(key.toString("base64url"));
+    });
+  });
+}
+
+function timingSafeEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left));
+  const rightBuffer = Buffer.from(String(right));
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
 }
 
 function randomToken() {
@@ -540,12 +484,11 @@ async function loadStore() {
     const raw = await fsp.readFile(config.storeFile, "utf8");
     const parsed = JSON.parse(raw);
     return {
-      magicLinks: parsed.magicLinks || {},
       sessions: parsed.sessions || {},
       users: parsed.users || {},
     };
   } catch (error) {
-    if (error.code === "ENOENT") return { magicLinks: {}, sessions: {}, users: {} };
+    if (error.code === "ENOENT") return { sessions: {}, users: {} };
     throw error;
   }
 }
@@ -562,11 +505,6 @@ function persistStore() {
 
 function pruneExpiredRecords() {
   const now = Date.now();
-  for (const [id, magicLink] of Object.entries(store.magicLinks)) {
-    const expiredForADay = Date.parse(magicLink.expiresAt) + 24 * 60 * 60 * 1000 <= now;
-    if (expiredForADay || magicLink.usedAt) delete store.magicLinks[id];
-  }
-
   for (const [id, session] of Object.entries(store.sessions)) {
     if (Date.parse(session.expiresAt) <= now) delete store.sessions[id];
   }
@@ -584,10 +522,6 @@ function createRateLimiter({ max, windowMs }) {
       return bucket.length <= max;
     },
   };
-}
-
-function externalBaseUrl(request) {
-  return config.publicBaseUrl || requestBaseUrl(request);
 }
 
 function requestBaseUrl(request) {
@@ -626,10 +560,18 @@ function isPublicPath(pathname) {
     "/app.js",
     "/asistent_za_maturu.png",
     "/auth-client.js",
+    "/croatian-choice.js",
     "/english-reading.html",
     "/english-reading.js",
+    "/english-listening.js",
     "/engleski-citanje.html",
+    "/engleski-slusanje.html",
+    "/exam-simulation.js",
+    "/fizika-abcd.html",
+    "/fizika.html",
+    "/hrvatski.html",
     "/index.html",
+    "/physics-choice.js",
     "/site-header.js",
     "/styles.css",
   ]);
@@ -653,15 +595,6 @@ function cacheHeaderFor(filePath) {
 function readPositiveNumber(value, fallback) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }
 
 function loadEnvFile(filePath) {

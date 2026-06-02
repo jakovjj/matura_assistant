@@ -31,7 +31,9 @@ const pickerState = {
 let solverExam;
 let responses = {};
 let activeTaskNumber;
+let activeQuestionNumber;
 let checked = false;
+const simulation = window.createExamSimulation({ onFinish: finishSimulation });
 
 function escapeHtml(value) {
   return String(value)
@@ -250,6 +252,8 @@ function loadResponses(exam) {
 }
 
 function saveResponses() {
+  if (simulation.active) return;
+
   try {
     localStorage.setItem(readingStorageKeyForId(solverExam.id), JSON.stringify(responses));
   } catch {
@@ -282,6 +286,7 @@ function examUrl(exam) {
 }
 
 function renderPicker() {
+  document.body.classList.remove("solver-page");
   const years = [...new Set(exams.map((exam) => exam.year))].sort((a, b) => b - a);
 
   app.innerHTML = `
@@ -385,6 +390,7 @@ function renderPickerRow(exam) {
 }
 
 function renderMissingExam() {
+  document.body.classList.remove("solver-page");
   app.innerHTML = `
     <div class="empty-state">
       <h2>Ispit nije pronađen</h2>
@@ -395,77 +401,115 @@ function renderMissingExam() {
 }
 
 function renderSolver(exam) {
+  document.body.classList.add("solver-page");
   solverExam = exam;
-  responses = loadResponses(exam);
+  responses = simulation.active ? {} : loadResponses(exam);
   activeTaskNumber = exam.tasks[0].number;
+  activeQuestionNumber = exam.tasks[0].firstQuestion;
 
   app.innerHTML = `
-    <div class="solver-toolbar">
-      <a href="./engleski-citanje.html">← Odaberi drugi ispit</a>
-      <span>
-        <a href="${escapeHtml(exam.paperUrl)}" target="_blank" rel="noreferrer">
-          Otvori službeni PDF
-        </a>
-        <a href="${escapeHtml(exam.archiveUrl)}" target="_blank" rel="noreferrer">
-          Preuzmi ZIP
-        </a>
-      </span>
-    </div>
-
-    <div class="solver-heading">
-      <div>
-        <p class="eyebrow">Engleski - čitanje</p>
-        <h2>${exam.year}. · ${escapeHtml(formatTerm(exam.term))} · ${escapeHtml(exam.level)} razina</h2>
-        <p>
-          Vrijeme u izvornoj knjižici: ${exam.durationMinutes} min${
-            exam.level === "B" ? " za čitanje i pisanje" : ""
-          } ·
-          školska godina ${escapeHtml(exam.schoolYear)}
-        </p>
+    <header class="solver-header">
+      <div class="solver-header__toolbar">
+        <a class="solver-header__back" href="./engleski-citanje.html">← Odaberi drugi ispit</a>
+        <nav class="solver-header__downloads" aria-label="Materijali ispita">
+          <a href="${escapeHtml(exam.paperUrl)}" target="_blank" rel="noreferrer">
+            Otvori službeni PDF
+          </a>
+          <a href="${escapeHtml(exam.archiveUrl)}" target="_blank" rel="noreferrer">
+            Preuzmi ZIP
+          </a>
+        </nav>
       </div>
-      <div class="solver-summary">
-        <strong id="answer-progress"></strong>
-        <span id="score-summary"></span>
-        <div class="solver-summary__actions">
-          <button class="secondary-button" id="clear-answers" type="button">
-            Obriši odgovore
-          </button>
-          ${
-            exam.checkingSupported
-              ? `<button class="primary-button" id="check-answers" type="button">
-                  Provjeri odgovore
-                </button>`
-              : ""
-          }
+
+      <div class="solver-header__main">
+        <div>
+          <p class="eyebrow">Engleski - čitanje</p>
+          <h2>${exam.year}. · ${escapeHtml(formatTerm(exam.term))} · ${escapeHtml(exam.level)} razina</h2>
+          <p>
+            Vrijeme u izvornoj knjižici: ${exam.durationMinutes} min${
+              exam.level === "B" ? " za čitanje i pisanje" : ""
+            } ·
+            školska godina ${escapeHtml(exam.schoolYear)}
+          </p>
+        </div>
+        <div class="solver-summary">
+          ${simulation.renderTimer()}
+          <strong id="answer-progress"></strong>
+          <span id="score-summary"></span>
         </div>
       </div>
-    </div>
+
+      <p class="solver-header__footer">
+        Pitanja su izdvojena iz službene PDF knjižice. Cijelu izvornu knjižicu
+        možeš otvoriti poveznicom iznad.
+      </p>
+    </header>
+
+    ${simulation.renderNotice()}
 
     ${
       exam.checkingSupported
         ? ""
         : `<p class="practice-notice">
             Automatska provjera za stariji format još nije dostupna. Uneseni odgovori
-            spremaju se u ovome pregledniku, a službeni ključ nalazi se u izvornome ZIP-u.
+            ${
+              simulation.active
+                ? "iz simulacije ne spremaju se."
+                : "spremaju se u ovome pregledniku, a službeni ključ nalazi se u izvornome ZIP-u."
+            }
           </p>`
     }
 
-    <nav class="task-navigation" id="task-navigation" aria-label="Zadatci čitanja"></nav>
+    <div class="solver-question-layout solver-question-layout--workspace">
+      <div class="solver-workspace">
+        <section class="task-content-panel" id="task-content-panel"></section>
 
-    <div class="solver-workspace">
-      <section class="task-content-panel" id="task-content-panel"></section>
+        <section class="answer-panel" id="answer-panel" aria-live="polite"></section>
+      </div>
 
-      <section class="answer-panel" id="answer-panel" aria-live="polite"></section>
+      <aside class="question-quickselect" aria-label="Brzi odabir pitanja">
+        <div class="question-quickselect__heading">
+          <strong>Brzi odabir</strong>
+          <small>Pitanja</small>
+        </div>
+        <nav class="question-quickselect__list" id="question-quickselect"></nav>
+      </aside>
     </div>
+
+    <footer class="solver-sticky-footer">
+      <div class="solver-sticky-footer__inner">
+        <nav class="task-navigation" id="task-navigation" aria-label="Zadatci čitanja"></nav>
+        <div class="solver-sticky-footer__controls">
+          <div class="solver-sticky-footer__status">
+            <strong id="footer-answer-progress"></strong>
+            <span id="footer-score-summary"></span>
+          </div>
+          <div class="solver-sticky-footer__actions">
+            <button class="secondary-button" id="clear-answers" type="button">
+              Obriši odgovore
+            </button>
+            ${
+              exam.checkingSupported || simulation.active
+                ? `<button class="primary-button" id="check-answers" type="button">
+                    ${simulation.active ? "Predaj simulaciju" : "Provjeri odgovore"}
+                  </button>`
+                : ""
+            }
+          </div>
+        </div>
+      </div>
+    </footer>
   `;
 
   document.querySelector("#clear-answers").addEventListener("click", clearAnswers);
   document.querySelector("#check-answers")?.addEventListener("click", checkAnswers);
 
   renderTaskNavigation();
+  renderQuestionQuickSelect();
   renderSolverSummary();
   renderTaskContent();
   renderAnswerPanel();
+  simulation.start(exam.durationMinutes);
 }
 
 function renderTaskNavigation() {
@@ -485,11 +529,49 @@ function renderTaskNavigation() {
     .join("");
 
   document.querySelectorAll(".task-button").forEach((button) => {
-    button.addEventListener("click", () => {
-      activeTaskNumber = Number(button.dataset.task);
-      renderTaskNavigation();
-      renderTaskContent();
-      renderAnswerPanel();
+    button.addEventListener("click", () => selectTask(Number(button.dataset.task)));
+  });
+}
+
+function renderQuestionQuickSelect() {
+  const quickSelect = document.querySelector("#question-quickselect");
+  if (!quickSelect) return;
+
+  const questions = allQuestions(solverExam);
+  const quickSelectPanel = quickSelect.closest(".question-quickselect");
+  if (quickSelectPanel) quickSelectPanel.hidden = questions.length <= 1;
+
+  quickSelect.innerHTML = questions
+    .map((question) => {
+      const answer = responses[question];
+      const stateClass = answer ? " question-quickselect__link--answered" : "";
+      const resultClass = checked
+        ? answer === solverExam.answers[question]
+          ? " question-quickselect__link--correct"
+          : " question-quickselect__link--wrong"
+        : "";
+      const activeClass =
+        Number(question) === Number(activeQuestionNumber) ? " question-quickselect__link--active" : "";
+      const answerState = answer ? "odgovoreno" : "nije odgovoreno";
+
+      return `
+        <a
+          class="question-quickselect__link${stateClass}${resultClass}${activeClass}"
+          href="#odgovor-${question}"
+          data-quick-question="${question}"
+          aria-label="Pitanje ${question}, ${answerState}"
+          ${activeClass ? 'aria-current="true"' : ""}
+        >
+          ${question}
+        </a>
+      `;
+    })
+    .join("");
+
+  quickSelect.querySelectorAll("[data-quick-question]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      selectQuestion(Number(link.dataset.quickQuestion));
     });
   });
 }
@@ -498,13 +580,16 @@ function renderSolverSummary() {
   const complete = answeredCount(solverExam);
   const total = allQuestions(solverExam).length;
   document.querySelector("#answer-progress").textContent = `${complete}/${total} odgovora`;
-  document.querySelector("#clear-answers").disabled = complete === 0;
+  document.querySelector("#footer-answer-progress").textContent = `${complete}/${total} odgovora`;
+  document.querySelector("#clear-answers").disabled = complete === 0 || simulation.finished;
 
   const checkButton = document.querySelector("#check-answers");
-  if (checkButton) checkButton.disabled = complete === 0;
+  if (checkButton) checkButton.disabled = complete === 0 || simulation.finished;
 
   const scoreSummary = document.querySelector("#score-summary");
-  scoreSummary.textContent = checked ? `${totalScore()}/${total} točno` : "";
+  const score = checked ? `${totalScore()}/${total} točno` : "";
+  scoreSummary.textContent = score;
+  document.querySelector("#footer-score-summary").textContent = score;
 }
 
 function renderTaskContent() {
@@ -522,10 +607,7 @@ function renderTaskContent() {
 }
 
 function renderAnswerPanel() {
-  const taskIndex = solverExam.tasks.findIndex((task) => task.number === activeTaskNumber);
-  const task = solverExam.tasks[taskIndex];
-  const previousTask = solverExam.tasks[taskIndex - 1];
-  const nextTask = solverExam.tasks[taskIndex + 1];
+  const task = solverExam.tasks.find((candidate) => candidate.number === activeTaskNumber);
   const answerType =
     task.kind === "choice"
       ? "Odaberi jedan odgovor za svako pitanje."
@@ -544,25 +626,6 @@ function renderAnswerPanel() {
     <div class="response-list">
       ${taskQuestions(task).map((question) => renderQuestion(task, question)).join("")}
     </div>
-
-    <div class="answer-panel__footer">
-      <button
-        class="secondary-button"
-        id="previous-task"
-        type="button"
-        ${previousTask ? "" : "disabled"}
-      >
-        Prethodni zadatak
-      </button>
-      <button
-        class="primary-button"
-        id="next-task"
-        type="button"
-        ${nextTask ? "" : "disabled"}
-      >
-        Sljedeći zadatak
-      </button>
-    </div>
   `;
 
   document.querySelectorAll('input[type="radio"][data-question]').forEach((input) => {
@@ -573,13 +636,6 @@ function renderAnswerPanel() {
     input.addEventListener("input", () => updateResponse(input.dataset.question, input.value));
   });
 
-  document.querySelector("#previous-task").addEventListener("click", () => {
-    if (previousTask) selectTask(previousTask.number);
-  });
-
-  document.querySelector("#next-task").addEventListener("click", () => {
-    if (nextTask) selectTask(nextTask.number);
-  });
 }
 
 function renderQuestion(task, question) {
@@ -592,7 +648,7 @@ function renderQuestion(task, question) {
 
   if (task.kind === "text") {
     return `
-      <label class="response-question response-question--text">
+      <label class="response-question response-question--text" id="odgovor-${question}">
         <strong>${question}.</strong>
         <input
           data-question="${question}"
@@ -600,13 +656,14 @@ function renderQuestion(task, question) {
           value="${escapeHtml(answer)}"
           autocomplete="off"
           aria-label="Odgovor na pitanje ${question}"
+          ${simulation.inputDisabledAttribute()}
         >
       </label>
     `;
   }
 
   return `
-    <fieldset class="response-question ${resultClass}">
+    <fieldset class="response-question ${resultClass}" id="odgovor-${question}">
       <legend>${question}.</legend>
       <div class="choice-list">
         ${task.options
@@ -633,6 +690,7 @@ function renderChoice(question, option, answer) {
         name="answer-${question}"
         value="${option}"
         ${selected ? "checked" : ""}
+        ${simulation.inputDisabledAttribute()}
       >
       <span>${option}</span>
     </label>
@@ -647,45 +705,102 @@ function renderFeedback(question, answer) {
 }
 
 function updateResponse(question, answer) {
+  if (simulation.finished) return;
+
   const wasChecked = checked;
   checked = false;
-  responses[question] = answer;
+  const normalizedAnswer = String(answer || "").trim();
+  if (normalizedAnswer) responses[question] = normalizedAnswer;
+  else delete responses[question];
+  activeQuestionNumber = Number(question);
   saveResponses();
   renderTaskNavigation();
+  renderQuestionQuickSelect();
   renderSolverSummary();
   if (wasChecked) renderAnswerPanel();
 }
 
-function selectTask(taskNumber) {
-  activeTaskNumber = taskNumber;
+function taskForQuestion(question) {
+  return solverExam.tasks.find(
+    (task) => question >= task.firstQuestion && question <= task.lastQuestion,
+  );
+}
+
+function selectQuestion(question) {
+  const task = taskForQuestion(question);
+  if (!task) return;
+
+  activeTaskNumber = task.number;
+  activeQuestionNumber = question;
   renderTaskNavigation();
   renderTaskContent();
   renderAnswerPanel();
-  document.querySelector("#answer-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+  renderQuestionQuickSelect();
+
+  document
+    .querySelector(`#odgovor-${question}`)
+    ?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function selectTask(taskNumber) {
+  activeTaskNumber = taskNumber;
+  const task = solverExam.tasks.find((candidate) => candidate.number === activeTaskNumber);
+  activeQuestionNumber = task?.firstQuestion || activeQuestionNumber;
+  renderTaskNavigation();
+  renderTaskContent();
+  renderAnswerPanel();
+  renderQuestionQuickSelect();
+  document.querySelector("#task-content-panel").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function clearAnswers() {
-  if (!window.confirm("Obrisati spremljene odgovore za ovaj ispit?")) return;
+  if (simulation.finished) return;
+  const prompt = simulation.active
+    ? "Obrisati odgovore iz ove simulacije?"
+    : "Obrisati spremljene odgovore za ovaj ispit?";
+  if (!window.confirm(prompt)) return;
   responses = {};
   checked = false;
-  try {
-    for (const key of readingStorageKeys(solverExam)) {
-      localStorage.removeItem(key);
+  if (!simulation.active) {
+    try {
+      for (const key of readingStorageKeys(solverExam)) {
+        localStorage.removeItem(key);
+      }
+    } catch {
+      // The in-memory reset still works if storage is unavailable.
     }
-  } catch {
-    // The in-memory reset still works if storage is unavailable.
   }
   renderTaskNavigation();
+  renderQuestionQuickSelect();
   renderSolverSummary();
   renderTaskContent();
   renderAnswerPanel();
 }
 
 function checkAnswers() {
+  if (simulation.active && !simulation.finished) {
+    if (!window.confirm("Predati simulaciju i završiti rješavanje?")) return;
+    simulation.finish("submitted");
+    return;
+  }
+
   checked = true;
   renderTaskNavigation();
+  renderQuestionQuickSelect();
   renderSolverSummary();
   renderAnswerPanel();
+}
+
+function finishSimulation(reason) {
+  checked = solverExam.checkingSupported;
+  renderTaskNavigation();
+  renderQuestionQuickSelect();
+  renderSolverSummary();
+  renderAnswerPanel();
+
+  if (reason === "expired") {
+    window.alert("Vrijeme za simulaciju je isteklo. Odgovori više nisu promjenjivi.");
+  }
 }
 
 function taskScore(task) {

@@ -2,10 +2,7 @@
   "name": "asistent-za-mature",
   "private": true,
   "scripts": {
-    "check": "node --check app.js && node --check auth-client.js && node --check english-reading.js && node --check server.js && node --check site-header.js",
+    "check": "node --check app.js && node --check auth-client.js && node --check croatian-choice.js && node --check exam-simulation.js && node --check english-listening.js && node --check english-reading.js && node --check physics-choice.js && node --check server.js && node --check site-header.js",
     "start": "node server.js"
-  },
-  "dependencies": {
-    "nodemailer": "^7.0.0"
   }
 }

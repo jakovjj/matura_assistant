@@ -9,7 +9,16 @@
     />
     <title>Asistent za Mature - interaktivni ispiti za vježbu</title>
     <link rel="icon" type="image/webp" href="./assets/asistent_za_maturu.webp" />
-    <link rel="stylesheet" href="./styles.css?v=20260601" />
+    <link rel="stylesheet" href="./styles.css?v=20260602-thresholds" />
+    <script>
+      (() => {
+        const params = new URLSearchParams(window.location.search);
+        document.documentElement.classList.toggle(
+          "is-app-subpage",
+          params.has("predmet") || params.has("ispit"),
+        );
+      })();
+    </script>
     <script type="text/javascript">
       (function (c, l, a, r, i, t, y) {
         c[a] =
@@ -32,7 +41,7 @@
     <script src="./site-header.js"></script>
 
     <main id="main">
-      <section class="page-heading home-heading">
+      <section class="page-heading home-heading" data-home-heading>
         <div class="container">
           <div class="page-heading__grid">
             <div>
@@ -103,7 +112,10 @@
 
     <script src="./data/exams.js"></script>
     <script src="./data/english-reading.js"></script>
-    <script src="./app.js?v=20260601"></script>
+    <script src="./data/english-listening.js"></script>
+    <script src="./data/physics-choice.js"></script>
+    <script src="./data/croatian-choice.js?v=20260601-croatian-choice"></script>
+    <script src="./app.js?v=20260602-thresholds"></script>
     <script src="./auth-client.js"></script>
   </body>
 </html>

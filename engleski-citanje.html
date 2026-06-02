@@ -9,7 +9,7 @@
     />
     <title>Asistent za Mature - Engleski - čitanje</title>
     <link rel="icon" type="image/webp" href="./assets/asistent_za_maturu.webp" />
-    <link rel="stylesheet" href="./styles.css?v=20260601" />
+    <link rel="stylesheet" href="./styles.css?v=20260601-simulation" />
     <script type="text/javascript">
       (function (c, l, a, r, i, t, y) {
         c[a] =
@@ -28,30 +28,10 @@
   <body>
     <a class="skip-link" href="#main">Preskoči na sadržaj</a>
 
-    <main id="main">
-      <section class="component-section" aria-label="Ispitne cjeline">
-        <div class="container">
-          <div class="subpage-context">
-            <a href="./">Naslovnica</a>
-            <span>Neslužbeni projekt</span>
-          </div>
-          <div class="component-tabs">
-            <a class="component-tab component-tab--active" href="./engleski-citanje.html">
-              <span>Čitanje</span>
-              <small>Dostupno</small>
-            </a>
-            <span class="component-tab component-tab--disabled">
-              <span>Slušanje</span>
-              <small>U pripremi</small>
-            </span>
-            <span class="component-tab component-tab--disabled">
-              <span>Esej</span>
-              <small>U pripremi</small>
-            </span>
-          </div>
-        </div>
-      </section>
+    <div data-site-header></div>
+    <script src="./site-header.js?v=20260601-exam-header"></script>
 
+    <main id="main">
       <section class="practice-section">
         <div class="container practice-container" id="reading-app"></div>
       </section>
@@ -90,7 +70,8 @@
     </footer>
 
     <script src="./data/english-reading.js"></script>
-    <script src="./english-reading.js"></script>
+    <script src="./exam-simulation.js?v=20260601-simulation"></script>
+    <script src="./english-reading.js?v=20260601-simulation"></script>
     <script src="./auth-client.js"></script>
   </body>
 </html>

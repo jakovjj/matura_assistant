@@ -28,12 +28,24 @@ This is a dependency-free static site:
 - `engleski-citanje.html`: standalone interactive English reading page
 - `english-reading.html`: redirect kept for old links to English reading
 - `english-reading.js`: English reading solver UI and local answer storage
+- `engleski-slusanje.html`: standalone interactive English listening page
+- `english-listening.js`: English listening solver UI and local answer storage
+- `fizika.html`: standalone interactive Physics page
+- `fizika-abcd.html`: redirect kept for old links to Physics multiple choice
+- `physics-choice.js`: Physics solver UI and local answer storage
+- `exam-simulation.js`: shared timed simulation mode without persistent answers
 - `data/exams.js`: generated archive index; do not edit manually
 - `data/english-reading.js`: generated English reading index; do not edit manually
+- `data/english-listening.js`: generated English listening index; do not edit manually
+- `data/physics-choice.js`: generated Physics multiple-choice index; do not edit manually
 - `files/ncvvo/`: mirrored ZIP packages from the public NCVVO archive
 - `files/interactive/english-reading/`: extracted PDFs for supported reading exams
+- `files/interactive/english-listening/`: extracted PDFs and audio for supported listening exams
+- `files/interactive/physics-choice/`: extracted PDFs and page images for supported Physics exams
 - `scripts/fetch_ncvvo.py`: deterministic NCVVO archive scraper
 - `scripts/build_english_reading.py`: deterministic English reading data builder
+- `scripts/build_english_listening.py`: deterministic English listening data builder
+- `scripts/build_physics_choice.py`: deterministic Physics multiple-choice data builder
 - `README.md`: local usage instructions
 
 Serve it locally with:
@@ -80,6 +92,27 @@ verified archive case requires a change.
 
 ## Interactive practice behavior
 
+- Keep the primary practice flow explicit and sequential: the user selects a
+  subject on the home page, selects the exam level and year on the subject
+  page, and then selects the actual exam part on the exam detail page when the
+  exam has separately solvable parts.
+- Treat exam parts (`ispitne cjeline`) as a first-class selection step. Many
+  exams have multiple parts, but some have only one. In both cases, show the
+  part before opening a solver and display its known duration immediately beside
+  its name.
+- Render exam-part selection as a compact list, not as large descriptive cards
+  or modal-like panels. Put the part/exam name, duration, and actions in one row
+  when space allows, with `Otvori vježbu` and `Simuliraj maturu` at the end.
+- Do not confuse exam parts with task types. A single exam part can contain
+  multiple task types, such as `višestruki izbor` and `produženi odgovor`; that
+  task-type navigation belongs inside the solver, not on the exam-detail part
+  selection screen.
+- Every defined interactive exam part must offer two actions: `Otvori vježbu`
+  and `Simuliraj maturu`.
+- `Simuliraj maturu` is a timed attempt that starts with a fresh transient
+  answer set. Clearly explain that it has a time limit and that its answers and
+  progress are not saved. Do not load or overwrite saved practice progress
+  while simulation mode is active.
 - Opening `Vježbaj` for an archive package must not create progress, mark the
   exam as started, or show a placeholder percentage. Progress is derived from
   saved answers in defined interactive exams.

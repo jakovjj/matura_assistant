@@ -1,5 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg">
   <!-- Lucide Static v1.17.0. See ../THIRD_PARTY_NOTICES.md. -->
+  <symbol id="arrow-left" viewBox="0 0 24 24">
+    <path d="m12 19-7-7 7-7" />
+    <path d="M19 12H5" />
+  </symbol>
+  <symbol id="arrow-right" viewBox="0 0 24 24">
+    <path d="M5 12h14" />
+    <path d="m12 5 7 7-7 7" />
+  </symbol>
   <symbol id="amphora" viewBox="0 0 24 24">
     <path d="M10 2v5.632c0 .424-.272.795-.653.982A6 6 0 0 0 6 14c.006 4 3 7 5 8" />
     <path d="M10 5H8a2 2 0 0 0 0 4h.68" />
@@ -49,6 +57,18 @@
     <path d="M14 21v-3a2 2 0 0 0-4 0v3" />
     <path d="m18 9 3.52 2.147a1 1 0 0 1 .48.854V19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6.999a1 1 0 0 1 .48-.854L6 9" />
     <path d="M6 21V7a1 1 0 0 1 .376-.782l5-3.999a1 1 0 0 1 1.249.001l5 4A1 1 0 0 1 18 7v14" />
+  </symbol>
+  <symbol id="clock" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 6v6l4 2" />
+  </symbol>
+  <symbol id="cookie" viewBox="0 0 24 24">
+    <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5" />
+    <path d="M8.5 8.5v.01" />
+    <path d="M16 15.5v.01" />
+    <path d="M12 12v.01" />
+    <path d="M11 17v.01" />
+    <path d="M7 14v.01" />
   </symbol>
   <symbol id="dna" viewBox="0 0 24 24">
     <path d="m10 16 1.5 1.5" />

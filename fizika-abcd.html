@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="hr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Preusmjeravanje - Fizika</title>
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const target = new URL(params.has("exam") ? "./fizika.html" : "./?predmet=Fizika", window.location.href);
+      for (const [key, value] of params) {
+        target.searchParams.set(key, value);
+      }
+      window.location.replace(target.toString());
+    </script>
+  </head>
+  <body>
+    <p>Preusmjeravanje na <a href="./?predmet=Fizika">Fiziku</a>.</p>
+  </body>
+</html>

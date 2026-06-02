@@ -1,5 +1,8 @@
 const archiveData = window.ASISTENT_ZA_MATURE_DATA;
 const englishReadingData = window.ASISTENT_ZA_MATURE_ENGLISH_READING;
+const englishListeningData = window.ASISTENT_ZA_MATURE_ENGLISH_LISTENING;
+const physicsChoiceData = window.ASISTENT_ZA_MATURE_PHYSICS_CHOICE;
+const croatianChoiceData = window.ASISTENT_ZA_MATURE_CROATIAN_CHOICE;
 
 if (!archiveData || !Array.isArray(archiveData.exams)) {
   throw new Error("Nedostaje generirani indeks ispita.");
@@ -73,6 +76,37 @@ const subjectColors = {
   Vjeronauk: "#4f5943",
 };
 
+const subjectAccusativeLabels = {
+  Biologija: "Biologiju",
+  "Engleski jezik": "Engleski jezik",
+  Etika: "Etiku",
+  Filozofija: "Filozofiju",
+  Fizika: "Fiziku",
+  "Francuski jezik": "Francuski jezik",
+  Geografija: "Geografiju",
+  "Glazbena umjetnost": "Glazbenu umjetnost",
+  "Grčki jezik": "Grčki jezik",
+  "Hrvatski jezik": "Hrvatski jezik",
+  Informatika: "Informatiku",
+  Kemija: "Kemiju",
+  "Latinski jezik": "Latinski jezik",
+  "Likovna umjetnost": "Likovnu umjetnost",
+  Logika: "Logiku",
+  "Mađarski jezik": "Mađarski jezik",
+  "Mađarski jezik i književnost": "Mađarski jezik i književnost",
+  Matematika: "Matematiku",
+  "Njemački jezik": "Njemački jezik",
+  "Politika i gospodarstvo": "Politiku i gospodarstvo",
+  Povijest: "Povijest",
+  Psihologija: "Psihologiju",
+  Sociologija: "Sociologiju",
+  "Srpski jezik": "Srpski jezik",
+  "Španjolski jezik": "Španjolski jezik",
+  "Talijanski jezik": "Talijanski jezik",
+  "Talijanski jezik i književnost": "Talijanski jezik i književnost",
+  Vjeronauk: "Vjeronauk",
+};
+
 const termLabels = {
   "ljetni rok": "Ljetni rok",
   "jesenski rok": "Jesenski rok",
@@ -96,14 +130,13 @@ const termOrder = {
 };
 
 const appRoot = document.querySelector("#app-root");
+const homeHeading = document.querySelector("[data-home-heading]");
 
 if (!appRoot) {
   throw new Error("Nedostaje korijenski element aplikacije.");
 }
 
-const pageState = {
-  year: "",
-};
+let yearNavigationCleanup = null;
 
 function escapeHtml(value) {
   return String(value)
@@ -164,6 +197,19 @@ function englishReadingIdForTerm(exam, term) {
   return `engleski-${exam.level.toLocaleLowerCase("hr")}-${exam.year}-${slugPart(term)}`;
 }
 
+function englishListeningIdForTerm(exam, term) {
+  return `engleski-${exam.level.toLocaleLowerCase("hr")}-${exam.year}-${slugPart(term)}`;
+}
+
+function physicsChoiceIdForTerm(exam, term) {
+  return `fizika-${exam.year}-${slugPart(term)}`;
+}
+
+function croatianChoiceIdForTerm(exam, term) {
+  const level = exam.level ? `-${exam.level.toLocaleLowerCase("hr")}` : "";
+  return `hrvatski${level}-${exam.year}-${slugPart(term)}`;
+}
+
 function englishReadingStorageKeys(readingExam) {
   const ids = [
     readingExam.id,
@@ -173,6 +219,39 @@ function englishReadingStorageKeys(readingExam) {
   ];
 
   return [...new Set(ids)].map((id) => `asistent-za-mature:english-reading:${id}`);
+}
+
+function englishListeningStorageKeys(listeningExam) {
+  const ids = [
+    listeningExam.id,
+    ...(legacyTermAliases[listeningExam.term] || []).map((term) =>
+      englishListeningIdForTerm(listeningExam, term),
+    ),
+  ];
+
+  return [...new Set(ids)].map((id) => `asistent-za-mature:english-listening:${id}`);
+}
+
+function physicsChoiceStorageKeys(choiceExam) {
+  const ids = [
+    choiceExam.id,
+    ...(legacyTermAliases[choiceExam.term] || []).map((term) =>
+      physicsChoiceIdForTerm(choiceExam, term),
+    ),
+  ];
+
+  return [...new Set(ids)].map((id) => `asistent-za-mature:physics-choice:${id}`);
+}
+
+function croatianChoiceStorageKeys(choiceExam) {
+  const ids = [
+    choiceExam.id,
+    ...(legacyTermAliases[choiceExam.term] || []).map((term) =>
+      croatianChoiceIdForTerm(choiceExam, term),
+    ),
+  ];
+
+  return [...new Set(ids)].map((id) => `asistent-za-mature:croatian-choice:${id}`);
 }
 
 const exams = archiveData.exams.map((exam) => {
@@ -191,6 +270,39 @@ const englishReadingExams = (englishReadingData?.exams || []).map((exam) => {
 const englishReadingByArchiveUrl = new Map(
   englishReadingExams.map((exam) => [exam.archiveUrl, exam]),
 );
+const englishListeningExams = (englishListeningData?.exams || []).map((exam) => {
+  const term = normalizeTerm(exam.term);
+  return {
+    ...exam,
+    term,
+    id: englishListeningIdForTerm(exam, term),
+  };
+});
+const englishListeningByArchiveUrl = new Map(
+  englishListeningExams.map((exam) => [exam.archiveUrl, exam]),
+);
+const physicsChoiceExams = (physicsChoiceData?.exams || []).map((exam) => {
+  const term = normalizeTerm(exam.term);
+  return {
+    ...exam,
+    term,
+    id: physicsChoiceIdForTerm(exam, term),
+  };
+});
+const physicsChoiceByArchiveUrl = new Map(
+  physicsChoiceExams.map((exam) => [exam.archiveUrl, exam]),
+);
+const croatianChoiceExams = (croatianChoiceData?.exams || []).map((exam) => {
+  const term = normalizeTerm(exam.term);
+  return {
+    ...exam,
+    term,
+    id: croatianChoiceIdForTerm(exam, term),
+  };
+});
+const croatianChoiceByArchiveUrl = new Map(
+  croatianChoiceExams.map((exam) => [exam.archiveUrl, exam]),
+);
 const englishPracticeParts = [
   {
     id: "citanje",
@@ -208,6 +320,150 @@ const englishPracticeParts = [
     description: "Pisani sastav iz ispita.",
   },
 ];
+const modernForeignLanguageDurations = {
+  "Engleski jezik": {
+    A: { citanje: 70, slusanje: 35, pisanje: 75 },
+    B: { citanje: 75, slusanje: 30, pisanje: 75 },
+    legacyB: { citanje: 60, slusanje: 25, pisanje: 60 },
+  },
+  "Francuski jezik": {
+    A: { citanje: 65, slusanje: 30, pisanje: 55 },
+    B: { citanje: 75, slusanje: 25, pisanje: 75 },
+  },
+  "Njemački jezik": {
+    A: { citanje: 70, slusanje: 35, pisanje: 75 },
+    B: { citanje: 100, slusanje: 30, pisanje: 100 },
+  },
+  "Španjolski jezik": {
+    A: { citanje: 65, slusanje: 30, pisanje: 55 },
+    B: { citanje: 75, slusanje: 25, pisanje: 75 },
+  },
+  "Talijanski jezik": {
+    A: { citanje: 65, slusanje: 30, pisanje: 55 },
+    B: { citanje: 75, slusanje: 25, pisanje: 75 },
+  },
+};
+const modernForeignLanguageSubjects = new Set([
+  "Engleski jezik",
+  "Francuski jezik",
+  "Njemački jezik",
+  "Španjolski jezik",
+  "Talijanski jezik",
+]);
+const unavailableForeignLanguageParts = [
+  {
+    id: "citanje",
+    label: "Čitanje",
+    description: "Ispit čitanja.",
+  },
+  {
+    id: "slusanje",
+    label: "Slušanje",
+    description: "Ispit slušanja.",
+  },
+  {
+    id: "pisanje",
+    label: "Pisanje",
+    description: "Ispit pisanja.",
+  },
+];
+const literatureLanguageSubjects = new Set([
+  "Mađarski jezik",
+  "Mađarski jezik i književnost",
+  "Srpski jezik",
+]);
+const literatureLanguageParts = [
+  {
+    id: "knjizevnost-jezik",
+    label: "Književnost i jezik",
+    description: "Zadatci iz književnosti i jezika.",
+  },
+  {
+    id: "skolski-esej",
+    label: "Školski esej",
+    description: "Pisani dio ispita.",
+  },
+];
+const literatureLanguageDurations = {
+  "Mađarski jezik": {
+    "knjizevnost-jezik": 80,
+    "skolski-esej": 180,
+  },
+  "Mađarski jezik i književnost": {
+    "knjizevnost-jezik": 80,
+    "skolski-esej": 180,
+  },
+  "Srpski jezik": {
+    "knjizevnost-jezik": 90,
+    "skolski-esej": 150,
+  },
+};
+const italianLiteratureParts = [
+  {
+    id: "strukturirani-ispit",
+    label: "Strukturirani ispit",
+    description: "Zadatci iz jezika i književnosti.",
+    durationMinutes: 100,
+  },
+  {
+    id: "pisani-rad",
+    label: "Pisani rad",
+    description: "Pisani dio ispita.",
+    durationMinutes: 180,
+  },
+];
+const musicPracticeParts = [
+  {
+    id: "glazba-u-kontekstu",
+    label: "Glazba u kontekstu",
+    description: "Prva ispitna knjižica.",
+    durationMinutes: 20,
+  },
+  {
+    id: "slusanje-upoznavanje-glazbe",
+    label: "Slušanje i upoznavanje glazbe",
+    description: "Druga ispitna knjižica sa zvučnim zapisom.",
+    durationMinutes: 70,
+  },
+];
+const singleExamPart = {
+  id: "ispit",
+  label: "Ispit",
+  description: "Ispitna knjižica.",
+};
+const singleExamDurations = {
+  Biologija: 150,
+  Etika: 150,
+  Filozofija: 150,
+  Fizika: 180,
+  Geografija: 90,
+  "Grčki jezik": 120,
+  Informatika: 100,
+  Kemija: 180,
+  "Latinski jezik": 120,
+  "Likovna umjetnost": 120,
+  Logika: 150,
+  Matematika: {
+    A: 180,
+    B: 150,
+    default: 180,
+  },
+  "Politika i gospodarstvo": 90,
+  Povijest: 135,
+  Psihologija: 90,
+  Sociologija: 90,
+  Vjeronauk: 70,
+};
+const twentyFivePercentPassSubjects = new Set([
+  "Biologija",
+  "Fizika",
+  "Geografija",
+  "Informatika",
+  "Kemija",
+  "Matematika",
+]);
+const croatianComponentThresholdNote =
+  "Hrvatski jezik ima i zasebne minimalne pragove po ispitnim cjelinama.";
 const subjectCounts = new Map();
 
 for (const exam of exams) {
@@ -232,6 +488,10 @@ function subjectIcon(subject, className) {
 
 function subjectColor(subject) {
   return subjectColors[subject] || "#001d4d";
+}
+
+function subjectAccusative(subject) {
+  return subjectAccusativeLabels[subject] || subject;
 }
 
 function downloadIcon() {
@@ -269,29 +529,235 @@ function examUrl(exam, practicePart = "") {
   return `./?${params.toString()}#predmeti`;
 }
 
-function englishReadingUrl(readingExam) {
-  return `./engleski-citanje.html?exam=${encodeURIComponent(readingExam.id)}`;
+function englishReadingUrl(readingExam, simulation = false) {
+  const params = new URLSearchParams({ exam: readingExam.id });
+  if (simulation) params.set("nacin", "simulacija");
+  return `./engleski-citanje.html?${params.toString()}`;
+}
+
+function englishListeningUrl(listeningExam, simulation = false) {
+  const params = new URLSearchParams({ exam: listeningExam.id });
+  if (simulation) params.set("nacin", "simulacija");
+  return `./engleski-slusanje.html?${params.toString()}`;
+}
+
+function physicsChoiceUrl(choiceExam, simulation = false) {
+  const params = new URLSearchParams({ exam: choiceExam.id });
+  if (simulation) params.set("nacin", "simulacija");
+  return `./fizika.html?${params.toString()}`;
+}
+
+function croatianChoiceUrl(choiceExam, simulation = false) {
+  const params = new URLSearchParams({ exam: choiceExam.id });
+  if (simulation) params.set("nacin", "simulacija");
+  return `./hrvatski.html?${params.toString()}`;
 }
 
 function readingExamForArchive(exam) {
   return englishReadingByArchiveUrl.get(exam.url) || null;
 }
 
-function interactiveParts(exam) {
-  if (exam.subject !== "Engleski jezik") return [];
+function listeningExamForArchive(exam) {
+  return englishListeningByArchiveUrl.get(exam.url) || null;
+}
 
-  const readingExam = readingExamForArchive(exam);
+function physicsChoiceExamForArchive(exam) {
+  return physicsChoiceByArchiveUrl.get(exam.url) || null;
+}
 
-  return englishPracticeParts.map((part) => {
-    const isReading = part.id === "citanje";
-    const isAvailable = isReading && Boolean(readingExam);
+function croatianChoiceExamForArchive(exam) {
+  return croatianChoiceByArchiveUrl.get(exam.url) || null;
+}
+
+function unavailablePart(exam, part) {
+  const href = examUrl(exam, part.id);
+  return {
+    ...part,
+    available: false,
+    durationMinutes: part.durationMinutes ?? null,
+    href,
+    simulationHref: href,
+  };
+}
+
+function unavailableParts(exam, parts) {
+  return parts.map((part) => unavailablePart(exam, part));
+}
+
+function modernForeignLanguageDuration(exam, partId) {
+  const subjectDurations = modernForeignLanguageDurations[exam.subject];
+  if (!subjectDurations) return null;
+
+  if (exam.subject === "Engleski jezik" && exam.level === "B" && exam.year < 2022) {
+    return subjectDurations.legacyB?.[partId] ?? null;
+  }
+
+  return subjectDurations[exam.level || ""]?.[partId] ?? null;
+}
+
+function literatureLanguageDuration(exam, partId) {
+  return literatureLanguageDurations[exam.subject]?.[partId] ?? null;
+}
+
+function singleExamDuration(exam) {
+  const duration = singleExamDurations[exam.subject];
+  if (duration && typeof duration === "object") {
+    return duration[exam.level || ""] ?? duration.default ?? null;
+  }
+  return duration ?? null;
+}
+
+function withDurations(exam, parts) {
+  return parts.map((part) => {
+    if (part.durationMinutes != null) return part;
+
+    const durationMinutes =
+      modernForeignLanguageDuration(exam, part.id) ??
+      literatureLanguageDuration(exam, part.id) ??
+      singleExamDuration(exam);
 
     return {
       ...part,
-      available: isAvailable,
-      href: isAvailable ? englishReadingUrl(readingExam) : examUrl(exam, part.id),
+      durationMinutes,
     };
   });
+}
+
+function linkedPart(exam, part, practiceExam, urlBuilder) {
+  if (!practiceExam) return unavailablePart(exam, part);
+
+  return {
+    ...part,
+    available: true,
+    durationMinutes: practiceExam.durationMinutes ?? part.durationMinutes ?? null,
+    href: urlBuilder(practiceExam),
+    simulationHref: urlBuilder(practiceExam, true),
+  };
+}
+
+function croatianCorePartLabel(exam) {
+  if (exam.year >= 2023) return "Čitanje, književnost i hrvatski jezik";
+  if (exam.year >= 2021) return "Književnost, neknjiževni tekst i jezik";
+  return "Književnost i jezik";
+}
+
+function croatianCoreDuration(exam) {
+  return exam.year <= 2016 ? 80 : 100;
+}
+
+function croatianPracticeParts(exam) {
+  const choiceExam = croatianChoiceExamForArchive(exam);
+  const corePart = linkedPart(
+    exam,
+    {
+      id: "abcd",
+      label: croatianCorePartLabel(exam),
+      description: "Zadatci iz ispitne knjižice.",
+      durationMinutes: croatianCoreDuration(exam),
+    },
+    choiceExam,
+    croatianChoiceUrl,
+  );
+
+  if (exam.year >= 2023 && !exam.level) {
+    return [
+      corePart,
+      unavailablePart(exam, {
+        id: "sazetak",
+        label: "Sažetak",
+        description: "Pisani sažetak.",
+        durationMinutes: 80,
+      }),
+      unavailablePart(exam, {
+        id: "skolski-esej",
+        label: "Školski esej",
+        description: "Pisani dio ispita.",
+        durationMinutes: 160,
+      }),
+    ];
+  }
+
+  return [
+    corePart,
+    unavailablePart(exam, {
+      id: "skolski-esej",
+      label: "Školski esej",
+      description: "Pisani dio ispita.",
+      durationMinutes: 160,
+    }),
+  ];
+}
+
+function interactiveParts(exam) {
+  if (exam.subject === "Engleski jezik") {
+    const readingExam = readingExamForArchive(exam);
+    const listeningExam = listeningExamForArchive(exam);
+    const parts = withDurations(
+      exam,
+      englishPracticeParts.map((part) =>
+        part.id === "esej"
+          ? {
+              ...part,
+              id: "pisanje",
+            }
+          : part,
+      ),
+    ).map((part) =>
+      part.id === "pisanje"
+        ? {
+            ...part,
+            id: "esej",
+          }
+        : part,
+    );
+
+    return parts.map((part) => {
+      const isReading = part.id === "citanje";
+      const isListening = part.id === "slusanje";
+      if (isReading) return linkedPart(exam, part, readingExam, englishReadingUrl);
+      if (isListening) return linkedPart(exam, part, listeningExam, englishListeningUrl);
+      return unavailablePart(exam, part);
+    });
+  }
+
+  if (exam.subject === "Hrvatski jezik") {
+    return croatianPracticeParts(exam);
+  }
+
+  if (exam.subject === "Fizika") {
+    const choiceExam = physicsChoiceExamForArchive(exam);
+    return [
+      linkedPart(
+        exam,
+        {
+          id: "fizika",
+          label: "Ispit",
+          description: "Zadatci iz ispitne knjižice.",
+          durationMinutes: singleExamDuration(exam),
+        },
+        choiceExam,
+        physicsChoiceUrl,
+      ),
+    ];
+  }
+
+  if (modernForeignLanguageSubjects.has(exam.subject)) {
+    return unavailableParts(exam, withDurations(exam, unavailableForeignLanguageParts));
+  }
+
+  if (literatureLanguageSubjects.has(exam.subject)) {
+    return unavailableParts(exam, withDurations(exam, literatureLanguageParts));
+  }
+
+  if (exam.subject === "Talijanski jezik i književnost") {
+    return unavailableParts(exam, italianLiteratureParts);
+  }
+
+  if (exam.subject === "Glazbena umjetnost") {
+    return unavailableParts(exam, musicPracticeParts);
+  }
+
+  return unavailableParts(exam, withDurations(exam, [singleExamPart]));
 }
 
 function readEnglishResponses(readingExam) {
@@ -337,16 +803,130 @@ function englishProgress(exam) {
   };
 }
 
-function examProgress(exam) {
-  const reading = englishProgress(exam);
-  const readingPercent =
-    reading && reading.total ? Math.round((reading.answered / reading.total) * 100) : 0;
-  let percent = readingPercent;
-  let label = "Nije započeto";
-  let completed = Boolean(reading && reading.total && reading.answered === reading.total);
+function readEnglishListeningResponses(listeningExam) {
+  const storedResponses = {};
+  try {
+    for (const key of englishListeningStorageKeys(listeningExam).reverse()) {
+      const stored = JSON.parse(localStorage.getItem(key) || "{}");
+      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+        Object.assign(storedResponses, stored);
+      }
+    }
+  } catch {
+    return {};
+  }
+  return storedResponses;
+}
 
-  if (reading) {
-    label = `${reading.answered}/${reading.total} odgovora`;
+function englishListeningProgress(exam) {
+  const listeningExam = listeningExamForArchive(exam);
+  if (!listeningExam) return null;
+
+  const knownQuestions = new Set(englishQuestionNumbers(listeningExam));
+  const responses = readEnglishListeningResponses(listeningExam);
+  const answered = Object.entries(responses).filter(
+    ([question, answer]) =>
+      knownQuestions.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+
+  return {
+    answered,
+    id: listeningExam.id,
+    total: knownQuestions.size,
+  };
+}
+
+function readPhysicsResponses(choiceExam) {
+  const storedResponses = {};
+  try {
+    for (const key of physicsChoiceStorageKeys(choiceExam).reverse()) {
+      const stored = JSON.parse(localStorage.getItem(key) || "{}");
+      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+        Object.assign(storedResponses, stored);
+      }
+    }
+  } catch {
+    return {};
+  }
+  return storedResponses;
+}
+
+function physicsQuestionNumbers(choiceExam) {
+  return (choiceExam.tasks || []).flatMap((task) =>
+    task.questions.map((question) => String(question.number)),
+  );
+}
+
+function physicsProgress(exam) {
+  const choiceExam = physicsChoiceExamForArchive(exam);
+  if (!choiceExam) return null;
+
+  const knownQuestions = new Set(physicsQuestionNumbers(choiceExam));
+  const responses = readPhysicsResponses(choiceExam);
+  const answered = Object.entries(responses).filter(
+    ([question, answer]) =>
+      knownQuestions.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+
+  return {
+    answered,
+    id: choiceExam.id,
+    total: knownQuestions.size,
+  };
+}
+
+function readCroatianResponses(choiceExam) {
+  const storedResponses = {};
+  try {
+    for (const key of croatianChoiceStorageKeys(choiceExam).reverse()) {
+      const stored = JSON.parse(localStorage.getItem(key) || "{}");
+      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+        Object.assign(storedResponses, stored);
+      }
+    }
+  } catch {
+    return {};
+  }
+  return storedResponses;
+}
+
+function croatianQuestionNumbers(choiceExam) {
+  return (choiceExam.questions || []).map(String);
+}
+
+function croatianProgress(exam) {
+  const choiceExam = croatianChoiceExamForArchive(exam);
+  if (!choiceExam) return null;
+
+  const knownQuestions = new Set(croatianQuestionNumbers(choiceExam));
+  const responses = readCroatianResponses(choiceExam);
+  const answered = Object.entries(responses).filter(
+    ([question, answer]) =>
+      knownQuestions.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+
+  return {
+    answered,
+    id: choiceExam.id,
+    total: knownQuestions.size,
+  };
+}
+
+function examProgress(exam) {
+  const progressItems = [
+    englishProgress(exam),
+    englishListeningProgress(exam),
+    physicsProgress(exam),
+    croatianProgress(exam),
+  ].filter(Boolean);
+  const answered = progressItems.reduce((sum, item) => sum + item.answered, 0);
+  const total = progressItems.reduce((sum, item) => sum + item.total, 0);
+  let percent = total ? Math.round((answered / total) * 100) : 0;
+  let label = "Nije započeto";
+  let completed = Boolean(total && answered === total);
+
+  if (total) {
+    label = `${answered}/${total} odgovora`;
   }
 
   if (completed) {
@@ -358,8 +938,7 @@ function examProgress(exam) {
     completed,
     label,
     percent: Math.max(0, Math.min(100, percent)),
-    reading,
-    status: reading?.answered ? "started" : "",
+    status: answered ? "started" : "",
   };
 }
 
@@ -379,6 +958,47 @@ function progressMeter(percent, label) {
   `;
 }
 
+function percentRange(from, to) {
+  return `${String(from).replace(".", ",")} - ${String(to).replace(".", ",")}%`;
+}
+
+function gradeThresholds(exam) {
+  const passThreshold = twentyFivePercentPassSubjects.has(exam.subject) ? 25 : 30;
+  const failingUpper = passThreshold === 25 ? 24.99 : 29.99;
+
+  return [
+    {
+      grade: "1",
+      label: "Nedovoljan",
+      range: percentRange(0, failingUpper),
+    },
+    {
+      grade: "2",
+      label: "Dovoljan",
+      range: percentRange(passThreshold, 49.99),
+    },
+    {
+      grade: "3",
+      label: "Dobar",
+      range: percentRange(50, 69.99),
+    },
+    {
+      grade: "4",
+      label: "Vrlo dobar",
+      range: percentRange(70, 84.99),
+    },
+    {
+      grade: "5",
+      label: "Odličan",
+      range: percentRange(85, 100),
+    },
+  ];
+}
+
+function gradeThresholdNote(exam) {
+  return exam.subject === "Hrvatski jezik" ? croatianComponentThresholdNote : "";
+}
+
 function route() {
   const params = new URLSearchParams(window.location.search);
   return {
@@ -390,6 +1010,7 @@ function route() {
 
 function renderApp() {
   const currentRoute = route();
+  syncHomeHeadingVisibility(currentRoute);
 
   if (currentRoute.examId) {
     const exam = examsById.get(currentRoute.examId);
@@ -414,7 +1035,17 @@ function renderApp() {
   renderHome();
 }
 
+function syncHomeHeadingVisibility(currentRoute) {
+  const isHomeRoute = !currentRoute.examId && !currentRoute.subject;
+  document.documentElement.classList.toggle("is-app-subpage", !isHomeRoute);
+
+  if (homeHeading) {
+    homeHeading.hidden = !isHomeRoute;
+  }
+}
+
 function renderHome() {
+  cleanupYearNavigation();
   document.title = "Asistent za Mature - interaktivni ispiti za vježbu";
 
   appRoot.innerHTML = `
@@ -483,6 +1114,7 @@ function renderSubjectGrid() {
 
 function renderSubjectCard(subject) {
   const colorStyle = ` style="--subject-color: ${subjectColor(subject)}"`;
+  const actionLabel = `Vježbaj ${subjectAccusative(subject)}`;
 
   return `
     <a class="subject-card" href="${subjectUrl(subject)}"${colorStyle}>
@@ -490,21 +1122,24 @@ function renderSubjectCard(subject) {
         ${subjectIcon(subject, "subject-symbol__icon")}
       </span>
       <span class="subject-card__body">
-        <strong>${escapeHtml(subject)}</strong>
+        <strong>${escapeHtml(actionLabel)}</strong>
       </span>
-      <span class="subject-card__action">Vježbaj</span>
+      <span class="subject-card__action" aria-hidden="true">
+        ${icon("arrow-right", "subject-card__action-icon")}
+      </span>
     </a>
   `;
 }
 
 function renderSubjectPage(subject) {
+  cleanupYearNavigation();
   document.title = `${subject} - Asistent za Mature`;
   const colorStyle = ` style="--subject-color: ${subjectColor(subject)}"`;
 
   appRoot.innerHTML = `
     <div class="subject-page"${colorStyle}>
       <div class="subject-page__intro">
-        <a class="back-link back-link--home" href="./#predmeti">
+        <a class="back-link back-link--home" href="./">
           ${icon("house", "back-link__icon")}
           <span>Svi predmeti</span>
         </a>
@@ -517,12 +1152,12 @@ function renderSubjectPage(subject) {
       </div>
 
       <div class="practice-layout">
-        <aside class="filters practice-filters" aria-label="Godine ispita">
+        <aside class="filters practice-filters" aria-label="Brza navigacija po godinama ispita">
           <div class="filters__heading">
             <h2>Godine ispita</h2>
           </div>
 
-          <div class="year-filter-list" id="year-filter-list"></div>
+          <nav class="year-jump-list" id="year-jump-list" aria-label="Godine ispita"></nav>
         </aside>
 
         <div class="subject-results">
@@ -532,59 +1167,148 @@ function renderSubjectPage(subject) {
     </div>
   `;
 
-  appRoot.querySelector("#year-filter-list").addEventListener("click", (event) => {
-    const button = event.target.closest("[data-year-filter]");
-    if (!button) return;
-
-    pageState.year = button.dataset.yearFilter;
-    renderSubjectYearFilter(subject);
-    renderSubjectExamList(subject);
-  });
-
-  renderSubjectYearFilter(subject);
+  renderSubjectYearNavigation(subject);
   renderSubjectExamList(subject);
+  setupYearNavigation();
 }
 
-function renderSubjectYearFilter(subject) {
-  const subjectYears = [...new Set(exams.filter((exam) => exam.subject === subject).map((exam) => exam.year))].sort(
-    (a, b) => b - a,
-  );
-  const subjectTotal = exams.filter((exam) => exam.subject === subject).length;
+function cleanupYearNavigation() {
+  if (!yearNavigationCleanup) return;
 
-  if (pageState.year && !subjectYears.includes(Number(pageState.year))) {
-    pageState.year = "";
-  }
-
-  appRoot.querySelector("#year-filter-list").innerHTML = [
-    renderYearFilterButton("", "Sve godine", subjectTotal),
-    ...subjectYears.map((year) => {
-      const count = exams.filter((exam) => exam.subject === subject && exam.year === year).length;
-      return renderYearFilterButton(String(year), `${year}.`, count);
-    }),
-  ].join("");
+  yearNavigationCleanup();
+  yearNavigationCleanup = null;
 }
 
-function renderYearFilterButton(value, label, count) {
-  const active = pageState.year === value;
+function subjectYears(subject) {
+  return [
+    ...new Set(exams.filter((exam) => exam.subject === subject).map((exam) => exam.year)),
+  ].sort((a, b) => b - a);
+}
 
+function activeYearFromHash(years) {
+  const hashMatch = window.location.hash.match(/^#year-(\d{4})$/);
+  if (!hashMatch) return years[0] || "";
+
+  const hashYear = Number(hashMatch[1]);
+  return years.includes(hashYear) ? hashYear : years[0] || "";
+}
+
+function renderSubjectYearNavigation(subject) {
+  const years = subjectYears(subject);
+  const activeYear = activeYearFromHash(years);
+
+  appRoot.querySelector("#year-jump-list").innerHTML = years
+    .map((year) => renderYearJumpLink(year, year === activeYear))
+    .join("");
+}
+
+function renderYearJumpLink(year, active) {
   return `
-    <button
-      class="year-filter-button${active ? " year-filter-button--active" : ""}"
-      type="button"
-      data-year-filter="${escapeHtml(value)}"
-      ${active ? 'aria-current="true"' : ""}
+    <a
+      class="year-jump-link${active ? " year-jump-link--active" : ""}"
+      href="#year-${year}"
+      data-year-link="${year}"
+      ${active ? 'aria-current="location"' : ""}
     >
-      <span>${escapeHtml(label)}</span>
-      <small>${count}</small>
-    </button>
+      ${year}.
+    </a>
   `;
 }
 
-function filteredSubjectExams(subject) {
-  return exams
-    .filter((exam) => exam.subject === subject)
-    .filter((exam) => !pageState.year || String(exam.year) === pageState.year)
-    .sort(compareExams);
+function setupYearNavigation() {
+  const nav = appRoot.querySelector("#year-jump-list");
+  const sections = [...appRoot.querySelectorAll("[data-year-section]")];
+
+  if (!nav || !sections.length) return;
+
+  let pendingFrame = 0;
+
+  const setActiveYear = (year) => {
+    nav.querySelectorAll("[data-year-link]").forEach((link) => {
+      const active = link.dataset.yearLink === year;
+      link.classList.toggle("year-jump-link--active", active);
+
+      if (active) {
+        link.setAttribute("aria-current", "location");
+      } else {
+        link.removeAttribute("aria-current");
+      }
+    });
+  };
+
+  const updateActiveYear = () => {
+    pendingFrame = 0;
+
+    const threshold = Math.min(window.innerHeight * 0.35, 220);
+    let activeSection = sections[0];
+
+    for (const section of sections) {
+      if (section.getBoundingClientRect().top <= threshold) {
+        activeSection = section;
+      } else {
+        break;
+      }
+    }
+
+    setActiveYear(activeSection.dataset.yearSection);
+  };
+
+  const requestActiveYearUpdate = () => {
+    if (pendingFrame) return;
+    pendingFrame = window.requestAnimationFrame(updateActiveYear);
+  };
+
+  const jumpToYearSection = (section) => {
+    document.documentElement.style.scrollBehavior = "auto";
+    section.scrollIntoView({ block: "start" });
+
+    window.requestAnimationFrame(() => {
+      document.documentElement.style.scrollBehavior = "";
+    });
+  };
+
+  const handleYearClick = (event) => {
+    const link = event.target.closest("[data-year-link]");
+    if (!link) return;
+
+    const year = link.dataset.yearLink;
+    const section = document.getElementById(`year-${year}`);
+    if (!section) return;
+
+    event.preventDefault();
+    setActiveYear(year);
+    history.pushState(null, "", link.getAttribute("href"));
+    jumpToYearSection(section);
+  };
+
+  nav.addEventListener("click", handleYearClick);
+  window.addEventListener("scroll", requestActiveYearUpdate, { passive: true });
+  window.addEventListener("resize", requestActiveYearUpdate);
+  window.addEventListener("hashchange", requestActiveYearUpdate);
+
+  requestActiveYearUpdate();
+
+  const hashTargetId = window.location.hash.slice(1);
+  if (hashTargetId.startsWith("year-")) {
+    const hashTarget = document.getElementById(hashTargetId);
+    if (hashTarget) {
+      window.requestAnimationFrame(() => jumpToYearSection(hashTarget));
+    }
+  }
+
+  yearNavigationCleanup = () => {
+    if (pendingFrame) {
+      window.cancelAnimationFrame(pendingFrame);
+    }
+    nav.removeEventListener("click", handleYearClick);
+    window.removeEventListener("scroll", requestActiveYearUpdate);
+    window.removeEventListener("resize", requestActiveYearUpdate);
+    window.removeEventListener("hashchange", requestActiveYearUpdate);
+  };
+}
+
+function subjectExams(subject) {
+  return exams.filter((exam) => exam.subject === subject).sort(compareExams);
 }
 
 function compareExams(a, b) {
@@ -599,13 +1323,13 @@ function compareExams(a, b) {
 }
 
 function renderSubjectExamList(subject) {
-  const filtered = filteredSubjectExams(subject);
+  const filtered = subjectExams(subject);
 
   if (!filtered.length) {
     appRoot.querySelector("#subject-exam-list").innerHTML = `
       <div class="empty-state">
-        <h3>Nema rezultata</h3>
-        <p>Odaberi drugu godinu ili se vrati na prikaz svih godina.</p>
+        <h3>Nema ispita</h3>
+        <p>Za odabrani predmet trenutačno nema dostupnih paketa.</p>
       </div>
     `;
     return;
@@ -626,9 +1350,14 @@ function renderPracticeYearBlock(year, yearExams) {
   const hasLevels = yearExams.some((exam) => exam.level);
 
   return `
-    <section class="year-block practice-year-block" aria-labelledby="year-${year}">
+    <section
+      class="year-block practice-year-block"
+      id="year-${year}"
+      data-year-section="${year}"
+      aria-labelledby="year-${year}-heading"
+    >
       <div class="year-heading">
-        <h3 id="year-${year}">${year}.</h3>
+        <h3 id="year-${year}-heading">${year}.</h3>
         <p>školska godina ${year - 1}./${year}.</p>
       </div>
       <div class="practice-table-wrap">
@@ -678,7 +1407,7 @@ function renderSubjectExamRow(exam, hasLevels) {
       </td>
       <td>
         <div class="exam-actions">
-          <a class="primary-button" href="${examUrl(exam)}">Vježbaj</a>
+          <a class="primary-button" href="${examUrl(exam)}">Odaberi ispit</a>
           <a
             class="download-icon-link"
             href="${escapeHtml(exam.url)}"
@@ -697,30 +1426,70 @@ function renderSubjectExamRow(exam, hasLevels) {
 }
 
 function renderExamPractice(exam, selectedPartId = "") {
+  cleanupYearNavigation();
   document.title = `${exam.subject} ${exam.year}. - Asistent za Mature`;
 
   appRoot.innerHTML = `
     <div class="practice-detail" style="--subject-color: ${subjectColor(exam.subject)}">
-      <a class="back-link" href="${subjectUrl(exam.subject)}">Natrag na ${escapeHtml(
-        exam.subject,
-      )}</a>
+      <a class="back-link" href="${subjectUrl(exam.subject)}">
+        ${icon("arrow-left", "back-link__icon")}
+        <span>Natrag na ${escapeHtml(exam.subject)}</span>
+      </a>
 
       <div class="practice-detail__heading">
         <span class="subject-symbol">
           ${subjectIcon(exam.subject, "subject-symbol__icon")}
         </span>
-        <div>
-          <p class="eyebrow">Vježba mature</p>
+        <div class="practice-detail__title-row">
           <h2>${escapeHtml(exam.subject)} ${exam.year}.</h2>
-          <p>
-            ${escapeHtml(formatTerm(exam.term))} · ${escapeHtml(formatLevel(exam.level))} ·
-            školska godina ${escapeHtml(exam.schoolYear)}
-          </p>
+          <p>${escapeHtml(formatLevel(exam.level))}, ${escapeHtml(exam.term)}</p>
         </div>
       </div>
 
-      ${renderInteractiveArea(exam, selectedPartId)}
+      <div class="practice-detail__content">
+        <div class="practice-detail__main">
+          ${renderInteractiveArea(exam, selectedPartId)}
+        </div>
+        ${renderGradeThresholds(exam)}
+      </div>
     </div>
+  `;
+}
+
+function renderGradeThresholds(exam) {
+  const note = gradeThresholdNote(exam);
+
+  return `
+    <aside class="grade-thresholds" aria-label="Pragovi ocjena">
+      <div class="grade-thresholds__heading">
+        <h3>Pragovi ocjena</h3>
+        <p>Postotci riješenosti ispita</p>
+      </div>
+      <table class="grade-thresholds__table">
+        <thead>
+          <tr>
+            <th>Ocjena</th>
+            <th>Postotak</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${gradeThresholds(exam)
+            .map(
+              (threshold) => `
+                <tr>
+                  <td>
+                    <strong>${escapeHtml(threshold.grade)}</strong>
+                    <span>${escapeHtml(threshold.label)}</span>
+                  </td>
+                  <td>${escapeHtml(threshold.range)}</td>
+                </tr>
+              `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+      ${note ? `<p class="grade-thresholds__note">${escapeHtml(note)}</p>` : ""}
+    </aside>
   `;
 }
 
@@ -737,71 +1506,78 @@ function renderInteractiveArea(exam, selectedPartId) {
     `;
   }
 
-  const selectedPart = selectedPartId
-    ? parts.find((part) => part.id === selectedPartId)
-    : null;
-
   return `
-    <section class="practice-interactive-card">
-      <div class="practice-interactive-card__heading">
-        <div>
-          <p class="eyebrow">Ispitne cjeline</p>
-          <h3>Ispit je podijeljen na više cjelina</h3>
-        </div>
+    <section class="practice-exam-selection">
+      <div class="practice-exam-list">
+        ${parts.map((part) => renderPracticeExamRow(part, selectedPartId)).join("")}
       </div>
-      <div class="practice-part-grid">
-        ${parts.map((part) => renderPracticePart(part, selectedPartId)).join("")}
-      </div>
-      ${
-        selectedPart && !selectedPart.available
-          ? renderUnavailableInteractiveNotice(selectedPart)
-          : ""
-      }
-      ${
-        selectedPartId && !selectedPart
-          ? renderUnavailableInteractiveNotice({ label: "Odabrana cjelina" })
-          : ""
-      }
+      ${parts.some((part) => part.available) ? renderSimulationNote() : ""}
     </section>
   `;
 }
 
-function renderPracticePart(part, selectedPartId) {
+function renderPracticeExamRow(part, selectedPartId) {
   const active = selectedPartId === part.id;
-  const availableClass = part.available ? " practice-part-card--available" : "";
-  const unavailableClass = part.available ? "" : " practice-part-card--unavailable";
-  const activeClass = active ? " practice-part-card--active" : "";
+  const activeClass = active ? " practice-exam-row--active" : "";
+  const duration = part.durationMinutes != null && Number.isFinite(Number(part.durationMinutes))
+    ? `${part.durationMinutes} min`
+    : "Trajanje nije podešeno";
 
   return `
-    <a
-      class="practice-part-card${availableClass}${unavailableClass}${activeClass}"
-      href="${escapeHtml(part.href)}"
-      ${active ? 'aria-current="true"' : ""}
-    >
-      <span class="practice-part-card__heading">
+    <article class="practice-exam-row${activeClass}">
+      <div class="practice-exam-row__name">
         <strong>${escapeHtml(part.label)}</strong>
-      </span>
-      <small>${escapeHtml(part.description)}</small>
-    </a>
+        ${part.available ? "" : '<small class="practice-exam-row__status">Trenutno nedostupno</small>'}
+      </div>
+      <div class="practice-exam-row__duration">
+        ${escapeHtml(duration)}
+      </div>
+      <div class="practice-exam-row__actions">
+        ${
+          part.available
+            ? `
+              <a
+                class="primary-button"
+                href="${escapeHtml(part.href)}"
+                ${active ? 'aria-current="true"' : ""}
+              >
+                Otvori vježbu
+              </a>
+              <a class="secondary-button" href="${escapeHtml(part.simulationHref)}">
+                Simuliraj maturu
+              </a>
+            `
+            : `
+              <button class="primary-button" type="button" disabled>
+                Otvori vježbu
+              </button>
+              <button class="secondary-button" type="button" disabled>
+                Simuliraj maturu
+              </button>
+            `
+        }
+      </div>
+    </article>
   `;
 }
 
-function renderUnavailableInteractiveNotice(part) {
+function renderSimulationNote() {
   return `
-    <div class="practice-unavailable-note">
-      <h3>${escapeHtml(part.label)}</h3>
-      <p>Nema definiranog interaktivnog ispita za sada.</p>
-    </div>
+    <p class="simulation-note">
+      <strong>Simulacija mature</strong> ima vremensko ograničenje prema trajanju
+      odabranog ispita. Odgovori i napredak iz simulacije ne spremaju se.
+    </p>
   `;
 }
 
 function renderMissing(title, message) {
+  cleanupYearNavigation();
   document.title = "Asistent za Mature";
   appRoot.innerHTML = `
     <div class="empty-state">
       <h2>${escapeHtml(title)}</h2>
       <p>${escapeHtml(message)}</p>
-      <a class="start-link" href="./#predmeti">Vrati se na predmete</a>
+      <a class="start-link" href="./">Vrati se na predmete</a>
     </div>
   `;
 }
