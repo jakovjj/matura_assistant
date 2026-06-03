@@ -44,6 +44,18 @@
     return `${attempt.percentage}%`;
   }
 
+  function percentageTone(attempt) {
+    if (attempt.percentage === null || attempt.checkingSupported === false) return "";
+
+    const percentage = Number(attempt.percentage);
+    if (!Number.isFinite(percentage)) return "";
+    if (percentage >= 85) return "excellent";
+    if (percentage >= 70) return "good";
+    if (percentage >= 50) return "medium";
+    if (percentage >= 30) return "low";
+    return "poor";
+  }
+
   function examTitle(attempt) {
     return [
       attempt.subject,
@@ -386,18 +398,23 @@
       attempt.answered !== null && attempt.totalQuestions !== null
         ? `${attempt.answered}/${attempt.totalQuestions}`
         : "Nije dostupno";
+    const percentage = formatPercentage(attempt);
+    const tone = percentageTone(attempt);
 
     return `
       <tr>
         <td>${escapeHtml(formatDate(attempt.submittedAt))}</td>
         <td>
           <strong>${escapeHtml(examTitle(attempt))}</strong>
-          ${attempt.schoolYear ? `<small>${escapeHtml(attempt.schoolYear)}</small>` : ""}
         </td>
         <td>${escapeHtml(attempt.part || "Cijeli ispit")}</td>
         <td>${escapeHtml(answered)}</td>
         <td>${escapeHtml(formatScore(attempt))}</td>
-        <td>${escapeHtml(formatPercentage(attempt))}</td>
+        <td>
+          <span class="profile-percentage${tone ? ` profile-percentage--${tone}` : ""}">
+            ${escapeHtml(percentage)}
+          </span>
+        </td>
       </tr>
     `;
   }

@@ -28,6 +28,11 @@ let responses = {};
 let activeQuestionNumber;
 let checked = false;
 const simulation = window.createExamSimulation({ onFinish: finishSimulation });
+const selfCheck = window.createTaskSelfCheck();
+
+function isChecked(question) {
+  return checked || selfCheck.has(question);
+}
 
 function escapeHtml(value) {
   return String(value)
@@ -143,6 +148,12 @@ function examUrl(exam, simulationMode = false) {
   return `./abcd.html?${params.toString()}`;
 }
 
+function historyChoiceUrl(exam) {
+  const params = new URLSearchParams({ exam: exam.id });
+  if (simulation.active) params.set("nacin", "simulacija");
+  return `./povijest.html?${params.toString()}`;
+}
+
 function subjectUrl(exam = solverExam) {
   return `./?predmet=${encodeURIComponent(exam?.subject || "")}`;
 }
@@ -215,6 +226,7 @@ function renderSolver(exam) {
   responses = simulation.active ? {} : loadResponses(exam);
   activeQuestionNumber = questionIds(exam)[0];
   checked = false;
+  selfCheck.reset();
 
   app.innerHTML = `
     ${renderSolverHeader({
@@ -228,6 +240,13 @@ function renderSolver(exam) {
         ${simulation.renderTimer()}
         <strong id="answer-progress"></strong>
         <span id="score-summary"></span>
+      `,
+      navigationHtml: `
+        <nav
+          class="task-navigation solver-header__task-navigation"
+          data-task-navigation
+          aria-label="ABCD zadatci u ispitnom zaglavlju"
+        ></nav>
       `,
     })}
 
@@ -266,7 +285,11 @@ function renderSolver(exam) {
 
     <footer class="solver-sticky-footer">
       <div class="solver-sticky-footer__inner">
-        <nav class="task-navigation" id="task-navigation" aria-label="ABCD zadatci"></nav>
+        <nav
+          class="task-navigation"
+          data-task-navigation
+          aria-label="ABCD zadatci"
+        ></nav>
         <div class="solver-sticky-footer__controls">
           <div class="solver-sticky-footer__status">
             ${icon("list-checks", "solver-sticky-footer__status-icon")}
@@ -306,7 +329,11 @@ function renderSolverSummary() {
   checkButton.className = checkButtonClass();
   checkButton.innerHTML = renderCheckButtonContent();
 
-  const score = checked ? `${totalScore()}/${total} točno` : "";
+  const resolved = allQuestions(solverExam).filter((question) => isChecked(question));
+  const resolvedCorrect = resolved.filter((question) =>
+    isCorrectAnswer(question, responses[question]),
+  ).length;
+  const score = resolved.length ? `${resolvedCorrect}/${resolved.length} točno` : "";
   document.querySelector("#score-summary").textContent = score;
   document.querySelector("#footer-score-summary").textContent = score;
 }
@@ -314,12 +341,16 @@ function renderSolverSummary() {
 function renderTaskNavigation() {
   const complete = answeredCount(solverExam);
   const total = allQuestions(solverExam).length;
-  document.querySelector("#task-navigation").innerHTML = `
+  const navigationHtml = `
     <span class="task-button task-button--active" aria-current="true">
       <strong>ABCD zadatci</strong>
       <small>${complete}/${total}</small>
     </span>
   `;
+
+  document.querySelectorAll("[data-task-navigation]").forEach((navigation) => {
+    navigation.innerHTML = navigationHtml;
+  });
 }
 
 function renderQuestionQuickSelect() {
@@ -334,7 +365,7 @@ function renderQuestionQuickSelect() {
     .map((question) => {
       const answer = responses[question];
       const stateClass = answer ? " question-quickselect__link--answered" : "";
-      const resultClass = checked
+      const resultClass = isChecked(question)
         ? isCorrectAnswer(question, answer)
           ? " question-quickselect__link--correct"
           : " question-quickselect__link--wrong"
@@ -384,11 +415,21 @@ function renderAnswerPanel() {
   document.querySelectorAll('input[type="radio"][data-question]').forEach((input) => {
     input.addEventListener("change", () => updateResponse(input.dataset.question, input.value));
   });
+  selfCheck.bind(document.querySelector("#answer-panel"), toggleSelfCheck);
+}
+
+function toggleSelfCheck(question) {
+  if (simulation.active || checked) return;
+  selfCheck.toggle(question, Boolean(responses[question]));
+  renderTaskNavigation();
+  renderQuestionQuickSelect();
+  renderSolverSummary();
+  renderAnswerPanel();
 }
 
 function renderQuestion(question) {
   const answer = responses[question] || "";
-  const resultClass = checked
+  const resultClass = isChecked(question)
     ? isCorrectAnswer(question, answer)
       ? " response-question--correct"
       : " response-question--wrong"
@@ -402,6 +443,10 @@ function renderQuestion(question) {
           .map((option) => renderChoice(question, option, answer))
           .join("")}
       </div>
+      ${selfCheck.renderButton(question, {
+        answered: Boolean(answer),
+        hidden: simulation.active || checked,
+      })}
       ${renderFeedback(question, answer)}
     </fieldset>
   `;
@@ -411,8 +456,8 @@ function renderChoice(question, option, answer) {
   const selected = option === answer;
   const correct = isCorrectAnswer(question, option);
   let resultClass = "";
-  if (checked && correct) resultClass = " answer-choice--correct";
-  if (checked && selected && !correct) resultClass = " answer-choice--wrong";
+  if (isChecked(question) && correct) resultClass = " answer-choice--correct";
+  if (isChecked(question) && selected && !correct) resultClass = " answer-choice--wrong";
 
   return `
     <label class="answer-choice${resultClass}">
@@ -430,7 +475,7 @@ function renderChoice(question, option, answer) {
 }
 
 function renderFeedback(question, answer) {
-  if (!checked) return "";
+  if (!isChecked(question)) return "";
   const answers = correctAnswers(question);
   if (answers.includes(answer)) return `<small class="response-feedback">Točno.</small>`;
   const label = answers.length > 1 ? "Točni odgovori" : "Točan odgovor";
@@ -441,6 +486,7 @@ function updateResponse(question, answer) {
   if (simulation.finished) return;
 
   checked = false;
+  selfCheck.delete(question);
   const normalizedAnswer = String(answer || "").trim();
   if (normalizedAnswer) responses[question] = normalizedAnswer;
   else delete responses[question];
@@ -470,6 +516,7 @@ function checkAnswers() {
 
   if (checked) {
     checked = false;
+    selfCheck.reset();
     renderTaskNavigation();
     renderQuestionQuickSelect();
     renderSolverSummary();
@@ -478,6 +525,7 @@ function checkAnswers() {
   }
 
   checked = true;
+  selfCheck.reset();
   renderTaskNavigation();
   renderQuestionQuickSelect();
   renderSolverSummary();
@@ -527,11 +575,25 @@ function totalScore() {
   ).length;
 }
 
-const id = selectedExamId();
-if (!id) {
-  window.location.replace("./");
-} else {
+function startAbcdPage() {
+  const id = selectedExamId();
+  if (!id) {
+    window.location.replace("./");
+    return;
+  }
+
   const exam = examsById.get(id);
+  if (exam?.subject === "Povijest") {
+    window.location.replace(historyChoiceUrl(exam));
+    return;
+  }
+
   if (exam) renderSolver(exam);
   else renderMissingExam();
+}
+
+if (!simulation.active && window.AsistentProfile?.ready) {
+  window.AsistentProfile.ready.finally(startAbcdPage);
+} else {
+  startAbcdPage();
 }

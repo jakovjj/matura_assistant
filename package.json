@@ -5,7 +5,7 @@
     "node": ">=22.5.0"
   },
   "scripts": {
-    "check": "node --check app.js && node --check auth-client.js && node --check abcd-choice.js && node --check croatian-choice.js && node --check exam-simulation.js && node --check english-essay.js && node --check english-listening.js && node --check english-reading.js && node --check math-choice.js && node --check physics-choice.js && node --check profile-page.js && node --check profile-store.js && node --check server.js && node --check site-header.js",
+    "check": "node --check app.js && node --check auth-client.js && node --check abcd-choice.js && node --check croatian-choice.js && node --check exam-simulation.js && node --check english-essay.js && node --check english-listening.js && node --check english-reading.js && node --check history-choice.js && node --check math-choice.js && node --check physics-choice.js && node --check profile-page.js && node --check profile-store.js && node --check server.js && node --check site-header.js",
     "start": "node server.js"
   }
 }

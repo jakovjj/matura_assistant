@@ -5,6 +5,7 @@ const englishEssayData = window.ASISTENT_ZA_MATURE_ENGLISH_ESSAY;
 const physicsChoiceData = window.ASISTENT_ZA_MATURE_PHYSICS_CHOICE;
 const mathChoiceData = window.ASISTENT_ZA_MATURE_MATH_CHOICE;
 const croatianChoiceData = window.ASISTENT_ZA_MATURE_CROATIAN_CHOICE;
+const historyChoiceData = window.ASISTENT_ZA_MATURE_HISTORY_CHOICE;
 const abcdChoiceData = window.ASISTENT_ZA_MATURE_ABCD_CHOICE;
 
 if (!archiveData || !Array.isArray(archiveData.exams)) {
@@ -16,6 +17,31 @@ const mandatorySubjects = [
   "Hrvatski jezik",
   "Engleski jezik",
 ];
+
+const temporarilyUnavailableSubjects = new Set([
+  "Biologija",
+  "Etika",
+  "Filozofija",
+  "Francuski jezik",
+  "Glazbena umjetnost",
+  "Grčki jezik",
+  "Informatika",
+  "Kemija",
+  "Latinski jezik",
+  "Likovna umjetnost",
+  "Logika",
+  "Mađarski jezik",
+  "Mađarski jezik i književnost",
+  "Njemački jezik",
+  "Politika i gospodarstvo",
+  "Psihologija",
+  "Sociologija",
+  "Srpski jezik",
+  "Španjolski jezik",
+  "Talijanski jezik",
+  "Talijanski jezik i književnost",
+  "Vjeronauk",
+]);
 
 const subjectIcons = {
   Biologija: "dna",
@@ -171,6 +197,8 @@ if (!appRoot) {
 }
 
 let yearNavigationCleanup = null;
+let serverSimulationAttempts = [];
+let serverSimulationAttemptsLoaded = false;
 
 function escapeHtml(value) {
   return String(value)
@@ -179,6 +207,12 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function numberOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 function normalizeSearch(value) {
@@ -251,6 +285,10 @@ function mathChoiceIdForTerm(exam, term) {
 function croatianChoiceIdForTerm(exam, term) {
   const level = exam.level ? `-${exam.level.toLocaleLowerCase("hr")}` : "";
   return `hrvatski${level}-${exam.year}-${slugPart(term)}`;
+}
+
+function historyChoiceIdForTerm(exam, term) {
+  return `povijest-${exam.year}-${slugPart(term)}`;
 }
 
 function abcdChoiceIdForTerm(exam, term) {
@@ -330,6 +368,17 @@ function croatianChoiceStorageKeys(choiceExam) {
   ];
 
   return [...new Set(ids)].map((id) => `asistent-za-mature:croatian-choice:${id}`);
+}
+
+function historyChoiceStorageKeys(choiceExam) {
+  const ids = [
+    choiceExam.id,
+    ...(legacyTermAliases[choiceExam.term] || []).map((term) =>
+      historyChoiceIdForTerm(choiceExam, term),
+    ),
+  ];
+
+  return [...new Set(ids)].map((id) => `asistent-za-mature:history-choice:${id}`);
 }
 
 function abcdChoiceStorageKeys(choiceExam) {
@@ -414,6 +463,17 @@ const croatianChoiceExams = (croatianChoiceData?.exams || []).map((exam) => {
 const croatianChoiceByArchiveUrl = new Map(
   croatianChoiceExams.map((exam) => [exam.archiveUrl, exam]),
 );
+const historyChoiceExams = (historyChoiceData?.exams || []).map((exam) => {
+  const term = normalizeTerm(exam.term);
+  return {
+    ...exam,
+    term,
+    id: historyChoiceIdForTerm(exam, term),
+  };
+});
+const historyChoiceByArchiveUrl = new Map(
+  historyChoiceExams.map((exam) => [exam.archiveUrl, exam]),
+);
 const abcdChoiceExams = (abcdChoiceData?.exams || []).map((exam) => {
   const term = normalizeTerm(exam.term);
   return {
@@ -442,6 +502,14 @@ const englishPracticeParts = [
     description: "Pisani sastav iz ispita.",
   },
 ];
+function englishPracticePartsForExam(exam) {
+  if (exam.level === "B") {
+    return englishPracticeParts.filter((part) => part.id !== "esej");
+  }
+
+  return englishPracticeParts;
+}
+
 const modernForeignLanguageDurations = {
   "Engleski jezik": {
     A: { citanje: 70, slusanje: 35, pisanje: 75 },
@@ -599,7 +667,7 @@ const allSubjects = [...subjectCounts.keys()].sort((a, b) => {
 function icon(iconName, className) {
   return `
     <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="./assets/lucide-icons.svg#${iconName}"></use>
+      <use href="./assets/lucide-icons.svg?v=20260603-subject-status#${iconName}"></use>
     </svg>
   `;
 }
@@ -640,6 +708,10 @@ function levelBadge(level) {
 
 function subjectUrl(subject) {
   return `./?predmet=${encodeURIComponent(subject)}`;
+}
+
+function isSubjectTemporarilyUnavailable(subject) {
+  return temporarilyUnavailableSubjects.has(subject);
 }
 
 function examUrl(exam, practicePart = "") {
@@ -691,6 +763,12 @@ function croatianChoiceUrl(choiceExam, simulation = false) {
   return `./hrvatski.html?${params.toString()}`;
 }
 
+function historyChoiceUrl(choiceExam, simulation = false) {
+  const params = new URLSearchParams({ exam: choiceExam.id });
+  if (simulation) params.set("nacin", "simulacija");
+  return `./povijest.html?${params.toString()}`;
+}
+
 function abcdChoiceUrl(choiceExam, simulation = false) {
   const params = new URLSearchParams({ exam: choiceExam.id });
   if (simulation) params.set("nacin", "simulacija");
@@ -719,6 +797,10 @@ function mathChoiceExamForArchive(exam) {
 
 function croatianChoiceExamForArchive(exam) {
   return croatianChoiceByArchiveUrl.get(exam.url) || null;
+}
+
+function historyChoiceExamForArchive(exam) {
+  return historyChoiceByArchiveUrl.get(exam.url) || null;
 }
 
 function abcdChoiceExamForArchive(exam) {
@@ -864,7 +946,7 @@ function interactiveParts(exam) {
     const essayExam = essayExamForArchive(exam);
     const parts = withDurations(
       exam,
-      englishPracticeParts.map((part) =>
+      englishPracticePartsForExam(exam).map((part) =>
         part.id === "esej"
           ? {
               ...part,
@@ -925,6 +1007,23 @@ function interactiveParts(exam) {
         },
         choiceExam,
         mathChoiceUrl,
+      ),
+    ];
+  }
+
+  if (exam.subject === "Povijest") {
+    const choiceExam = historyChoiceExamForArchive(exam);
+    return [
+      linkedPart(
+        exam,
+        {
+          id: "povijest",
+          label: "Ispit",
+          description: "Zadatci višestrukoga izbora i otvoreni zadatci iz ispitne knjižice.",
+          durationMinutes: singleExamDuration(exam),
+        },
+        choiceExam,
+        historyChoiceUrl,
       ),
     ];
   }
@@ -1248,6 +1347,59 @@ function croatianProgress(exam) {
   };
 }
 
+function readHistoryChoiceState(choiceExam) {
+  const storedState = {};
+  try {
+    for (const key of historyChoiceStorageKeys(choiceExam).reverse()) {
+      const stored = JSON.parse(localStorage.getItem(key) || "{}");
+      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+        Object.assign(storedState, stored);
+      }
+    }
+  } catch {
+    return {};
+  }
+  return storedState;
+}
+
+function historyQuestionNumbers(choiceExam) {
+  return [
+    ...(choiceExam.questions || []).map(String),
+    ...(choiceExam.openQuestions || []).map(String),
+  ];
+}
+
+function historyProgress(exam) {
+  const choiceExam = historyChoiceExamForArchive(exam);
+  if (!choiceExam) return null;
+
+  const knownClosed = new Set((choiceExam.questions || []).map(String));
+  const knownOpen = new Set((choiceExam.openQuestions || []).map(String));
+  const stored = readHistoryChoiceState(choiceExam);
+  const closedResponses =
+    stored.closedResponses && typeof stored.closedResponses === "object"
+      ? stored.closedResponses
+      : {};
+  const openResponses =
+    stored.openResponses && typeof stored.openResponses === "object"
+      ? stored.openResponses
+      : {};
+  const answeredClosed = Object.entries(closedResponses).filter(
+    ([question, answer]) =>
+      knownClosed.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+  const answeredOpen = Object.entries(openResponses).filter(
+    ([question, answer]) =>
+      knownOpen.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+
+  return {
+    answered: answeredClosed + answeredOpen,
+    id: choiceExam.id,
+    total: historyQuestionNumbers(choiceExam).length,
+  };
+}
+
 function readAbcdChoiceResponses(choiceExam) {
   const storedResponses = {};
   try {
@@ -1268,7 +1420,7 @@ function abcdChoiceQuestionNumbers(choiceExam) {
 }
 
 function abcdChoiceProgress(exam) {
-  if (exam.subject === "Matematika") return null;
+  if (exam.subject === "Matematika" || exam.subject === "Povijest") return null;
 
   const choiceExam = abcdChoiceExamForArchive(exam);
   if (!choiceExam) return null;
@@ -1295,6 +1447,7 @@ function examProgress(exam) {
     physicsProgress(exam),
     mathProgress(exam),
     croatianProgress(exam),
+    historyProgress(exam),
     abcdChoiceProgress(exam),
   ].filter(Boolean);
   const answered = progressItems.reduce((sum, item) => sum + item.answered, 0);
@@ -1318,6 +1471,139 @@ function examProgress(exam) {
     percent: Math.max(0, Math.min(100, percent)),
     status: answered ? "started" : "",
   };
+}
+
+function localSimulationAttempts() {
+  try {
+    const simulations = window.AsistentProfile?.getProfile?.().simulations;
+    return Array.isArray(simulations) ? simulations : [];
+  } catch {
+    return [];
+  }
+}
+
+function simulationAttemptKey(attempt) {
+  return (
+    attempt?.id
+    || `${attempt?.submittedAt || ""}:${attempt?.examId || ""}:${attempt?.part || ""}`
+  );
+}
+
+function mergeSimulationAttempts(...lists) {
+  const attemptsById = new Map();
+
+  for (const attempt of lists.flat()) {
+    if (!attempt || typeof attempt !== "object") continue;
+    const key = simulationAttemptKey(attempt);
+    if (!key || attemptsById.has(key)) continue;
+    attemptsById.set(key, attempt);
+  }
+
+  return [...attemptsById.values()];
+}
+
+function allSimulationAttempts() {
+  return mergeSimulationAttempts(serverSimulationAttempts, localSimulationAttempts());
+}
+
+async function loadServerSimulationAttempts() {
+  if (serverSimulationAttemptsLoaded || !window.fetch) return;
+  serverSimulationAttemptsLoaded = true;
+
+  try {
+    const response = await fetch("/api/profile/simulations", { credentials: "same-origin" });
+    if (!response.ok) return;
+
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) return;
+
+    const data = await response.json();
+    if (!Array.isArray(data.simulations)) return;
+
+    serverSimulationAttempts = data.simulations;
+    renderApp();
+  } catch {
+    // Local profile data remains enough for the subject overview.
+  }
+}
+
+function interactiveExamIds(exam) {
+  return new Set(
+    [
+      readingExamForArchive(exam)?.id,
+      listeningExamForArchive(exam)?.id,
+      essayExamForArchive(exam)?.id,
+      physicsChoiceExamForArchive(exam)?.id,
+      mathChoiceExamForArchive(exam)?.id,
+      croatianChoiceExamForArchive(exam)?.id,
+      historyChoiceExamForArchive(exam)?.id,
+      abcdChoiceExamForArchive(exam)?.id,
+    ].filter(Boolean),
+  );
+}
+
+function simulationAttemptPercentage(attempt) {
+  if (!attempt || attempt.checkingSupported === false) return null;
+
+  const percentage = numberOrNull(attempt.percentage);
+  if (percentage !== null) return percentage;
+
+  const score = numberOrNull(attempt.score);
+  const maxScore = numberOrNull(attempt.maxScore);
+  if (score === null || !maxScore) return null;
+
+  return Math.round((score / maxScore) * 100);
+}
+
+function simulationAttemptMatchesExam(attempt, exam, examIds) {
+  if (!attempt || typeof attempt !== "object") return false;
+  if (examIds.has(attempt.examId)) return true;
+
+  const attemptYear = numberOrNull(attempt.year);
+  const attemptLevel = String(attempt.level || "");
+
+  return (
+    attempt.subject === exam.subject
+    && attemptYear === exam.year
+    && normalizeTerm(attempt.term) === exam.term
+    && attemptLevel === String(exam.level || "")
+  );
+}
+
+function bestSimulationPercentage(exam, attempts) {
+  const examIds = interactiveExamIds(exam);
+  let best = null;
+
+  for (const attempt of attempts) {
+    if (!simulationAttemptMatchesExam(attempt, exam, examIds)) continue;
+
+    const percentage = simulationAttemptPercentage(attempt);
+    if (percentage === null) continue;
+    best = best === null ? percentage : Math.max(best, percentage);
+  }
+
+  return best === null ? null : Math.max(0, Math.min(100, Math.round(best)));
+}
+
+function percentageTone(percentage) {
+  if (percentage >= 85) return "excellent";
+  if (percentage >= 70) return "good";
+  if (percentage >= 50) return "medium";
+  if (percentage >= 30) return "low";
+  return "poor";
+}
+
+function renderBestSimulationPercentage(percentage) {
+  if (percentage === null) {
+    return `<span class="subject-best-score subject-best-score--empty" aria-label="Nema rezultata">/</span>`;
+  }
+
+  const tone = percentageTone(percentage);
+  return `
+    <span class="subject-best-score subject-best-score--${tone}">
+      ${escapeHtml(`${percentage}%`)}
+    </span>
+  `;
 }
 
 function progressMeter(percent, label) {
@@ -1441,9 +1727,18 @@ function renderSubjectGrid() {
   const visibleMandatorySubjects = mandatorySubjects.filter((subject) =>
     subjectCounts.has(subject),
   );
-  const visibleOptionalSubjects = allSubjects.filter(
-    (subject) => !mandatorySubjects.includes(subject),
-  );
+  const visibleOptionalSubjects = allSubjects
+    .filter((subject) => !mandatorySubjects.includes(subject))
+    .sort((a, b) => {
+      const aUnavailable = isSubjectTemporarilyUnavailable(a);
+      const bUnavailable = isSubjectTemporarilyUnavailable(b);
+
+      if (aUnavailable !== bUnavailable) {
+        return aUnavailable ? 1 : -1;
+      }
+
+      return a.localeCompare(b, "hr");
+    });
 
   subjectList.innerHTML = `
     <section class="subject-group">
@@ -1466,7 +1761,7 @@ function renderSubjectGrid() {
 
     <section class="subject-group">
       <div class="subject-group__heading">
-        <h3>Ostali predmeti <span class="subject-group__note">(Poredani abecedno)</span></h3>
+        <h3>Ostali predmeti <span class="subject-group__note">(Dostupni prvo)</span></h3>
       </div>
       <div class="subject-grid">
         ${
@@ -1487,24 +1782,28 @@ function renderSubjectGrid() {
 function renderSubjectCard(subject) {
   const colorStyle = ` style="--subject-color: ${subjectColor(subject)}; --subject-image: url('./assets/subjects/${subjectImage(subject)}.webp')"`;
   const actionLabel = `Vježbaj ${subjectAccusative(subject)}`;
-  const implementationStatus =
-    subject === "Fizika" || subject === "Matematika"
-      ? `<span class="subject-card__status">Potpuno implementiran predmet</span>`
-      : "";
+  const unavailable = isSubjectTemporarilyUnavailable(subject);
+  const subjectStatus = unavailable
+    ? `<span class="subject-card__status subject-card__status--unavailable">U izradi</span>`
+    : "";
+  const cardClass = `subject-card${unavailable ? " subject-card--unavailable" : ""}`;
+  const tagName = unavailable ? "span" : "a";
+  const hrefAttribute = unavailable ? ' aria-disabled="true"' : ` href="${subjectUrl(subject)}"`;
+  const actionIcon = unavailable ? "wrench" : "arrow-right";
 
   return `
-    <a class="subject-card" href="${subjectUrl(subject)}"${colorStyle}>
+    <${tagName} class="${cardClass}"${hrefAttribute}${colorStyle}>
       <span class="subject-symbol">
         ${subjectIcon(subject, "subject-symbol__icon")}
       </span>
       <span class="subject-card__body">
         <strong>${escapeHtml(actionLabel)}</strong>
-        ${implementationStatus}
+        ${subjectStatus}
       </span>
       <span class="subject-card__action" aria-hidden="true">
-        ${icon("arrow-right", "subject-card__action-icon")}
+        ${icon(actionIcon, "subject-card__action-icon")}
       </span>
-    </a>
+    </${tagName}>
   `;
 }
 
@@ -1701,6 +2000,7 @@ function compareExams(a, b) {
 
 function renderSubjectExamList(subject) {
   const filtered = subjectExams(subject);
+  const simulationAttempts = allSimulationAttempts();
 
   if (!filtered.length) {
     appRoot.querySelector("#subject-exam-list").innerHTML = `
@@ -1719,11 +2019,11 @@ function renderSubjectExamList(subject) {
   }
 
   appRoot.querySelector("#subject-exam-list").innerHTML = [...byYear.entries()]
-    .map(([year, yearExams]) => renderPracticeYearBlock(year, yearExams))
+    .map(([year, yearExams]) => renderPracticeYearBlock(year, yearExams, simulationAttempts))
     .join("");
 }
 
-function renderPracticeYearBlock(year, yearExams) {
+function renderPracticeYearBlock(year, yearExams, simulationAttempts) {
   const hasLevels = yearExams.some((exam) => exam.level);
 
   return `
@@ -1745,6 +2045,7 @@ function renderPracticeYearBlock(year, yearExams) {
             <col class="subject-exam-table__col-term" />
             ${hasLevels ? '<col class="subject-exam-table__col-level" />' : ""}
             <col class="subject-exam-table__col-progress" />
+            <col class="subject-exam-table__col-best" />
             <col class="subject-exam-table__col-actions" />
           </colgroup>
           <thead>
@@ -1752,11 +2053,14 @@ function renderPracticeYearBlock(year, yearExams) {
               <th>Rok</th>
               ${hasLevels ? "<th>Razina</th>" : ""}
               <th>Napredak</th>
+              <th title="Najbolji rezultat virtualne mature">Najbolji rezultat</th>
               <th>Materijali</th>
             </tr>
           </thead>
           <tbody>
-            ${yearExams.map((exam) => renderSubjectExamRow(exam, hasLevels)).join("")}
+            ${yearExams
+              .map((exam) => renderSubjectExamRow(exam, hasLevels, simulationAttempts))
+              .join("")}
           </tbody>
         </table>
       </div>
@@ -1764,8 +2068,9 @@ function renderPracticeYearBlock(year, yearExams) {
   `;
 }
 
-function renderSubjectExamRow(exam, hasLevels) {
+function renderSubjectExamRow(exam, hasLevels, simulationAttempts) {
   const progress = examProgress(exam);
+  const bestPercentage = bestSimulationPercentage(exam, simulationAttempts);
 
   return `
     <tr>
@@ -1780,6 +2085,9 @@ function renderSubjectExamRow(exam, hasLevels) {
             <strong class="exam-progress__percent">${progress.percent}%</strong>
           </div>
         </div>
+      </td>
+      <td class="subject-exam-table__best-cell">
+        ${renderBestSimulationPercentage(bestPercentage)}
       </td>
       <td>
         <div class="exam-actions">
@@ -1958,4 +2266,7 @@ function renderMissing(title, message) {
   `;
 }
 
+window.addEventListener("asistent:practice-progress-synced", renderApp);
+window.AsistentProfile?.ready?.then(renderApp).catch(() => {});
+loadServerSimulationAttempts();
 renderApp();

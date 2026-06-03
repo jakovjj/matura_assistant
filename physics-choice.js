@@ -42,6 +42,11 @@ let checked = false;
 let activeQuestionNumber;
 let quickSelectFrame;
 const simulation = window.createExamSimulation({ onFinish: finishSimulation });
+const selfCheck = window.createTaskSelfCheck();
+
+function isChecked(question) {
+  return checked || selfCheck.has(question);
+}
 
 function escapeHtml(value) {
   return String(value)
@@ -378,6 +383,7 @@ function renderSolver(exam, taskTypeId = "visestruki-izbor") {
     activeTaskTypeId = taskTypes.choice;
   }
   checked = false;
+  selfCheck.reset();
   activeQuestionNumber = questionsForTaskType(activeTaskTypeId, exam)[0] || allQuestions(exam)[0];
 
   app.innerHTML = `
@@ -516,6 +522,54 @@ function bindTaskTypeNavigation() {
   });
 }
 
+function renderTaskTypePager() {
+  const all = [{ id: taskTypes.choice, label: "Zadatci višestrukoga izbora" }];
+  if (openQuestions().length) {
+    all.push({ id: taskTypes.open, label: "Otvoreni zadatci" });
+  }
+  if (all.length <= 1) return "";
+  const index = all.findIndex((task) => task.id === activeTaskTypeId);
+  if (index === -1) return "";
+  const prev = all[index - 1];
+  const next = all[index + 1];
+  if (!prev && !next) return "";
+
+  const button = (task, direction) => {
+    const label = direction === "prev" ? "Prethodni zadaci" : "Sljedeći zadaci";
+    const arrow = direction === "prev"
+      ? icon("arrow-left", "task-type-pager__icon")
+      : icon("arrow-right", "task-type-pager__icon");
+    const copy = `
+      <span class="task-type-pager__copy">
+        <small>${label}</small>
+        <strong>${escapeHtml(task.label)}</strong>
+      </span>
+    `;
+    return `
+      <button
+        type="button"
+        class="task-type-pager__button task-type-pager__button--${direction}"
+        data-task-pager="${task.id}"
+      >
+        ${direction === "prev" ? arrow + copy : copy + arrow}
+      </button>
+    `;
+  };
+
+  return `
+    <nav class="task-type-pager" aria-label="Navigacija među vrstama zadataka">
+      ${prev ? button(prev, "prev") : "<span></span>"}
+      ${next ? button(next, "next") : "<span></span>"}
+    </nav>
+  `;
+}
+
+function bindTaskTypePager() {
+  document.querySelectorAll("[data-task-pager]").forEach((control) => {
+    control.addEventListener("click", () => selectTaskType(control.dataset.taskPager));
+  });
+}
+
 function selectTaskType(taskTypeId) {
   const normalizedTaskTypeId = normalizeTaskTypeId(taskTypeId);
   if (normalizedTaskTypeId === activeTaskTypeId) return;
@@ -544,7 +598,10 @@ function renderTaskTypeContent() {
 
   document.querySelector("#section-content").innerHTML = `
     <div class="solver-question-layout">
-      <section class="task-content-panel physics-task-content-panel" id="task-content-panel"></section>
+      <div class="solver-question-main">
+        <section class="task-content-panel physics-task-content-panel" id="task-content-panel"></section>
+        <div id="task-type-pager-slot"></div>
+      </div>
       <aside class="question-quickselect" aria-label="Brzi odabir pitanja">
         <div class="question-quickselect__heading">
           <strong>Brzi odabir</strong>
@@ -574,7 +631,8 @@ function renderSolverSummary() {
 
   const scoreSummary = document.querySelector("#score-summary");
   const footerScoreSummary = document.querySelector("#footer-score-summary");
-  const score = checked ? `${totalScore()}/${maximumScore()} bodova` : "";
+  const resolvedMax = resolvedMaximum();
+  const score = resolvedMax ? `${resolvedScore()}/${resolvedMax} bodova` : "";
   scoreSummary.textContent = score;
   footerScoreSummary.textContent = score;
 }
@@ -604,9 +662,11 @@ function renderTaskContent() {
       ${questions.map(renderSourceQuestion).join("")}
     </div>
   `;
+  document.querySelector("#task-type-pager-slot").innerHTML = renderTaskTypePager();
   bindResponseListeners();
   renderQuickSelect();
   bindQuickSelectTracking();
+  bindTaskTypePager();
 }
 
 function renderSourceQuestion(question) {
@@ -721,6 +781,15 @@ function bindResponseListeners() {
   document.querySelectorAll("[data-open-solution]").forEach((button) => {
     button.addEventListener("click", () => toggleOpenSolution(button));
   });
+  selfCheck.bind(document.querySelector("#task-content-panel"), toggleSelfCheck);
+}
+
+function toggleSelfCheck(question) {
+  if (simulation.active || checked) return;
+  selfCheck.toggle(question, Boolean(responses[question]));
+  renderTaskTypeNavigation();
+  renderSolverSummary();
+  renderTaskTypeContent();
 }
 
 function renderQuickSelect() {
@@ -739,7 +808,7 @@ function renderQuickSelect() {
       const stateClass = (isChoiceTaskType && answer) || isOpenTaskScored
         ? " question-quickselect__link--answered"
         : "";
-      const resultClass = checked && isChoiceTaskType
+      const resultClass = isChoiceTaskType && isChecked(question)
         ? isCorrectAnswer(question, answer)
           ? " question-quickselect__link--correct"
           : " question-quickselect__link--wrong"
@@ -825,7 +894,7 @@ function renderQuestionResponse(question) {
 
 function renderQuestion(question) {
   const answer = responses[question] || "";
-  const resultClass = checked
+  const resultClass = isChecked(question)
     ? isCorrectAnswer(question, answer)
       ? " response-question--correct"
       : " response-question--wrong"
@@ -840,6 +909,10 @@ function renderQuestion(question) {
           .map((option) => renderChoice(question, option, answer))
           .join("")}
       </div>
+      ${selfCheck.renderButton(question, {
+        answered: Boolean(answer),
+        hidden: simulation.active || checked,
+      })}
       ${renderFeedback(question, answer)}
     </fieldset>
   `;
@@ -849,8 +922,8 @@ function renderChoice(question, option, answer) {
   const selected = option === answer;
   const correct = isCorrectAnswer(question, option);
   let resultClass = "";
-  if (checked && correct) resultClass = " answer-choice--correct";
-  if (checked && selected && !correct) resultClass = " answer-choice--wrong";
+  if (isChecked(question) && correct) resultClass = " answer-choice--correct";
+  if (isChecked(question) && selected && !correct) resultClass = " answer-choice--wrong";
 
   return `
     <label class="answer-choice${resultClass}">
@@ -868,7 +941,7 @@ function renderChoice(question, option, answer) {
 }
 
 function renderFeedback(question, answer) {
-  if (!checked) return "";
+  if (!isChecked(question)) return "";
   const answers = correctAnswers(question);
   if (answers.includes(answer)) return `<small class="response-feedback">Točno.</small>`;
   const label = answers.length > 1 ? "Točni odgovori" : "Točan odgovor";
@@ -977,7 +1050,9 @@ function updateResponse(question, answer) {
   if (simulation.finished) return;
 
   const wasChecked = checked;
+  const wasSelfChecked = selfCheck.has(question);
   checked = false;
+  selfCheck.delete(question);
   const normalizedAnswer = String(answer || "").trim();
   if (normalizedAnswer) responses[question] = normalizedAnswer;
   else delete responses[question];
@@ -985,7 +1060,7 @@ function updateResponse(question, answer) {
   renderTaskTypeNavigation();
   renderSolverSummary();
   renderQuickSelect();
-  if (wasChecked) renderTaskTypeContent();
+  if (wasChecked || wasSelfChecked) renderTaskTypeContent();
 }
 
 function checkAnswers() {
@@ -997,6 +1072,7 @@ function checkAnswers() {
 
   if (checked) {
     checked = false;
+    selfCheck.reset();
     closeResultsDialog();
     renderTaskTypeNavigation();
     renderSolverSummary();
@@ -1005,6 +1081,7 @@ function checkAnswers() {
   }
 
   checked = true;
+  selfCheck.reset();
   renderTaskTypeNavigation();
   renderSolverSummary();
   renderTaskTypeContent();
@@ -1049,6 +1126,27 @@ function recordSubmittedSimulation() {
 
 function totalScore() {
   return scoreForQuestions(choiceQuestions()) + openScoreTotal();
+}
+
+// Running result over the tasks the user has revealed: checked choice
+// questions plus any self-scored open questions (all of them once the whole
+// exam is checked). Matches totalScore()/maximumScore() when checked is true.
+function resolvedOpenQuestions() {
+  return checked ? openQuestions() : openQuestions().filter((question) => hasOpenScore(question));
+}
+
+function resolvedScore() {
+  const openScore = resolvedOpenQuestions().reduce((score, question) => {
+    return score + (hasOpenScore(question) ? openScores[question] : 0);
+  }, 0);
+  return scoreForQuestions(choiceQuestions().filter((question) => isChecked(question))) + openScore;
+}
+
+function resolvedMaximum() {
+  const openMax = resolvedOpenQuestions().reduce((score, question) => {
+    return score + (maxPointsForOpenQuestion(questionByNumber.get(String(question))) || 0);
+  }, 0);
+  return choiceQuestions().filter((question) => isChecked(question)).length + openMax;
 }
 
 function openScoreTotal() {
@@ -1096,11 +1194,20 @@ function closeResultsDialogOnEscape(event) {
   if (event.key === "Escape") closeResultsDialog();
 }
 
-const id = selectedExamId();
-if (!id) {
-  window.location.replace(physicsSubjectUrl());
-} else {
+function startPhysicsPage() {
+  const id = selectedExamId();
+  if (!id) {
+    window.location.replace(physicsSubjectUrl());
+    return;
+  }
+
   const exam = examsById.get(id);
   if (exam) renderSolver(exam, selectedTaskTypeId());
   else renderMissingExam();
+}
+
+if (!simulation.active && window.AsistentProfile?.ready) {
+  window.AsistentProfile.ready.finally(startPhysicsPage);
+} else {
+  startPhysicsPage();
 }

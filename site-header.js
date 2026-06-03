@@ -44,6 +44,7 @@
             alt=""
             width="56"
             height="56"
+            draggable="false"
             decoding="async"
           />
           <span>

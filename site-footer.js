@@ -14,6 +14,7 @@
             width="40"
             height="40"
             loading="lazy"
+            draggable="false"
             decoding="async"
           />
           <div>

@@ -202,6 +202,7 @@
     try {
       const session = await api("/api/auth/me");
       state.user = session.authenticated ? session.user : null;
+      if (state.user) window.AsistentProfile?.syncPracticeProgress?.();
     } catch {
       state.user = null;
     } finally {

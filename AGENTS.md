@@ -40,6 +40,8 @@ This is a dependency-free static site:
 - `hrvatski.html`: standalone interactive Croatian page
 - `croatian-choice.js`: Croatian solver UI and local answer storage
 - `exam-simulation.js`: shared timed simulation mode without persistent answers
+- `solver-self-check.js`: shared per-task self-check (`Provjeri zadatak` button)
+  used by every solver outside simulation mode
 - `data/exams.js`: generated archive index; do not edit manually
 - `data/english-reading.js`: generated English reading index; do not edit manually
 - `data/english-listening.js`: generated English listening index; do not edit manually
@@ -101,6 +103,9 @@ verified archive case requires a change.
 - On smaller screens the sidebar becomes a normal content block without an
   internal scroll area.
 - Use Croatian for user-facing copy.
+- Do not introduce ad hoc result, feedback, or confirmation panels when a
+  solver already has an established modal or control pattern for that workflow.
+  Reuse the existing pattern and keep any new text compact.
 
 ## Interactive practice behavior
 
@@ -147,6 +152,14 @@ verified archive case requires a change.
   and total points across the whole exam. The modal must have an `X` close
   control so the user can review marked answers across every task type without
   losing the checked state.
+- Outside simulation mode, every auto-checkable task offers a `Provjeri zadatak`
+  button beside it (via `solver-self-check.js`). It reveals only that task's
+  correctness using the existing inline feedback and adds it to the running
+  score and percentage in the header and sticky footer. The button is hidden
+  during simulation and once the whole exam is checked. Open-response tasks
+  already self-check through `Otvori rješenje` and the points input, so they do
+  not get this button. New solvers should reuse `window.createTaskSelfCheck()`
+  rather than reimplementing per-task checking.
 - If an archive package has no defined interactive exam, show a clear Croatian
   message such as `Nema definiranog interaktivnog ispita za sada.` and leave the
   exam otherwise unchanged.

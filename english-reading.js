@@ -35,6 +35,11 @@ let activeTaskNumber;
 let activeQuestionNumber;
 let checked = false;
 const simulation = window.createExamSimulation({ onFinish: finishSimulation });
+const selfCheck = window.createTaskSelfCheck();
+
+function isChecked(question) {
+  return checked || selfCheck.has(question);
+}
 
 function escapeHtml(value) {
   return String(value)
@@ -318,13 +323,33 @@ function renderTaskSourceImages(task) {
 }
 
 function renderTaskSourceContent(task) {
-  return (
-    renderStructuredTaskContent(task) ||
+  const sourceImages = renderTaskSourceImages(task);
+  const sourceContent =
+    sourceImages ||
     `<div class="task-source english-reading-source">
       ${renderTaskSource(task.text)}
-      ${renderFallbackQuestionList(task)}
-    </div>`
-  );
+    </div>`;
+
+  return `
+    ${sourceContent}
+    ${renderTaskResponses(task)}
+  `;
+}
+
+function renderTaskResponses(task) {
+  const total = task.lastQuestion - task.firstQuestion + 1;
+
+  return `
+    <section class="english-reading-responses" aria-label="Digitalni list za odgovore">
+      <div class="english-reading-responses__heading">
+        <strong>Digitalni list za odgovore</strong>
+        <small>${taskAnsweredCount(task)}/${total}</small>
+      </div>
+      <div class="response-list">
+        ${taskQuestions(task).map((question) => renderQuestion(task, String(question))).join("")}
+      </div>
+    </section>
+  `;
 }
 
 function allQuestions(exam) {
@@ -698,6 +723,8 @@ function renderSolver(exam) {
   document.body.classList.add("solver-page");
   solverExam = exam;
   responses = simulation.active ? {} : loadResponses(exam);
+  checked = false;
+  selfCheck.reset();
   activeTaskNumber = exam.tasks[0].number;
   activeQuestionNumber = exam.tasks[0].firstQuestion;
 
@@ -714,6 +741,13 @@ function renderSolver(exam) {
         ${simulation.renderTimer()}
         <strong id="answer-progress"></strong>
         <span id="score-summary"></span>
+      `,
+      navigationHtml: `
+        <nav
+          class="task-navigation solver-header__task-navigation"
+          data-task-navigation
+          aria-label="Zadatci čitanja u ispitnom zaglavlju"
+        ></nav>
       `,
     })}
 
@@ -745,7 +779,11 @@ function renderSolver(exam) {
 
     <footer class="solver-sticky-footer">
       <div class="solver-sticky-footer__inner">
-        <nav class="task-navigation" id="task-navigation" aria-label="Zadatci čitanja"></nav>
+        <nav
+          class="task-navigation"
+          data-task-navigation
+          aria-label="Zadatci čitanja"
+        ></nav>
         <div class="solver-sticky-footer__controls">
           <div class="solver-sticky-footer__status">
             <svg class="solver-sticky-footer__status-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
@@ -768,9 +806,41 @@ function renderSolver(exam) {
         </div>
       </div>
     </footer>
+
+    <div class="exam-results-dialog" id="exam-results-dialog" role="dialog" aria-modal="true" aria-labelledby="exam-results-title" hidden>
+      <div class="exam-results-dialog__backdrop"></div>
+      <section class="exam-results-dialog__panel">
+        <button class="exam-results-dialog__close" id="close-exam-results" type="button" aria-label="Zatvori rezultat">
+          &times;
+        </button>
+        <svg class="exam-results-dialog__check" aria-hidden="true" focusable="false" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="28"></circle>
+          <path d="m20 33 8 8 17-18"></path>
+        </svg>
+        <p class="eyebrow">Rezultat cijeloga ispita</p>
+        <h2 id="exam-results-title">Rješenja su provjerena</h2>
+        <div class="exam-results-dialog__metrics">
+          <div>
+            <strong id="exam-results-percentage"></strong>
+            <span>Riješenost</span>
+          </div>
+          <div>
+            <strong id="exam-results-score"></strong>
+            <span>Bodovi</span>
+          </div>
+        </div>
+        <p>
+          Rezultat obuhvaća sve zadatke čitanja. Zatvori prozor i pregledaj
+          označene odgovore po zadatcima.
+        </p>
+      </section>
+    </div>
   `;
 
   document.querySelector("#check-answers")?.addEventListener("click", checkAnswers);
+  document.querySelector("#close-exam-results")?.addEventListener("click", closeResultsDialog);
+  document.querySelector(".exam-results-dialog__backdrop")?.addEventListener("click", closeResultsDialog);
+  document.addEventListener("keydown", closeResultsDialogOnEscape);
 
   renderTaskNavigation();
   renderQuestionQuickSelect();
@@ -780,7 +850,7 @@ function renderSolver(exam) {
 }
 
 function renderTaskNavigation() {
-  document.querySelector("#task-navigation").innerHTML = solverExam.tasks
+  const navigationHtml = solverExam.tasks
     .map((task) => {
       const total = task.lastQuestion - task.firstQuestion + 1;
       const activeClass = task.number === activeTaskNumber ? " task-button--active" : "";
@@ -793,7 +863,11 @@ function renderTaskNavigation() {
     })
     .join("");
 
-  document.querySelectorAll(".task-button").forEach((button) => {
+  document.querySelectorAll("[data-task-navigation]").forEach((navigation) => {
+    navigation.innerHTML = navigationHtml;
+  });
+
+  document.querySelectorAll("[data-task]").forEach((button) => {
     button.addEventListener("click", () => selectTask(Number(button.dataset.task)));
   });
 }
@@ -810,7 +884,7 @@ function renderQuestionQuickSelect() {
     .map((question) => {
       const answer = responses[question];
       const stateClass = answer ? " question-quickselect__link--answered" : "";
-      const resultClass = checked
+      const resultClass = isChecked(question) && solverExam.answers[question]
         ? answer === solverExam.answers[question]
           ? " question-quickselect__link--correct"
           : " question-quickselect__link--wrong"
@@ -856,7 +930,13 @@ function renderSolverSummary() {
   }
 
   const scoreSummary = document.querySelector("#score-summary");
-  const score = checked ? `${totalScore()}/${total} točno` : "";
+  const resolved = allQuestions(solverExam).filter(
+    (question) => isChecked(question) && solverExam.answers[question],
+  );
+  const resolvedCorrect = resolved.filter(
+    (question) => responses[question] === solverExam.answers[question],
+  ).length;
+  const score = resolved.length ? `${resolvedCorrect}/${resolved.length} točno` : "";
   scoreSummary.textContent = score;
   document.querySelector("#footer-score-summary").textContent = score;
 }
@@ -881,44 +961,66 @@ function bindResponseListeners() {
     input.addEventListener("change", () => updateResponse(input.dataset.question, input.value));
   });
 
+  selfCheck.bind(document.querySelector("#task-content-panel"), toggleSelfCheck);
   document.querySelectorAll('input[type="text"][data-question]').forEach((input) => {
     input.addEventListener("input", () => updateResponse(input.dataset.question, input.value));
   });
 }
 
+function toggleSelfCheck(question) {
+  if (simulation.active || checked) return;
+  selfCheck.toggle(question, Boolean(responses[question]));
+  renderTaskNavigation();
+  renderQuestionQuickSelect();
+  renderSolverSummary();
+  renderTaskContent();
+}
+
 function renderQuestion(task, question) {
   const answer = responses[question] || "";
-  const resultClass = checked
+  const correctAnswer = solverExam.answers[question];
+  const resultClass = isChecked(question) && correctAnswer
     ? answer === solverExam.answers[question]
       ? " response-question--correct"
       : " response-question--wrong"
     : "";
+  const checkButton = selfCheck.renderButton(question, {
+    answered: Boolean(answer),
+    hidden: simulation.active || checked || !correctAnswer,
+  });
 
   if (task.kind === "text") {
     return `
-      <label class="physics-inline-response english-inline-text-response ${resultClass}">
-        <span class="physics-inline-response__label">Upiši odgovor</span>
-        <input
-          data-question="${escapeHtml(question)}"
-          type="text"
-          value="${escapeHtml(answer)}"
-          autocomplete="off"
-          aria-label="Odgovor na pitanje ${question}"
-          ${simulation.inputDisabledAttribute()}
-        >
-      </label>
+      <div
+        class="response-question response-question--text english-inline-text-response${resultClass}"
+        id="odgovor-${escapeHtml(question)}"
+      >
+        <label class="english-inline-text-response__field">
+          <strong>${escapeHtml(question)}.</strong>
+          <input
+            data-question="${escapeHtml(question)}"
+            type="text"
+            value="${escapeHtml(answer)}"
+            autocomplete="off"
+            aria-label="Odgovor na pitanje ${question}"
+            ${simulation.inputDisabledAttribute()}
+          >
+        </label>
+        ${checkButton}
+        ${renderFeedback(question, answer)}
+      </div>
     `;
   }
 
   return `
-    <fieldset class="physics-inline-response ${resultClass}">
-      <legend>Odgovor na ${escapeHtml(question)}. pitanje</legend>
-      <span class="physics-inline-response__label">Odaberi odgovor</span>
+    <fieldset class="response-question${resultClass}" id="odgovor-${escapeHtml(question)}">
+      <legend>${escapeHtml(question)}.</legend>
       <div class="choice-list">
         ${task.options
           .map((option) => renderChoice(question, option, answer))
           .join("")}
       </div>
+      ${checkButton}
       ${renderFeedback(question, answer)}
     </fieldset>
   `;
@@ -928,8 +1030,8 @@ function renderChoice(question, option, answer) {
   const selected = option === answer;
   const correct = option === solverExam.answers[question];
   let resultClass = "";
-  if (checked && correct) resultClass = " answer-choice--correct";
-  if (checked && selected && !correct) resultClass = " answer-choice--wrong";
+  if (isChecked(question) && correct) resultClass = " answer-choice--correct";
+  if (isChecked(question) && selected && !correct) resultClass = " answer-choice--wrong";
 
   return `
     <label class="answer-choice${resultClass}">
@@ -947,8 +1049,9 @@ function renderChoice(question, option, answer) {
 }
 
 function renderFeedback(question, answer) {
-  if (!checked) return "";
+  if (!isChecked(question)) return "";
   const correctAnswer = solverExam.answers[question];
+  if (!correctAnswer) return "";
   if (answer === correctAnswer) return `<small class="response-feedback">Točno.</small>`;
   return `<small class="response-feedback">Točan odgovor: ${correctAnswer}.</small>`;
 }
@@ -957,7 +1060,9 @@ function updateResponse(question, answer) {
   if (simulation.finished) return;
 
   const wasChecked = checked;
+  const wasSelfChecked = selfCheck.has(question);
   checked = false;
+  selfCheck.delete(question);
   const normalizedAnswer = String(answer || "").trim();
   if (normalizedAnswer) responses[question] = normalizedAnswer;
   else delete responses[question];
@@ -966,7 +1071,20 @@ function updateResponse(question, answer) {
   renderTaskNavigation();
   renderQuestionQuickSelect();
   renderSolverSummary();
-  if (wasChecked) renderTaskContent();
+  if (wasChecked || wasSelfChecked) {
+    if (wasChecked) closeResultsDialog();
+    renderTaskContent();
+  } else {
+    renderTaskResponseSummary();
+  }
+}
+
+function renderTaskResponseSummary() {
+  const task = solverExam.tasks.find((candidate) => candidate.number === activeTaskNumber);
+  const summary = document.querySelector(".english-reading-responses__heading small");
+  if (!task || !summary) return;
+  const total = task.lastQuestion - task.firstQuestion + 1;
+  summary.textContent = `${taskAnsweredCount(task)}/${total}`;
 }
 
 function taskForQuestion(question) {
@@ -1009,6 +1127,8 @@ function checkAnswers() {
 
   if (checked) {
     checked = false;
+    selfCheck.reset();
+    closeResultsDialog();
     renderTaskNavigation();
     renderQuestionQuickSelect();
     renderSolverSummary();
@@ -1017,10 +1137,12 @@ function checkAnswers() {
   }
 
   checked = true;
+  selfCheck.reset();
   renderTaskNavigation();
   renderQuestionQuickSelect();
   renderSolverSummary();
   renderTaskContent();
+  openResultsDialog();
 }
 
 function finishSimulation(reason) {
@@ -1035,6 +1157,8 @@ function finishSimulation(reason) {
   if (reason === "expired") {
     window.alert("Vrijeme za simulaciju je isteklo. Odgovori više nisu promjenjivi.");
   }
+
+  if (checked) openResultsDialog();
 }
 
 function recordSubmittedSimulation() {
@@ -1072,11 +1196,50 @@ function totalScore() {
   return solverExam.tasks.reduce((score, task) => score + taskScore(task), 0);
 }
 
-const id = selectedExamId();
-if (!id) {
-  window.location.replace(englishSubjectUrl);
-} else {
+function scorePercentage() {
+  const total = allQuestions(solverExam).length;
+  return total ? Math.round((totalScore() / total) * 100) : 0;
+}
+
+function openResultsDialog() {
+  const dialog = document.querySelector("#exam-results-dialog");
+  if (!dialog) return;
+
+  const total = allQuestions(solverExam).length;
+  document.querySelector("#exam-results-percentage").textContent = `${scorePercentage()}%`;
+  document.querySelector("#exam-results-score").textContent = `${totalScore()}/${total}`;
+  dialog.hidden = false;
+  document.body.classList.add("exam-results-dialog-open");
+  document.querySelector("#close-exam-results")?.focus();
+}
+
+function closeResultsDialog() {
+  const dialog = document.querySelector("#exam-results-dialog");
+  if (!dialog || dialog.hidden) return;
+
+  dialog.hidden = true;
+  document.body.classList.remove("exam-results-dialog-open");
+  document.querySelector("#check-answers")?.focus();
+}
+
+function closeResultsDialogOnEscape(event) {
+  if (event.key === "Escape") closeResultsDialog();
+}
+
+function startReadingPage() {
+  const id = selectedExamId();
+  if (!id) {
+    window.location.replace(englishSubjectUrl);
+    return;
+  }
+
   const exam = examsById.get(id);
   if (exam) renderSolver(exam);
   else renderMissingExam();
+}
+
+if (!simulation.active && window.AsistentProfile?.ready) {
+  window.AsistentProfile.ready.finally(startReadingPage);
+} else {
+  startReadingPage();
 }

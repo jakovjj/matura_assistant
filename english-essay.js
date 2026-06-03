@@ -25,13 +25,6 @@ const legacyTermAliases = {
   "jesenski rok": ["drugi rok"],
 };
 
-const rubricRows = [
-  ["taskCompletion", "Izvršenje zadatka"],
-  ["coherenceCohesion", "Koherencija i kohezija"],
-  ["vocabulary", "Vokabular"],
-  ["grammar", "Gramatika"],
-];
-
 let solverExam;
 let essayText = "";
 let ocrPending = false;
@@ -39,6 +32,8 @@ let ocrError = "";
 let gradingPending = false;
 let gradingResult = null;
 let gradingError = "";
+let gradingAbortController = null;
+let gradingRunId = 0;
 let simulationRecorded = false;
 const simulation = window.createExamSimulation({ onFinish: finishSimulation });
 
@@ -229,30 +224,6 @@ function renderTaskSourceContent(exam) {
   );
 }
 
-function renderRubric() {
-  return `
-    <div class="essay-rubric">
-      <h3>Kriteriji ocjenjivanja</h3>
-      <p>Ukupno 20 bodova. Svaki kriterij nosi 0-5 bodova.</p>
-      <div class="essay-rubric__grid">
-        ${rubricRows
-          .map(
-            ([, label]) => `
-              <div>
-                <strong>${escapeHtml(label)}</strong>
-                <span>0-5 bodova</span>
-              </div>
-            `,
-          )
-          .join("")}
-      </div>
-      <a href="${escapeHtml(data.rubricSource?.url || "#")}" target="_blank" rel="noreferrer">
-        Službeni NCVVO kriteriji
-      </a>
-    </div>
-  `;
-}
-
 function renderMissingExam() {
   document.body.classList.remove("solver-page", "essay-solver-active");
   app.innerHTML = `
@@ -273,6 +244,7 @@ function renderSolver(exam) {
   gradingPending = false;
   gradingResult = null;
   gradingError = "";
+  gradingAbortController = null;
   simulationRecorded = false;
 
   app.innerHTML = `
@@ -295,29 +267,20 @@ function renderSolver(exam) {
 
     <div class="essay-practice-layout">
       <section class="essay-task-panel" aria-labelledby="essay-task-title">
-        <p class="eyebrow">Zadatak</p>
         <h3 id="essay-task-title">Writing paper</h3>
         ${renderTaskSourceContent(exam)}
-        <div class="essay-instructions">
-          <h3>Upute</h3>
-          <ul>
-            <li>Napiši raspravljački esej od ${exam.wordRange.min}-${exam.wordRange.max} riječi.</li>
-            <li>Esej treba imati uvod, glavni dio i zaključak.</li>
-            <li>Razradi zadana gledišta i jasno navedi vlastito mišljenje.</li>
-          </ul>
-        </div>
-        ${renderRubric()}
       </section>
 
       <section class="essay-writing-panel" aria-labelledby="essay-writing-title">
         <div class="essay-writing-panel__heading">
-          <h3 id="essay-writing-title">Tvoj esej</h3>
-          <span id="essay-word-pill" class="essay-word-pill"></span>
-        </div>
-
-        <div class="essay-ocr-row">
-          <p>Fotografija služi samo za OCR: iščitani tekst upisuje se u polje eseja.</p>
+          <div>
+            <h3 id="essay-writing-title">Tvoj esej</h3>
+            <span id="essay-word-pill" class="essay-word-pill"></span>
+          </div>
           <label class="secondary-button essay-photo-upload__button">
+            <svg class="essay-photo-upload__icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+              <use href="./assets/lucide-icons.svg?v=20260603-essay-layout#camera"></use>
+            </svg>
             <span id="essay-photo-label">Iščitaj fotografiju</span>
             <input
               id="essay-photo"
@@ -345,13 +308,10 @@ function renderSolver(exam) {
       </section>
     </div>
 
-    <footer class="solver-sticky-footer">
+    <footer class="solver-sticky-footer solver-sticky-footer--essay">
       <div class="solver-sticky-footer__inner">
         <div class="solver-sticky-footer__controls">
           <div class="solver-sticky-footer__status">
-            <svg class="solver-sticky-footer__status-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-              <use href="./assets/lucide-icons.svg#file-pen-line"></use>
-            </svg>
             <div class="solver-sticky-footer__status-copy">
               <strong id="footer-essay-word-summary"></strong>
               <span id="footer-essay-score-summary"></span>
@@ -368,11 +328,72 @@ function renderSolver(exam) {
         </div>
       </div>
     </footer>
+
+    <div class="exam-results-dialog" id="exam-results-dialog" role="dialog" aria-modal="true" aria-labelledby="exam-results-title" hidden>
+      <div class="exam-results-dialog__backdrop"></div>
+      <section class="exam-results-dialog__panel">
+        <button class="exam-results-dialog__close" id="close-exam-results" type="button" aria-label="Zatvori rezultat">
+          &times;
+        </button>
+        <svg class="exam-results-dialog__clock" aria-hidden="true" focusable="false" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="26"></circle>
+          <path d="M32 16v16l11 7" class="exam-results-dialog__clock-hand"></path>
+        </svg>
+        <svg class="exam-results-dialog__check" aria-hidden="true" focusable="false" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="28"></circle>
+          <path d="m20 33 8 8 17-18"></path>
+        </svg>
+        <p class="eyebrow" id="exam-results-eyebrow">Rezultat eseja</p>
+        <h2 id="exam-results-title">Esej je ocijenjen</h2>
+        <div class="exam-results-dialog__metrics" id="exam-results-metrics">
+          <div>
+            <strong id="exam-results-percentage"></strong>
+            <span>Postotak</span>
+          </div>
+          <div>
+            <strong id="exam-results-score"></strong>
+            <span>Bodovi</span>
+          </div>
+        </div>
+        <div class="exam-results-dialog__criteria" id="exam-results-criteria">
+          <strong>Kriteriji ocjenjivanja</strong>
+          <dl>
+            <div>
+              <dt>Izvršenje zadatka</dt>
+              <dd id="exam-results-task-completion"></dd>
+            </div>
+            <div>
+              <dt>Koherencija i kohezija</dt>
+              <dd id="exam-results-coherence-cohesion"></dd>
+            </div>
+            <div>
+              <dt>Vokabular</dt>
+              <dd id="exam-results-vocabulary"></dd>
+            </div>
+            <div>
+              <dt>Gramatika</dt>
+              <dd id="exam-results-grammar"></dd>
+            </div>
+          </dl>
+        </div>
+        <details class="exam-results-dialog__comment" id="exam-results-comment-panel">
+          <summary>AI komentar</summary>
+          <p id="exam-results-comment"></p>
+        </details>
+        <p id="exam-results-description">
+          Rezultat je procjena prema kriterijima za esej. Zatvori prozor za nastavak uređivanja ili ponovno ocjenjivanje.
+        </p>
+      </section>
+    </div>
   `;
 
   document.querySelector("#essay-text").addEventListener("input", handleEssayInput);
   document.querySelector("#essay-photo").addEventListener("change", handlePhotoSelection);
   document.querySelector("#grade-essay").addEventListener("click", gradeEssay);
+  document.querySelector("#close-exam-results").addEventListener("click", closeResultsDialog);
+  document.querySelector(".exam-results-dialog__backdrop").addEventListener("click", closeResultsDialog);
+  document.addEventListener("keydown", closeResultsDialogOnEscape);
+  window.addEventListener("pagehide", abortPendingGrading);
 
   renderEssaySummary();
   renderOcrStatus();
@@ -504,15 +525,6 @@ function renderGradingPanel() {
   const target = document.querySelector("#essay-grading-panel");
   if (!target) return;
 
-  if (gradingPending) {
-    target.innerHTML = `
-      <div class="essay-grading-panel">
-        <p class="practice-notice">Ocjenjivanje je u tijeku.</p>
-      </div>
-    `;
-    return;
-  }
-
   if (gradingError) {
     target.innerHTML = `
       <div class="essay-grading-panel">
@@ -522,48 +534,7 @@ function renderGradingPanel() {
     return;
   }
 
-  if (!gradingResult) {
-    target.innerHTML = "";
-    return;
-  }
-
-  target.innerHTML = `
-    <div class="essay-grading-panel">
-      <div class="essay-grade-summary">
-        <div>
-          <span>Ukupno</span>
-          <strong>${escapeHtml(gradingResult.total)}/${solverExam.maxScore}</strong>
-        </div>
-        <div>
-          <span>Postotak</span>
-          <strong>${scorePercentage(gradingResult)}%</strong>
-        </div>
-      </div>
-      <table class="essay-grade-table">
-        <thead>
-          <tr>
-            <th>Kriterij</th>
-            <th>Bodovi</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rubricRows
-            .map(
-              ([key, label]) => `
-                <tr>
-                  <td>${escapeHtml(label)}</td>
-                  <td>${escapeHtml(gradingResult[key])}/5</td>
-                </tr>
-              `,
-            )
-            .join("")}
-        </tbody>
-      </table>
-      <p class="essay-grade-note">
-        Prikazuju se samo bodovi po kriterijima, bez generiranog komentara.
-      </p>
-    </div>
-  `;
+  target.innerHTML = "";
 }
 
 function renderEssaySummary() {
@@ -577,7 +548,7 @@ function renderEssaySummary() {
   document.querySelector("#essay-word-summary").textContent = wordText;
   document.querySelector("#footer-essay-word-summary").textContent = wordText;
   document.querySelector("#essay-score-summary").textContent = scoreText;
-  document.querySelector("#footer-essay-score-summary").textContent = scoreText || "Esej se ocjenjuje po 4 kriterija.";
+  document.querySelector("#footer-essay-score-summary").textContent = scoreText;
 
   if (pill) {
     pill.textContent = `${wordText} / ${range.min}-${range.max}`;
@@ -617,21 +588,134 @@ async function gradeEssay() {
   gradingPending = true;
   gradingError = "";
   gradingResult = null;
+  gradingAbortController = new AbortController();
+  const runId = gradingRunId + 1;
+  gradingRunId = runId;
   updateGradeButton();
   renderGradingPanel();
+  openGradingPendingDialog();
 
   try {
-    const payload = await requestEssayGrade();
+    const payload = await requestEssayGrade(gradingAbortController.signal);
+    if (runId !== gradingRunId) return;
     gradingResult = payload.grade;
     recordSubmittedSimulation();
   } catch (error) {
-    gradingError = error.message || "Ocjenjivanje nije uspjelo.";
+    if (runId !== gradingRunId) return;
+    gradingError = isAbortError(error) ? "" : error.message || "Ocjenjivanje nije uspjelo.";
   } finally {
+    if (runId !== gradingRunId) return;
     gradingPending = false;
+    gradingAbortController = null;
     updateGradeButton();
     renderEssaySummary();
     renderGradingPanel();
+    if (gradingResult) openResultsDialog();
+    else hideResultsDialog({ restoreFocus: false });
   }
+}
+
+function essayResultComment() {
+  const comment = String(gradingResult?.comment || "").trim();
+  return comment || "Komentar nije dostupan za ovo ocjenjivanje.";
+}
+
+function criterionScore(value) {
+  const score = Math.round(Number(value));
+  return Number.isFinite(score) ? `${Math.max(0, Math.min(5, score))}/5` : "-/5";
+}
+
+function setResultsDialogCopy({ state, eyebrow, title, description, closeLabel }) {
+  const dialog = document.querySelector("#exam-results-dialog");
+  if (!dialog) return;
+
+  dialog.dataset.state = state;
+  document.querySelector("#exam-results-eyebrow").textContent = eyebrow;
+  document.querySelector("#exam-results-title").textContent = title;
+  document.querySelector("#exam-results-description").textContent = description;
+  document.querySelector("#close-exam-results").setAttribute("aria-label", closeLabel);
+}
+
+function openGradingPendingDialog() {
+  const dialog = document.querySelector("#exam-results-dialog");
+  if (!dialog) return;
+
+  setResultsDialogCopy({
+    state: "grading",
+    eyebrow: "AI ocjenjivanje",
+    title: "Ocjenjivanje je u tijeku",
+    description: "Ako zatvoriš ovaj prozor ili napustiš stranicu, ocjenjivanje će se prekinuti.",
+    closeLabel: "Prekini ocjenjivanje",
+  });
+  document.querySelector("#exam-results-comment-panel").open = false;
+  dialog.hidden = false;
+  document.body.classList.add("exam-results-dialog-open");
+  document.querySelector("#close-exam-results").focus();
+}
+
+function openResultsDialog() {
+  const dialog = document.querySelector("#exam-results-dialog");
+  if (!dialog || !gradingResult) return;
+
+  setResultsDialogCopy({
+    state: "result",
+    eyebrow: "Rezultat eseja",
+    title: "Esej je ocijenjen",
+    description: "Rezultat je procjena prema kriterijima za esej. Zatvori prozor za nastavak uređivanja ili ponovno ocjenjivanje.",
+    closeLabel: "Zatvori rezultat",
+  });
+  document.querySelector("#exam-results-percentage").textContent = `${scorePercentage(gradingResult)}%`;
+  document.querySelector("#exam-results-score").textContent = `${gradingResult.total}/${solverExam.maxScore}`;
+  document.querySelector("#exam-results-task-completion").textContent = criterionScore(gradingResult.taskCompletion);
+  document.querySelector("#exam-results-coherence-cohesion").textContent = criterionScore(gradingResult.coherenceCohesion);
+  document.querySelector("#exam-results-vocabulary").textContent = criterionScore(gradingResult.vocabulary);
+  document.querySelector("#exam-results-grammar").textContent = criterionScore(gradingResult.grammar);
+  document.querySelector("#exam-results-comment").textContent = essayResultComment();
+  document.querySelector("#exam-results-comment-panel").open = false;
+  dialog.hidden = false;
+  document.body.classList.add("exam-results-dialog-open");
+  document.querySelector("#close-exam-results").focus();
+}
+
+function closeResultsDialog(options = {}) {
+  if (gradingPending) {
+    abortPendingGrading();
+    return;
+  }
+
+  hideResultsDialog(options);
+}
+
+function hideResultsDialog(options = {}) {
+  const dialog = document.querySelector("#exam-results-dialog");
+  if (!dialog || dialog.hidden) return;
+
+  const restoreFocus = options?.restoreFocus !== false;
+  dialog.hidden = true;
+  delete dialog.dataset.state;
+  document.body.classList.remove("exam-results-dialog-open");
+  if (restoreFocus) document.querySelector("#grade-essay")?.focus();
+}
+
+function closeResultsDialogOnEscape(event) {
+  if (event.key === "Escape") closeResultsDialog();
+}
+
+function abortPendingGrading() {
+  if (!gradingPending) return;
+
+  gradingRunId += 1;
+  gradingAbortController?.abort();
+  gradingAbortController = null;
+  gradingPending = false;
+  gradingError = "";
+  updateGradeButton();
+  renderGradingPanel();
+  hideResultsDialog({ restoreFocus: false });
+}
+
+function isAbortError(error) {
+  return error?.name === "AbortError";
 }
 
 async function requestEssayOcr(image) {
@@ -653,7 +737,7 @@ async function requestEssayOcr(image) {
   return payload;
 }
 
-async function requestEssayGrade() {
+async function requestEssayGrade(signal) {
   const response = await fetch("/api/english-essay/grade", {
     body: JSON.stringify({
       examId: solverExam.id,
@@ -664,6 +748,7 @@ async function requestEssayGrade() {
       "Content-Type": "application/json",
     },
     method: "POST",
+    signal,
   });
   const contentType = response.headers.get("content-type") || "";
   if (!contentType.includes("application/json")) {
@@ -709,11 +794,20 @@ function recordSubmittedSimulation() {
   });
 }
 
-const id = selectedExamId();
-if (!id) {
-  window.location.replace(englishSubjectUrl);
-} else {
+function startEssayPage() {
+  const id = selectedExamId();
+  if (!id) {
+    window.location.replace(englishSubjectUrl);
+    return;
+  }
+
   const exam = examsById.get(id);
   if (exam) renderSolver(exam);
   else renderMissingExam();
+}
+
+if (!simulation.active && window.AsistentProfile?.ready) {
+  window.AsistentProfile.ready.finally(startEssayPage);
+} else {
+  startEssayPage();
 }

@@ -38,8 +38,8 @@ COMMON_TEXT_FIXES = {
     "Sfudenfs": "Students",
 }
 SOURCE_RENDER_DPI = 144
-SOURCE_CROP_HORIZONTAL_MARGIN = 48
-SOURCE_CROP_VERTICAL_PADDING = 9
+SOURCE_TASK_HORIZONTAL_PADDING = 8
+SOURCE_TASK_VERTICAL_PADDING = 6
 SOURCE_FOOTER_MARGIN = 65
 
 
@@ -284,20 +284,8 @@ def find_essay_task_crop(contents: bytes) -> SourceCrop:
         if start_index is None:
             continue
 
-        heading_index = next(
-            (
-                index
-                for index in range(start_index - 1, max(-1, start_index - 9), -1)
-                if re.search(
-                    r"Writing\s+Paper|ISPIT\s+PISANJA|Task\s+\d+|Question\s+\d+",
-                    lines[index].text,
-                    flags=re.IGNORECASE,
-                )
-            ),
-            start_index,
-        )
-        start_line = lines[heading_index]
         end_line: PdfLine | None = None
+        task_lines: list[PdfLine] = []
 
         for line in lines[start_index:]:
             if line.y_min >= page.height - SOURCE_FOOTER_MARGIN:
@@ -308,6 +296,7 @@ def find_essay_task_crop(contents: bytes) -> SourceCrop:
                 flags=re.IGNORECASE,
             ):
                 break
+            task_lines.append(line)
             end_line = line
             if re.search(r"own opinion\.", line.text, flags=re.IGNORECASE):
                 break
@@ -315,16 +304,20 @@ def find_essay_task_crop(contents: bytes) -> SourceCrop:
         if end_line is None:
             raise ValueError("Could not locate the end of the English essay task crop")
 
-        y_min = max(0, start_line.y_min - SOURCE_CROP_VERTICAL_PADDING)
-        y_max = min(page.height, end_line.y_max + SOURCE_CROP_VERTICAL_PADDING)
+        x_min = max(0, min(line.x_min for line in task_lines) - SOURCE_TASK_HORIZONTAL_PADDING)
+        x_max = min(page.width, max(line.x_max for line in task_lines) + SOURCE_TASK_HORIZONTAL_PADDING)
+        y_min = max(0, task_lines[0].y_min - SOURCE_TASK_VERTICAL_PADDING)
+        y_max = min(page.height, end_line.y_max + SOURCE_TASK_VERTICAL_PADDING)
         if y_max <= y_min:
+            raise ValueError("English essay task crop has invalid bounds")
+        if x_max <= x_min:
             raise ValueError("English essay task crop has invalid bounds")
 
         return SourceCrop(
             page=page,
-            x_min=SOURCE_CROP_HORIZONTAL_MARGIN,
+            x_min=x_min,
             y_min=y_min,
-            x_max=page.width - SOURCE_CROP_HORIZONTAL_MARGIN,
+            x_max=x_max,
             y_max=y_max,
         )
 

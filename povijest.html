@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="hr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Interaktivno rješavanje zadataka iz Povijesti na državnoj maturi."
+    />
+    <title>Asistent za Mature - Povijest</title>
+    <link rel="icon" type="image/webp" href="./assets/asistent_za_maturu.webp" />
+    <link rel="stylesheet" href="./styles.css?v=20260603-self-check-button" />
+    <script>
+      if (!new URLSearchParams(window.location.search).has("exam")) {
+        window.location.replace("./?predmet=Povijest");
+      }
+    </script>
+    <script type="text/javascript">
+      (function (c, l, a, r, i, t, y) {
+        c[a] =
+          c[a] ||
+          function () {
+            (c[a].q = c[a].q || []).push(arguments);
+          };
+        t = l.createElement(r);
+        t.async = 1;
+        t.src = "https://www.clarity.ms/tag/" + i;
+        y = l.getElementsByTagName(r)[0];
+        y.parentNode.insertBefore(t, y);
+      })(window, document, "clarity", "script", "x0a1kkmiqz");
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Preskoči na sadržaj</a>
+
+    <div data-site-header></div>
+    <script src="./site-header.js?v=20260601-exam-header"></script>
+
+    <main id="main">
+      <section class="practice-section">
+        <div class="container practice-container" id="history-app"></div>
+      </section>
+    </main>
+
+    <div data-site-footer></div>
+    <script src="./site-footer.js?v=20260602-footer"></script>
+
+    <script src="./data/history-choice.js?v=20260603-history-sources"></script>
+    <script src="./profile-store.js?v=20260603-cross-host-sync"></script>
+    <script src="./exam-simulation.js?v=20260601-simulation"></script>
+    <script src="./solver-self-check.js?v=20260603-self-check-2"></script>
+    <script src="./solver-header.js?v=20260603-exam-header-sync"></script>
+    <script src="./history-choice.js?v=20260603-history-sources"></script>
+    <script src="./auth-client.js?v=20260603-practice-sync"></script>
+  </body>
+</html>
