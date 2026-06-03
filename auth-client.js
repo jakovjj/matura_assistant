@@ -1,30 +1,20 @@
 (function () {
   const widgets = document.querySelectorAll("[data-auth-widget]");
-  if (!widgets.length) return;
+  const authPage = document.querySelector("[data-auth-page]");
+  if (!widgets.length && !authPage) return;
 
   const cookieNoticeName = "azm_cookie_notice";
-
-  const state = {
-    available: true,
-    dialog: null,
-    loading: true,
-    mode: "login",
-    user: null,
+  const oauthErrors = {
+    oauth_code: "Prijava nije uspjela. Pokušaj ponovno.",
+    oauth_denied: "Prijava je otkazana.",
+    oauth_exchange: "Prijava nije uspjela. Pokušaj ponovno.",
+    oauth_state: "Prijava je istekla. Pokušaj ponovno.",
+    oauth_unavailable: "Google prijava još nije konfigurirana.",
   };
 
-  const modeCopy = {
-    login: {
-      button: "Prijavi se",
-      intro: "Upiši adresu i lozinku koju si koristio pri izradi računa.",
-      passwordAutocomplete: "current-password",
-      title: "Prijava",
-    },
-    signup: {
-      button: "Napravi račun",
-      intro: "Za prototip se prihvaća bilo koja @skole.hr adresa. E-mail se ne potvrđuje.",
-      passwordAutocomplete: "new-password",
-      title: "Novi račun",
-    },
+  const state = {
+    loading: true,
+    user: null,
   };
 
   function escapeHtml(value) {
@@ -39,7 +29,7 @@
   function icon(iconName, className) {
     return `
       <svg class="${className}" aria-hidden="true">
-        <use href="./assets/lucide-icons.svg#${iconName}"></use>
+        <use href="./assets/lucide-icons.svg?v=20260602-cookie#${iconName}"></use>
       </svg>
     `;
   }
@@ -76,15 +66,30 @@
     });
 
     const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      throw new Error("Prijava nije dostupna na ovom poslužitelju.");
-    }
+    if (!contentType.includes("application/json")) throw new Error("API nije dostupan.");
 
     const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "Zahtjev nije uspio.");
-    }
+    if (!response.ok) throw new Error(data.error || "Zahtjev nije uspio.");
     return data;
+  }
+
+  function currentReturnPath() {
+    return `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  }
+
+  function normalizeReturnPath(value) {
+    return typeof value === "string" && value.startsWith("/") && !value.startsWith("//")
+      ? value
+      : "/";
+  }
+
+  function authPageHref() {
+    return `./prijava.html?next=${encodeURIComponent(currentReturnPath())}`;
+  }
+
+  function googleLoginHref() {
+    const next = normalizeReturnPath(new URLSearchParams(window.location.search).get("next"));
+    return `/api/auth/google?next=${encodeURIComponent(next)}`;
   }
 
   function renderWidgets() {
@@ -96,10 +101,10 @@
 
       if (state.user) {
         widget.innerHTML = `
-          <span class="auth-widget__user" title="${escapeHtml(state.user.email)}">
+          <a class="auth-widget__user" href="./profil.html" title="${escapeHtml(state.user.email)}">
             ${escapeHtml(state.user.email)}
-          </span>
-          <button class="auth-widget__button auth-widget__button--secondary" type="button" data-auth-logout>
+          </a>
+          <button class="auth-widget__logout" type="button" data-auth-logout>
             Odjava
           </button>
         `;
@@ -107,180 +112,102 @@
       }
 
       widget.innerHTML = `
-        <button class="auth-widget__button" type="button" data-auth-open data-auth-start-mode="login">
+        <a class="auth-widget__button" href="${escapeHtml(authPageHref())}">
           Prijavi se
-        </button>
-        <button
-          class="auth-widget__button auth-widget__button--secondary"
-          type="button"
-          data-auth-open
-          data-auth-start-mode="signup"
-        >
-          Registriraj se
-        </button>
+        </a>
       `;
     });
   }
 
-  function ensureDialog() {
-    if (state.dialog) return state.dialog;
+  function renderAuthPage() {
+    if (!authPage) return;
 
-    const dialog = document.createElement("div");
-    dialog.className = "auth-dialog";
-    dialog.hidden = true;
-    dialog.innerHTML = `
-      <div class="auth-dialog__backdrop" data-auth-close></div>
-      <section
-        class="auth-dialog__panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="auth-dialog-title"
-      >
-        <button class="auth-dialog__close" type="button" data-auth-close aria-label="Zatvori prijavu">
-          ×
-        </button>
-        <p class="eyebrow">Školski račun</p>
-        <h2 id="auth-dialog-title"></h2>
-        <p data-auth-intro></p>
-        <div class="auth-dialog__tabs" role="tablist" aria-label="Odabir prijave">
-          <button type="button" data-auth-mode="login">Prijava</button>
-          <button type="button" data-auth-mode="signup">Novi račun</button>
+    if (state.loading) {
+      authPage.innerHTML = authCard({
+        intro: "Provjeravam postoji li aktivna prijava.",
+        title: "Provjera prijave",
+      });
+      return;
+    }
+
+    if (state.user) {
+      authPage.innerHTML = authCard({
+        body: `
+          <p class="auth-page-card__intro">Možeš nastaviti s vježbom mature.</p>
+          <p class="auth-page-card__user" title="${escapeHtml(state.user.email)}">
+            ${escapeHtml(state.user.email)}
+          </p>
+          <div class="auth-page-card__actions">
+            <a class="primary-button" href="./">Nastavi na vježbe</a>
+            <a class="secondary-button" href="./profil.html">Otvori profil</a>
+            <button class="secondary-button" type="button" data-auth-logout>Odjava</button>
+          </div>
+        `,
+        title: "Prijavljen si",
+      });
+      return;
+    }
+
+    const error = oauthErrors[new URLSearchParams(window.location.search).get("auth_error")];
+
+    authPage.innerHTML = authCard({
+      body: `
+        <p class="auth-page-card__intro">
+          Prijavi se za spremanje napretka na svojim uređajima.
+        </p>
+        ${error ? `<p class="auth-page-card__message" data-tone="error">${escapeHtml(error)}</p>` : ""}
+        <div class="auth-page-card__google-action">
+          <a class="auth-google-button" href="${escapeHtml(googleLoginHref())}">
+            <img
+              class="auth-google-button__mark"
+              src="./assets/google-g.webp"
+              alt=""
+              width="20"
+              height="20"
+            />
+            <span>Nastavi s Googleom</span>
+          </a>
         </div>
-        <form class="auth-form" data-auth-form>
-          <label class="field">
-            <span>E-mail adresa</span>
-            <input
-              name="email"
-              type="email"
-              inputmode="email"
-              autocomplete="username"
-              placeholder="ime.prezime@skole.hr"
-              required
-            />
-          </label>
-          <label class="field">
-            <span>Lozinka</span>
-            <input
-              name="password"
-              type="password"
-              autocomplete="current-password"
-              required
-            />
-          </label>
-          <button class="primary-button auth-form__submit" type="submit"></button>
-        </form>
-        <p class="auth-dialog__message" data-auth-message hidden></p>
-      </section>
+        <p class="auth-page-card__note">
+          Neslužbeni projekt.
+        </p>
+      `,
+      title: "Prijava",
+    });
+  }
+
+  function authCard({ body, eyebrow = "Asistent za maturu", intro, title }) {
+    return `
+      <article class="auth-page-card">
+        <div class="auth-page-card__brand">
+          <img
+            class="auth-page-card__logo"
+            src="./assets/asistent_za_maturu.webp"
+            alt=""
+            width="56"
+            height="56"
+            decoding="async"
+          />
+          <div>
+            <p class="eyebrow">${escapeHtml(eyebrow)}</p>
+            <h1>${escapeHtml(title)}</h1>
+          </div>
+        </div>
+        ${body || `<p class="auth-page-card__intro">${escapeHtml(intro)}</p>`}
+      </article>
     `;
-
-    document.body.append(dialog);
-    state.dialog = dialog;
-
-    dialog.addEventListener("click", (event) => {
-      const modeButton = event.target.closest("[data-auth-mode]");
-      if (modeButton) {
-        setMode(modeButton.dataset.authMode);
-        return;
-      }
-
-      if (event.target.closest("[data-auth-close]")) closeDialog();
-    });
-
-    dialog.querySelector("[data-auth-form]").addEventListener("submit", async (event) => {
-      event.preventDefault();
-
-      const form = event.currentTarget;
-      const submit = form.querySelector("[type='submit']");
-      const formData = new FormData(form);
-      submit.disabled = true;
-      setDialogMessage(state.mode === "signup" ? "Izrađujem račun..." : "Prijavljujem...", "muted");
-
-      try {
-        const result = await api(`/api/auth/${state.mode === "signup" ? "signup" : "login"}`, {
-          body: JSON.stringify({
-            email: formData.get("email"),
-            password: formData.get("password"),
-          }),
-          method: "POST",
-        });
-        state.user = result.user;
-        renderWidgets();
-        setDialogMessage(result.message || "Prijavljen si.", "success");
-        form.reset();
-        window.setTimeout(closeDialog, 250);
-      } catch (error) {
-        setDialogMessage(error.message, "error");
-      } finally {
-        submit.disabled = false;
-      }
-    });
-
-    renderDialogMode();
-    return dialog;
   }
 
-  function setMode(mode) {
-    state.mode = mode === "signup" ? "signup" : "login";
-    renderDialogMode();
-    clearDialogMessage();
-  }
-
-  function renderDialogMode() {
-    if (!state.dialog) return;
-
-    const copy = modeCopy[state.mode];
-    state.dialog.querySelector("#auth-dialog-title").textContent = copy.title;
-    state.dialog.querySelector("[data-auth-intro]").textContent = copy.intro;
-    state.dialog.querySelector(".auth-form__submit").textContent = copy.button;
-    state.dialog.querySelector("input[name='password']").autocomplete = copy.passwordAutocomplete;
-    state.dialog.querySelectorAll("[data-auth-mode]").forEach((button) => {
-      const isActive = button.dataset.authMode === state.mode;
-      button.classList.toggle("auth-dialog__tab--active", isActive);
-      button.setAttribute("aria-selected", isActive ? "true" : "false");
-    });
-  }
-
-  function clearDialogMessage() {
-    if (!state.dialog) return;
-    const messageNode = state.dialog.querySelector("[data-auth-message]");
-    messageNode.hidden = true;
-    messageNode.textContent = "";
-  }
-
-  function setDialogMessage(message, tone) {
-    const messageNode = state.dialog.querySelector("[data-auth-message]");
-    messageNode.textContent = message;
-    messageNode.dataset.tone = tone;
-    messageNode.hidden = false;
-  }
-
-  function openDialog(mode) {
-    if (mode) state.mode = mode === "signup" ? "signup" : "login";
-    const dialog = ensureDialog();
-    renderDialogMode();
-    dialog.hidden = false;
-    document.body.classList.add("auth-dialog-open");
-    window.setTimeout(() => dialog.querySelector("input[name='email']").focus(), 0);
-  }
-
-  function closeDialog() {
-    if (!state.dialog) return;
-    state.dialog.hidden = true;
-    document.body.classList.remove("auth-dialog-open");
-    clearDialogMessage();
-  }
-
-  async function loadUser() {
+  async function loadAuthState() {
     try {
-      const data = await api("/api/auth/me");
-      state.available = true;
-      state.user = data.authenticated ? data.user : null;
+      const session = await api("/api/auth/me");
+      state.user = session.authenticated ? session.user : null;
     } catch {
-      state.available = false;
       state.user = null;
     } finally {
       state.loading = false;
       renderWidgets();
+      renderAuthPage();
     }
   }
 
@@ -293,10 +220,12 @@
     } finally {
       state.user = null;
       renderWidgets();
+      renderAuthPage();
     }
   }
 
   function renderCookieNotice() {
+    if (authPage) return;
     if (readCookie(cookieNoticeName) === "accepted") return;
     if (document.querySelector("[data-cookie-notice]")) return;
 
@@ -329,27 +258,16 @@
   }
 
   document.addEventListener("click", (event) => {
-    const authOpenButton = event.target.closest("[data-auth-open]");
-    if (authOpenButton) {
-      openDialog(authOpenButton.dataset.authStartMode);
-      return;
-    }
-
     if (event.target.closest("[data-auth-logout]")) {
       logout();
       return;
     }
 
-    if (event.target.closest("[data-cookie-accept]")) {
-      acceptCookieNotice();
-    }
-  });
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeDialog();
+    if (event.target.closest("[data-cookie-accept]")) acceptCookieNotice();
   });
 
   renderWidgets();
+  renderAuthPage();
   renderCookieNotice();
-  loadUser();
+  loadAuthState();
 })();

@@ -24,11 +24,22 @@ const legacyTermAliases = {
 };
 
 const croatianSubjectColor = "#7a3f4a";
+const defaultTaskTypeId = "citanje-s-polaznim-tekstom";
+const taskTypeAliases = {
+  abcd: defaultTaskTypeId,
+  citanje: defaultTaskTypeId,
+  "citanje-s-polaznim-tekstom": defaultTaskTypeId,
+  "visestruki-izbor": "visestruki-izbor",
+  nadopunjavanje: "nadopunjavanje",
+};
 
 let solverExam;
+let questionByNumber = new Map();
 let responses = {};
+let activeTaskTypeId = defaultTaskTypeId;
 let activeQuestionNumber;
 let checked = false;
+let quickSelectFrame;
 const simulation = window.createExamSimulation({ onFinish: finishSimulation });
 
 function escapeHtml(value) {
@@ -45,6 +56,28 @@ function icon(iconName, className) {
     <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
       <use href="./assets/lucide-icons.svg#${iconName}"></use>
     </svg>
+  `;
+}
+
+function checkButtonLabel() {
+  if (simulation.active && !simulation.finished) return "Predaj simulaciju";
+  return checked ? "Sakrij rješenja" : "Provjeri rješenja";
+}
+
+function checkButtonIcon() {
+  return checked && !(simulation.active && !simulation.finished) ? "eye-off" : "circle-check";
+}
+
+function checkButtonClass() {
+  return checked && !(simulation.active && !simulation.finished)
+    ? "primary-button primary-button--muted"
+    : "primary-button";
+}
+
+function renderCheckButtonContent() {
+  return `
+    ${icon(checkButtonIcon(), "solver-sticky-footer__action-icon")}
+    ${checkButtonLabel()}
   `;
 }
 
@@ -109,17 +142,55 @@ const exams = data.exams.map((exam) => {
 });
 const examsById = buildExamMap(exams);
 
-function questionIds(exam = solverExam) {
-  return exam?.questions || [];
+function tasks(exam = solverExam) {
+  return exam?.tasks || [];
+}
+
+function taskQuestions(task) {
+  return (task?.questions || []).map((question) => String(question.number));
+}
+
+function allQuestions(exam = solverExam) {
+  return tasks(exam).flatMap(taskQuestions);
+}
+
+function taskForId(taskTypeId, exam = solverExam) {
+  return tasks(exam).find((task) => task.id === taskTypeId) || tasks(exam)[0];
+}
+
+function questionsForTaskType(taskTypeId = activeTaskTypeId, exam = solverExam) {
+  return taskQuestions(taskForId(taskTypeId, exam));
+}
+
+function buildQuestionMap(exam) {
+  return new Map(
+    tasks(exam).flatMap((task) =>
+      task.questions.map((question) => [String(question.number), question]),
+    ),
+  );
 }
 
 function selectedExamId() {
   return new URLSearchParams(window.location.search).get("exam");
 }
 
-function examUrl(exam, simulationMode = false) {
+function normalizeTaskTypeId(taskTypeId, exam = solverExam) {
+  const normalized = taskTypeAliases[taskTypeId] || taskTypeId || defaultTaskTypeId;
+  return taskForId(normalized, exam)?.id || tasks(exam)[0]?.id || defaultTaskTypeId;
+}
+
+function selectedTaskTypeId(exam) {
+  const params = new URLSearchParams(window.location.search);
+  return normalizeTaskTypeId(params.get("vrsta") || params.get("cjelina"), exam);
+}
+
+function examUrl(exam, taskTypeId = defaultTaskTypeId) {
   const params = new URLSearchParams({ exam: exam.id });
-  if (simulationMode) params.set("nacin", "simulacija");
+  const normalizedTaskTypeId = normalizeTaskTypeId(taskTypeId, exam);
+  if (normalizedTaskTypeId !== tasks(exam)[0]?.id) {
+    params.set("vrsta", normalizedTaskTypeId);
+  }
+  if (simulation.active) params.set("nacin", "simulacija");
   return `./hrvatski.html?${params.toString()}`;
 }
 
@@ -127,8 +198,8 @@ function croatianSubjectUrl() {
   return "./?predmet=Hrvatski%20jezik";
 }
 
-function allQuestions(exam) {
-  return questionIds(exam);
+function levelText(exam) {
+  return exam.level ? `${exam.level} razina` : "Bez razine";
 }
 
 function correctAnswers(question) {
@@ -171,8 +242,12 @@ function saveResponses() {
   }
 }
 
-function answeredCount(exam, storedResponses = responses) {
+function answeredCount(exam = solverExam, storedResponses = responses) {
   return allQuestions(exam).filter((question) => storedResponses[question]?.trim()).length;
+}
+
+function taskAnsweredCount(task) {
+  return taskQuestions(task).filter((question) => responses[question]?.trim()).length;
 }
 
 function renderMissingExam() {
@@ -187,83 +262,161 @@ function renderMissingExam() {
   `;
 }
 
-function levelText(exam) {
-  return exam.level ? `${exam.level} razina` : "Bez razine";
-}
-
-function renderSolver(exam) {
+function renderSolver(exam, taskTypeId) {
   document.body.classList.add("solver-page", "croatian-solver-page");
   app.classList.add("croatian-solver-active");
   solverExam = exam;
+  questionByNumber = buildQuestionMap(exam);
   responses = simulation.active ? {} : loadResponses(exam);
-  activeQuestionNumber = questionIds(exam)[0];
+  activeTaskTypeId = normalizeTaskTypeId(taskTypeId, exam);
+  activeQuestionNumber = questionsForTaskType(activeTaskTypeId, exam)[0] || allQuestions(exam)[0];
   checked = false;
 
   app.innerHTML = `
-    <header class="solver-header" style="--subject-color: ${croatianSubjectColor}">
-      <div class="solver-header__toolbar">
-        <a class="solver-header__back" href="${croatianSubjectUrl()}">← Odaberi drugi ispit</a>
-        <nav class="solver-header__downloads" aria-label="Materijali ispita">
-          <a href="${escapeHtml(exam.paperUrl)}" target="_blank" rel="noreferrer">
-            Otvori službeni PDF
-          </a>
-          <a href="${escapeHtml(exam.archiveUrl)}" target="_blank" rel="noreferrer">
-            Preuzmi ZIP
-          </a>
-        </nav>
-      </div>
-
-      <div class="solver-header__main">
-        <div class="solver-header__identity">
-          <span class="subject-symbol solver-header__subject-symbol">
-            ${icon("book-open-text", "subject-symbol__icon")}
-          </span>
-          <div>
-            <p class="eyebrow">Hrvatski jezik</p>
-            <h2>${exam.year}. · ${escapeHtml(formatTerm(exam.term))} · ${escapeHtml(levelText(exam))}</h2>
-            <p>
-              Vrijeme u izvornoj knjižici: ${exam.durationMinutes} min ·
-              školska godina ${escapeHtml(exam.schoolYear)}
-            </p>
-          </div>
-        </div>
-        <div class="solver-summary">
-          ${simulation.renderTimer()}
-          <strong id="answer-progress"></strong>
-          <span id="score-summary"></span>
-        </div>
-      </div>
-
-      <p class="solver-header__footer">
-        Knjižica se prikazuje iz službenog PDF-a. Odgovore označi u digitalnom
-        ABCD listu za odgovore.
-      </p>
-    </header>
+    ${renderSolverHeader({
+      subjectColor: croatianSubjectColor,
+      backHref: croatianSubjectUrl(),
+      backLabel: "← Odaberi drugi ispit",
+      paperUrl: exam.paperUrl,
+      archiveUrl: exam.archiveUrl,
+      eyebrow: "Hrvatski jezik",
+      title: `${exam.year}. · ${formatTerm(exam.term)} · ${levelText(exam)}`,
+      iconName: "book-open-text",
+      summaryHtml: `
+        ${simulation.renderTimer()}
+        <strong id="answer-progress"></strong>
+        <span id="score-summary"></span>
+      `,
+    })}
 
     ${simulation.renderNotice()}
 
-    <div class="solver-question-layout solver-question-layout--workspace">
-      <div class="solver-workspace croatian-practice-layout">
-        <section class="task-content-panel croatian-document-panel">
-          <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Ispitna knjižica</p>
-              <h3>Čitanje, književnost i hrvatski jezik</h3>
+    <div id="section-content"></div>
+
+    <footer class="solver-sticky-footer">
+      <div class="solver-sticky-footer__inner">
+        <nav class="task-navigation" id="task-type-navigation" aria-label="Vrste zadataka u ispitu"></nav>
+        <div class="solver-sticky-footer__controls">
+          <div class="solver-sticky-footer__status">
+            ${icon("list-checks", "solver-sticky-footer__status-icon")}
+            <div class="solver-sticky-footer__status-copy">
+              <strong id="footer-answer-progress"></strong>
+              <span id="footer-score-summary"></span>
             </div>
-            <small>${questionIds(exam).length} pitanja</small>
           </div>
-          <div class="croatian-pdf-frame">
-            <iframe
-              src="${escapeHtml(exam.paperUrl)}"
-              title="Službena PDF knjižica iz Hrvatskoga jezika"
-              loading="lazy"
-            ></iframe>
+          <div class="solver-sticky-footer__actions">
+            <button class="${checkButtonClass()}" id="check-answers" type="button">
+              ${renderCheckButtonContent()}
+            </button>
           </div>
-        </section>
-
-        <section class="answer-panel croatian-answer-panel" id="answer-panel" aria-live="polite"></section>
+        </div>
       </div>
+    </footer>
 
+    <div class="exam-results-dialog" id="exam-results-dialog" role="dialog" aria-modal="true" aria-labelledby="exam-results-title" hidden>
+      <div class="exam-results-dialog__backdrop"></div>
+      <section class="exam-results-dialog__panel">
+        <button class="exam-results-dialog__close" id="close-exam-results" type="button" aria-label="Zatvori rezultat">
+          &times;
+        </button>
+        <svg class="exam-results-dialog__check" aria-hidden="true" focusable="false" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="28"></circle>
+          <path d="m20 33 8 8 17-18"></path>
+        </svg>
+        <p class="eyebrow">Rezultat cijeloga ispita</p>
+        <h2 id="exam-results-title">Rješenja su provjerena</h2>
+        <div class="exam-results-dialog__metrics">
+          <div>
+            <strong id="exam-results-percentage"></strong>
+            <span>Riješenost</span>
+          </div>
+          <div>
+            <strong id="exam-results-score"></strong>
+            <span>Bodovi</span>
+          </div>
+        </div>
+        <p>
+          Rezultat obuhvaća sve vrste zadataka. Zatvori prozor i pregledaj
+          označene odgovore u svakoj vrsti zadatka.
+        </p>
+      </section>
+    </div>
+  `;
+
+  document.querySelector("#check-answers").addEventListener("click", checkAnswers);
+  document.querySelector("#close-exam-results").addEventListener("click", closeResultsDialog);
+  document.querySelector(".exam-results-dialog__backdrop").addEventListener("click", closeResultsDialog);
+  document.addEventListener("keydown", closeResultsDialogOnEscape);
+
+  renderTaskTypeNavigation();
+  renderSolverSummary();
+  renderTaskTypeContent();
+  simulation.start(exam.durationMinutes);
+}
+
+function renderTaskTypeNavigation() {
+  document.querySelector("#task-type-navigation").innerHTML = tasks()
+    .map((task) => {
+      const isActive = task.id === activeTaskTypeId;
+      return `
+        <a
+          class="task-button${isActive ? " task-button--active" : ""}"
+          href="${examUrl(solverExam, task.id)}"
+          data-task-type="${task.id}"
+          ${isActive ? 'aria-current="true"' : ""}
+        >
+          <strong>${escapeHtml(task.label)}</strong>
+          <small>${taskAnsweredCount(task)}/${taskQuestions(task).length}</small>
+        </a>
+      `;
+    })
+    .join("");
+
+  document.querySelectorAll("[data-task-type]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      selectTaskType(link.dataset.taskType);
+    });
+  });
+}
+
+function selectTaskType(taskTypeId) {
+  const normalizedTaskTypeId = normalizeTaskTypeId(taskTypeId);
+  if (normalizedTaskTypeId === activeTaskTypeId) return;
+
+  activeTaskTypeId = normalizedTaskTypeId;
+  activeQuestionNumber = questionsForTaskType()[0];
+  history.replaceState(null, "", examUrl(solverExam, activeTaskTypeId));
+  renderTaskTypeNavigation();
+  renderSolverSummary();
+  renderTaskTypeContent();
+  document.querySelector("#section-content")?.scrollIntoView({ block: "start" });
+}
+
+function renderSolverSummary() {
+  const complete = answeredCount();
+  const total = allQuestions().length;
+  document.querySelector("#answer-progress").textContent = `${complete}/${total} odgovora`;
+  document.querySelector("#footer-answer-progress").textContent = `${complete}/${total} odgovora`;
+  const checkButton = document.querySelector("#check-answers");
+  checkButton.disabled =
+    (simulation.finished && solverExam?.checkingSupported === false) ||
+    (complete === 0 && !checked && !simulation.finished);
+  checkButton.className = checkButtonClass();
+  checkButton.innerHTML = renderCheckButtonContent();
+
+  const score = checked ? `${totalScore()}/${total} bodova` : "";
+  document.querySelector("#score-summary").textContent = score;
+  document.querySelector("#footer-score-summary").textContent = score;
+}
+
+function renderTaskTypeContent() {
+  const task = taskForId(activeTaskTypeId);
+  const questions = task.questions || [];
+
+  document.querySelector("#section-content").innerHTML = `
+    <div class="solver-question-layout">
+      <section class="task-content-panel physics-task-content-panel" id="task-content-panel"></section>
       <aside class="question-quickselect" aria-label="Brzi odabir pitanja">
         <div class="question-quickselect__heading">
           <strong>Brzi odabir</strong>
@@ -272,94 +425,175 @@ function renderSolver(exam) {
         <nav class="question-quickselect__list" id="question-quickselect"></nav>
       </aside>
     </div>
+  `;
 
-    <footer class="solver-sticky-footer">
-      <div class="solver-sticky-footer__inner">
-        <nav class="task-navigation" id="task-navigation" aria-label="Zadatci Hrvatskoga jezika"></nav>
-        <div class="solver-sticky-footer__controls">
-          <div class="solver-sticky-footer__status">
-            <strong id="footer-answer-progress"></strong>
-            <span id="footer-score-summary"></span>
-          </div>
-          <div class="solver-sticky-footer__actions">
-            <button class="secondary-button" id="clear-answers" type="button">
-              Obriši odgovore
-            </button>
-            <button class="primary-button" id="check-answers" type="button">
-              ${simulation.active ? "Predaj simulaciju" : "Provjeri odgovore"}
-            </button>
-          </div>
-        </div>
+  document.querySelector("#task-content-panel").innerHTML = `
+    <div class="panel-heading">
+      <div>
+        <p class="eyebrow">Pitanja iz knjižice</p>
+        <h3>${escapeHtml(task.label)}</h3>
       </div>
-    </footer>
+      <small>${questions.length} pitanja</small>
+    </div>
+    <p class="practice-notice">${escapeHtml(task.description)}</p>
+    <div class="task-source physics-source-list">
+      ${renderContextImages(task.sourceImages, "Tekst s prazninama i ponuđeni odgovori")}
+      ${questions.map(renderSourceQuestion).join("")}
+    </div>
   `;
 
-  document.querySelector("#clear-answers").addEventListener("click", clearAnswers);
-  document.querySelector("#check-answers").addEventListener("click", checkAnswers);
-
-  renderTaskNavigation();
-  renderQuestionQuickSelect();
-  renderSolverSummary();
-  renderAnswerPanel();
-  simulation.start(exam.durationMinutes);
+  bindResponseListeners();
+  renderQuickSelect();
+  bindQuickSelectTracking();
 }
 
-function renderSolverSummary() {
-  const complete = answeredCount(solverExam);
-  const total = allQuestions(solverExam).length;
-  document.querySelector("#answer-progress").textContent = `${complete}/${total} odgovora`;
-  document.querySelector("#footer-answer-progress").textContent = `${complete}/${total} odgovora`;
-  document.querySelector("#clear-answers").disabled = complete === 0 || simulation.finished;
-  document.querySelector("#check-answers").disabled = complete === 0 || simulation.finished;
+function renderSourceQuestion(question) {
+  const number = String(question.number);
+  const sourceImage = renderCroppedImage(
+    question.sourceImage,
+    `Izvorni prikaz ${number}. pitanja iz službene PDF knjižice.`,
+  );
+  const completionPrompt = activeTaskTypeId === "nadopunjavanje"
+    ? `<p>Odaberi odgovor za prazninu ${escapeHtml(number)}.</p>`
+    : "";
 
-  const scoreSummary = document.querySelector("#score-summary");
-  const score = checked ? `${totalScore()}/${total} točno` : "";
-  scoreSummary.textContent = score;
-  document.querySelector("#footer-score-summary").textContent = score;
-}
-
-function renderTaskNavigation() {
-  const complete = answeredCount(solverExam);
-  const total = allQuestions(solverExam).length;
-  const score = checked ? ` · ${totalScore()}/${total} točno` : "";
-  document.querySelector("#task-navigation").innerHTML = `
-    <span class="task-button task-button--active" aria-current="true">
-      <strong>ABCD zadatci</strong>
-      <small>${complete}/${total} odgovora${score}</small>
-    </span>
+  return `
+    ${renderContextImages(question.contextImages, "Polazni tekst")}
+    <article
+      class="physics-source-question${sourceImage ? " physics-source-question--image" : ""}"
+      id="pitanje-${escapeHtml(number)}"
+      data-question-number="${escapeHtml(number)}"
+    >
+      ${sourceImage ? "" : `<h4>${escapeHtml(number)}</h4>`}
+      <div class="physics-source-question__body">
+        ${sourceImage || completionPrompt}
+      </div>
+      ${renderQuestion(number)}
+    </article>
   `;
 }
 
-function renderQuestionQuickSelect() {
+function renderContextImages(images = [], title) {
+  if (!images.length) return "";
+  return `
+    <section class="croatian-source-context">
+      <p class="eyebrow">${escapeHtml(title)}</p>
+      ${images
+        .map((image, index) =>
+          renderCroppedImage(image, `${title}, službeni prikaz ${index + 1}.`),
+        )
+        .join("")}
+    </section>
+  `;
+}
+
+function renderCroppedImage(source, alt) {
+  const crop = source?.crop;
+  const dimensions = [
+    source?.width,
+    source?.height,
+    crop?.x,
+    crop?.y,
+    crop?.width,
+    crop?.height,
+  ].map(Number);
+  if (!source?.url || dimensions.some((value) => !Number.isFinite(value) || value < 0)) return "";
+  if (!source.width || !source.height || !crop.width || !crop.height) return "";
+
+  const width = (source.width / crop.width) * 100;
+  const offsetX = (-crop.x / source.width) * 100;
+  const offsetY = (-crop.y / source.height) * 100;
+
+  return `
+    <figure class="physics-source-figure">
+      <div class="physics-source-crop" style="aspect-ratio: ${crop.width} / ${crop.height}">
+        <img
+          src="${escapeHtml(source.url)}"
+          alt="${escapeHtml(alt)}"
+          width="${source.width}"
+          height="${source.height}"
+          loading="lazy"
+          decoding="async"
+          style="width: ${width}%; transform: translate(${offsetX}%, ${offsetY}%);"
+        >
+      </div>
+    </figure>
+  `;
+}
+
+function bindResponseListeners() {
+  document.querySelectorAll('input[type="radio"][data-question]').forEach((input) => {
+    input.addEventListener("change", () => updateResponse(input.dataset.question, input.value));
+  });
+}
+
+function quickSelectGroupNumber(question) {
+  return String(question).split(".")[0];
+}
+
+function quickSelectItems() {
+  const items = [];
+  for (const question of questionsForTaskType()) {
+    const number = String(question);
+    const group = quickSelectGroupNumber(number);
+    const previousItem = items[items.length - 1];
+    if (previousItem?.group === group) {
+      previousItem.questions.push(number);
+      continue;
+    }
+
+    items.push({
+      label: group,
+      target: number,
+      group,
+      questions: [number],
+    });
+  }
+  return items;
+}
+
+function quickSelectAnswerState(item) {
+  const answeredCountForItem = item.questions.filter((question) => responses[question]).length;
+  if (answeredCountForItem === item.questions.length) return "odgovoreno";
+  if (answeredCountForItem > 0) return "djelomično odgovoreno";
+  return "nije odgovoreno";
+}
+
+function activeQuickSelectGroup() {
+  return quickSelectGroupNumber(activeQuestionNumber);
+}
+
+function renderQuickSelect() {
   const quickSelect = document.querySelector("#question-quickselect");
   if (!quickSelect) return;
 
-  const questions = questionIds();
+  const items = quickSelectItems();
   const quickSelectPanel = quickSelect.closest(".question-quickselect");
-  if (quickSelectPanel) quickSelectPanel.hidden = questions.length <= 1;
+  if (quickSelectPanel) quickSelectPanel.hidden = items.length <= 2;
 
-  quickSelect.innerHTML = questions
-    .map((question) => {
-      const answer = responses[question];
-      const stateClass = answer ? " question-quickselect__link--answered" : "";
+  quickSelect.innerHTML = items
+    .map((item) => {
+      const isAnswered = item.questions.every((question) => responses[question]);
+      const stateClass = isAnswered ? " question-quickselect__link--answered" : "";
       const resultClass = checked
-        ? isCorrectAnswer(question, answer)
+        ? item.questions.every((question) => isCorrectAnswer(question, responses[question]))
           ? " question-quickselect__link--correct"
           : " question-quickselect__link--wrong"
         : "";
       const activeClass =
-        String(question) === String(activeQuestionNumber) ? " question-quickselect__link--active" : "";
-      const answerState = answer ? "odgovoreno" : "nije odgovoreno";
-
+        item.group === activeQuickSelectGroup() ? " question-quickselect__link--active" : "";
+      const answerState = quickSelectAnswerState(item);
+      const itemLabel = item.questions.length > 1 ? "Zadatak" : "Pitanje";
       return `
         <a
           class="question-quickselect__link${stateClass}${resultClass}${activeClass}"
-          href="#odgovor-${escapeHtml(question)}"
-          data-quick-question="${escapeHtml(question)}"
-          aria-label="Pitanje ${escapeHtml(question)}, ${answerState}"
+          href="#pitanje-${escapeHtml(item.target)}"
+          data-quick-question="${escapeHtml(item.target)}"
+          data-quick-group="${escapeHtml(item.group)}"
+          aria-label="${itemLabel} ${escapeHtml(item.label)}, ${answerState}"
           ${activeClass ? 'aria-current="true"' : ""}
         >
-          ${escapeHtml(question)}
+          ${escapeHtml(item.label)}
         </a>
       `;
     })
@@ -368,33 +602,53 @@ function renderQuestionQuickSelect() {
   quickSelect.querySelectorAll("[data-quick-question]").forEach((link) => {
     link.addEventListener("click", (event) => {
       event.preventDefault();
-      selectQuestion(link.dataset.quickQuestion);
+      const question = link.dataset.quickQuestion;
+      const target = document.getElementById(`pitanje-${question}`);
+      activeQuestionNumber = question;
+      updateQuickSelectActiveState();
+      target?.scrollIntoView({ block: "start", behavior: "auto" });
+      if (target) history.replaceState(null, "", `#pitanje-${question}`);
     });
   });
 }
 
-function renderAnswerPanel() {
-  const complete = answeredCount(solverExam);
-  const total = allQuestions(solverExam).length;
-  document.querySelector("#answer-panel").innerHTML = `
-    <div class="panel-heading">
-      <div>
-        <p class="eyebrow">Digitalni list za odgovore</p>
-        <h3>ABCD zadatci</h3>
-      </div>
-      <small>${complete}/${total}</small>
-    </div>
-    <p class="answer-panel__hint">
-      Odaberi jedan odgovor za svako pitanje. Polazni tekstovi ostaju u PDF knjižici.
-    </p>
+function bindQuickSelectTracking() {
+  window.removeEventListener("scroll", queueActiveQuestionUpdate);
+  window.addEventListener("scroll", queueActiveQuestionUpdate, { passive: true });
+  updateActiveQuestionFromScroll();
+}
 
-    <div class="response-list croatian-response-list">
-      ${questionIds().map((question) => renderQuestion(question)).join("")}
-    </div>
-  `;
+function queueActiveQuestionUpdate() {
+  if (quickSelectFrame) return;
+  quickSelectFrame = window.requestAnimationFrame(updateActiveQuestionFromScroll);
+}
 
-  document.querySelectorAll('input[type="radio"][data-question]').forEach((input) => {
-    input.addEventListener("change", () => updateResponse(input.dataset.question, input.value));
+function updateActiveQuestionFromScroll() {
+  quickSelectFrame = undefined;
+  const questions = [...document.querySelectorAll("[data-question-number]")];
+  if (!questions.length) return;
+
+  const focusLine = Math.min(window.innerHeight * 0.28, 240);
+  let activeQuestion = questions[0];
+  for (const question of questions) {
+    if (question.getBoundingClientRect().top > focusLine) break;
+    activeQuestion = question;
+  }
+
+  const nextQuestionNumber = activeQuestion.dataset.questionNumber;
+  if (nextQuestionNumber === activeQuestionNumber) return;
+  activeQuestionNumber = nextQuestionNumber;
+  updateQuickSelectActiveState();
+}
+
+function updateQuickSelectActiveState() {
+  const activeGroup = activeQuickSelectGroup();
+  document.querySelectorAll("[data-quick-question]").forEach((link) => {
+    const linkGroup = link.dataset.quickGroup || link.dataset.quickQuestion;
+    const isActive = linkGroup === activeGroup;
+    link.classList.toggle("question-quickselect__link--active", isActive);
+    if (isActive) link.setAttribute("aria-current", "true");
+    else link.removeAttribute("aria-current");
   });
 }
 
@@ -407,8 +661,9 @@ function renderQuestion(question) {
     : "";
 
   return `
-    <fieldset class="response-question ${resultClass}" id="odgovor-${escapeHtml(question)}">
-      <legend>${escapeHtml(question)}.</legend>
+    <fieldset class="physics-inline-response ${resultClass}">
+      <legend>Odgovor na ${escapeHtml(question)}. pitanje</legend>
+      <span class="physics-inline-response__label">Odaberi odgovor</span>
       <div class="choice-list">
         ${["A", "B", "C", "D"]
           .map((option) => renderChoice(question, option, answer))
@@ -452,48 +707,16 @@ function renderFeedback(question, answer) {
 function updateResponse(question, answer) {
   if (simulation.finished) return;
 
+  const wasChecked = checked;
   checked = false;
   const normalizedAnswer = String(answer || "").trim();
   if (normalizedAnswer) responses[question] = normalizedAnswer;
   else delete responses[question];
-  activeQuestionNumber = question;
   saveResponses();
-  renderTaskNavigation();
-  renderQuestionQuickSelect();
+  renderTaskTypeNavigation();
   renderSolverSummary();
-  renderAnswerPanel();
-}
-
-function selectQuestion(question) {
-  activeQuestionNumber = question;
-  renderQuestionQuickSelect();
-  document.getElementById(`odgovor-${question}`)?.scrollIntoView({
-    behavior: "smooth",
-    block: "center",
-  });
-}
-
-function clearAnswers() {
-  if (simulation.finished) return;
-  const prompt = simulation.active
-    ? "Obrisati odgovore iz ove simulacije?"
-    : "Obrisati spremljene odgovore za ovaj ispit?";
-  if (!window.confirm(prompt)) return;
-  responses = {};
-  checked = false;
-  if (!simulation.active) {
-    try {
-      for (const key of choiceStorageKeys(solverExam)) {
-        localStorage.removeItem(key);
-      }
-    } catch {
-      // The in-memory reset still works if storage is unavailable.
-    }
-  }
-  renderTaskNavigation();
-  renderQuestionQuickSelect();
-  renderSolverSummary();
-  renderAnswerPanel();
+  renderQuickSelect();
+  if (wasChecked) renderTaskTypeContent();
 }
 
 function checkAnswers() {
@@ -503,31 +726,89 @@ function checkAnswers() {
     return;
   }
 
+  if (checked) {
+    checked = false;
+    closeResultsDialog();
+    renderTaskTypeNavigation();
+    renderSolverSummary();
+    renderTaskTypeContent();
+    return;
+  }
+
   checked = true;
-  renderTaskNavigation();
-  renderQuestionQuickSelect();
+  renderTaskTypeNavigation();
   renderSolverSummary();
-  renderAnswerPanel();
+  renderTaskTypeContent();
+  openResultsDialog();
 }
 
 function finishSimulation(reason) {
   checked = true;
-  renderTaskNavigation();
-  renderQuestionQuickSelect();
+  renderTaskTypeNavigation();
   renderSolverSummary();
-  renderAnswerPanel();
+  renderTaskTypeContent();
 
+  if (reason === "submitted") recordSubmittedSimulation();
   if (reason === "expired") {
     window.alert("Vrijeme za simulaciju je isteklo. Odgovori više nisu promjenjivi.");
   }
+  openResultsDialog();
+}
+
+function recordSubmittedSimulation() {
+  if (!window.AsistentProfile) return;
+
+  const total = allQuestions().length;
+  window.AsistentProfile.recordSimulationAttempt({
+    solver: "croatian-choice",
+    subject: "Hrvatski jezik",
+    part: "Čitanje, književnost i hrvatski jezik",
+    examId: solverExam.id,
+    year: solverExam.year,
+    term: solverExam.term,
+    level: solverExam.level,
+    schoolYear: solverExam.schoolYear,
+    durationMinutes: solverExam.durationMinutes,
+    answered: answeredCount(),
+    totalQuestions: total,
+    score: totalScore(),
+    maxScore: total,
+    percentage: scorePercentage(),
+    checkingSupported: true,
+  });
 }
 
 function totalScore() {
-  return scoreForQuestions(allQuestions(solverExam));
+  return allQuestions().filter((question) => isCorrectAnswer(question, responses[question])).length;
 }
 
-function scoreForQuestions(questions) {
-  return questions.filter((question) => isCorrectAnswer(question, responses[question])).length;
+function scorePercentage() {
+  const maximum = allQuestions().length;
+  return maximum ? Math.round((totalScore() / maximum) * 100) : 0;
+}
+
+function openResultsDialog() {
+  const dialog = document.querySelector("#exam-results-dialog");
+  if (!dialog) return;
+
+  document.querySelector("#exam-results-percentage").textContent = `${scorePercentage()}%`;
+  document.querySelector("#exam-results-score").textContent = `${totalScore()}/${allQuestions().length}`;
+  dialog.hidden = false;
+  document.body.classList.add("exam-results-dialog-open");
+  document.querySelector("#close-exam-results").focus();
+}
+
+function closeResultsDialog() {
+  const dialog = document.querySelector("#exam-results-dialog");
+  if (!dialog || dialog.hidden) return;
+
+  dialog.hidden = true;
+  document.body.classList.remove("exam-results-dialog-open");
+  document.querySelector("#check-answers")?.focus();
+}
+
+function closeResultsDialogOnEscape(event) {
+  if (event.key === "Escape") closeResultsDialog();
 }
 
 const id = selectedExamId();
@@ -535,6 +816,6 @@ if (!id) {
   window.location.replace(croatianSubjectUrl());
 } else {
   const exam = examsById.get(id);
-  if (exam) renderSolver(exam);
+  if (exam) renderSolver(exam, selectedTaskTypeId(exam));
   else renderMissingExam();
 }

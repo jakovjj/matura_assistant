@@ -19,6 +19,8 @@ from typing import Any
 from urllib.parse import quote, unquote, urlparse
 from xml.etree import ElementTree
 
+from PIL import Image
+
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVE_INDEX = ROOT / "data" / "exams.js"
@@ -33,6 +35,10 @@ SOURCE_RENDER_DPI = 144
 SOURCE_CROP_HORIZONTAL_MARGIN = 48
 SOURCE_CROP_VERTICAL_PADDING = 9
 SOURCE_FOOTER_MARGIN = 65
+SOLUTION_FOOTER_MARGIN = 70
+SOLUTION_TABLE_RULE_MIN_WIDTH_RATIO = 0.45
+SOLUTION_TABLE_CROP_PADDING = 2
+SOLUTION_RULE_MARKER_TOLERANCE = 4
 TERM_ALIASES = {
     "prvi rok": "ljetni rok",
     "drugi rok": "jesenski rok",
@@ -99,6 +105,7 @@ class PdfLine:
     text: str
     first_word: str
     x_min: float
+    x_max: float
     y_min: float
     y_max: float
 
@@ -121,6 +128,14 @@ class QuestionMarker:
 @dataclass(frozen=True)
 class QuestionCrop:
     page: PdfPage
+    x_min: float
+    y_min: float
+    x_max: float
+    y_max: float
+
+
+@dataclass(frozen=True)
+class HorizontalRule:
     x_min: float
     y_min: float
     x_max: float
@@ -223,6 +238,7 @@ def pdf_bbox_pages(contents: bytes) -> list[PdfPage]:
                     text=" ".join(word for word in word_texts if word),
                     first_word=word_texts[0],
                     x_min=float(words[0].attrib["xMin"]),
+                    x_max=float(words[-1].attrib["xMax"]),
                     y_min=float(line_element.attrib["yMin"]),
                     y_max=float(line_element.attrib["yMax"]),
                 )
@@ -316,11 +332,15 @@ def point_label_from_lines(lines: list[PdfLine]) -> str | None:
             continue
         score_values: list[int] = []
         for score_line in lines[max(0, index - 10) : index]:
-            if abs(score_line.x_min - line.x_min) > 140:
+            if abs(score_line.x_min - line.x_min) > 70:
                 continue
             if not re.fullmatch(r"(?:\d+\s*)+", score_line.text.strip()):
                 continue
-            score_values.extend(int(value) for value in re.findall(r"\d+", score_line.text))
+            score_values.extend(
+                value
+                for value in (int(value) for value in re.findall(r"\d+", score_line.text))
+                if 0 <= value <= 10
+            )
         if score_values:
             return format_point_label(max(score_values))
     return None
@@ -332,6 +352,17 @@ def format_point_label(points: int) -> str:
     if 2 <= points <= 4:
         return f"{points} boda"
     return f"{points} bodova"
+
+
+def point_label_from_solution_lines(lines: list[PdfLine]) -> str | None:
+    point_values = [
+        int(match.group(1))
+        for line in lines
+        for match in POINT_LABEL_RE.finditer(line.text)
+    ]
+    if point_values:
+        return format_point_label(sum(point_values))
+    return point_label_from_lines(lines)
 
 
 def find_open_question_crops(contents: bytes) -> tuple[dict[int, QuestionCrop], dict[int, str]]:
@@ -406,7 +437,10 @@ def find_open_question_crops(contents: bytes) -> tuple[dict[int, QuestionCrop], 
     return crops, points
 
 
-def find_solution_page_crops(contents: bytes, question_numbers: list[int]) -> dict[int, QuestionCrop]:
+def find_solution_page_crops(
+    contents: bytes,
+    question_numbers: list[int],
+) -> tuple[dict[int, QuestionCrop], dict[int, str]]:
     pages = pdf_bbox_pages(contents)
     wanted_numbers = set(question_numbers)
     markers: list[QuestionMarker] = []
@@ -427,16 +461,91 @@ def find_solution_page_crops(contents: bytes, question_numbers: list[int]) -> di
             f"found {found_numbers}"
         )
 
+    markers.sort(key=lambda marker: (marker.page.number, marker.y_min))
+    rules_by_page = detect_horizontal_rules(
+        contents,
+        {marker.page.number: marker.page for marker in markers},
+    )
     crops: dict[int, QuestionCrop] = {}
-    for marker in markers:
+    points: dict[int, str] = {}
+    for index, marker in enumerate(markers):
+        next_marker = markers[index + 1] if index + 1 < len(markers) else None
+        page_rules = rules_by_page.get(marker.page.number, [])
+        top_rule = max(
+            (
+                rule
+                for rule in page_rules
+                if rule.y_min <= marker.y_min + SOLUTION_RULE_MARKER_TOLERANCE
+            ),
+            key=lambda rule: rule.y_min,
+            default=None,
+        )
+        bottom_rule = min(
+            (
+                rule
+                for rule in page_rules
+                if rule.y_min > marker.y_min + SOLUTION_RULE_MARKER_TOLERANCE
+            ),
+            key=lambda rule: rule.y_min,
+            default=None,
+        )
+        table_rule_height = (
+            bottom_rule.y_max - top_rule.y_min
+            if top_rule and bottom_rule
+            else marker.page.height
+        )
+        use_table_rules = (
+            top_rule is not None
+            and bottom_rule is not None
+            and table_rule_height <= marker.page.height * 0.65
+        )
+
+        if use_table_rules:
+            x_min = max(0, min(top_rule.x_min, bottom_rule.x_min) - SOLUTION_TABLE_CROP_PADDING)
+            y_min = max(0, top_rule.y_min - SOLUTION_TABLE_CROP_PADDING)
+            x_max = min(
+                marker.page.width,
+                max(top_rule.x_max, bottom_rule.x_max) + SOLUTION_TABLE_CROP_PADDING,
+            )
+            y_max = min(marker.page.height, bottom_rule.y_max + SOLUTION_TABLE_CROP_PADDING)
+        else:
+            relevant_lines = [
+                line
+                for line in sorted_page_lines(marker.page)
+                if line.y_min >= marker.y_min
+                and line.y_min < marker.page.height - SOLUTION_FOOTER_MARGIN
+                and (not next_marker or next_marker.page != marker.page or line.y_min < next_marker.y_min)
+            ]
+            if not relevant_lines:
+                raise ValueError(f"Solution {marker.number} has no visible source lines")
+            x_min = max(0, min(line.x_min for line in relevant_lines) - SOURCE_CROP_HORIZONTAL_MARGIN)
+            y_min = max(0, marker.y_min - SOURCE_CROP_VERTICAL_PADDING)
+            x_max = min(
+                marker.page.width,
+                max(line.x_max for line in relevant_lines) + SOURCE_CROP_HORIZONTAL_MARGIN,
+            )
+            y_max = min(
+                relevant_lines[-1].y_max + SOURCE_CROP_VERTICAL_PADDING,
+                marker.page.height - SOLUTION_FOOTER_MARGIN,
+            )
+
+        relevant_lines = [
+            line
+            for line in sorted_page_lines(marker.page)
+            if line.y_min >= y_min and line.y_min < y_max
+        ]
+        point_label = point_label_from_solution_lines(relevant_lines)
+        if point_label:
+            points[marker.number] = point_label
+
         crops[marker.number] = QuestionCrop(
             page=marker.page,
-            x_min=0,
-            y_min=0,
-            x_max=marker.page.width,
-            y_max=marker.page.height,
+            x_min=x_min,
+            y_min=y_min,
+            x_max=x_max,
+            y_max=y_max,
         )
-    return crops
+    return crops, points
 
 
 def normalized_name(name: str) -> str:
@@ -504,6 +613,100 @@ def png_dimensions(contents: bytes) -> tuple[int, int]:
     if contents[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR":
         raise ValueError("Expected a PNG source page")
     return struct.unpack(">II", contents[16:24])
+
+
+def longest_dark_run(row: bytes, threshold: int = 180) -> tuple[int, int, int]:
+    best_start = 0
+    best_length = 0
+    current_start: int | None = None
+
+    for index, value in enumerate(row):
+        if value < threshold:
+            if current_start is None:
+                current_start = index
+            continue
+
+        if current_start is not None:
+            length = index - current_start
+            if length > best_length:
+                best_start = current_start
+                best_length = length
+            current_start = None
+
+    if current_start is not None:
+        length = len(row) - current_start
+        if length > best_length:
+            best_start = current_start
+            best_length = length
+
+    return best_start, best_start + best_length, best_length
+
+
+def detect_horizontal_rules(contents: bytes, pages: dict[int, PdfPage]) -> dict[int, list[HorizontalRule]]:
+    rules_by_page: dict[int, list[HorizontalRule]] = {}
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        temporary_root = Path(temporary_directory)
+        pdf_path = temporary_root / "source.pdf"
+        pdf_path.write_bytes(contents)
+
+        for page_number, page in sorted(pages.items()):
+            temporary_prefix = temporary_root / f"rules-{page_number}"
+            try:
+                subprocess.run(
+                    [
+                        "pdftocairo",
+                        "-png",
+                        "-singlefile",
+                        "-r",
+                        str(SOURCE_RENDER_DPI),
+                        "-f",
+                        str(page_number),
+                        "-l",
+                        str(page_number),
+                        str(pdf_path),
+                        str(temporary_prefix),
+                    ],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=True,
+                )
+            except FileNotFoundError as exc:
+                raise RuntimeError("pdftocairo is required to locate Physics solution rows") from exc
+            except subprocess.CalledProcessError as exc:
+                message = exc.stderr.decode("utf-8", errors="replace")
+                raise RuntimeError(f"pdftocairo failed while locating solution rows: {message}") from exc
+
+            image = Image.open(temporary_prefix.with_suffix(".png")).convert("L")
+            width, height = image.size
+            scale_x = width / page.width
+            scale_y = height / page.height
+            minimum_run = int(width * SOLUTION_TABLE_RULE_MIN_WIDTH_RATIO)
+            candidates: list[tuple[int, int, int]] = []
+            pixels = image.load()
+            for y in range(height):
+                row = bytes(pixels[x, y] for x in range(width))
+                x_min, x_max, run_length = longest_dark_run(row)
+                if run_length >= minimum_run:
+                    candidates.append((y, x_min, x_max))
+
+            groups: list[list[tuple[int, int, int]]] = []
+            for candidate in candidates:
+                if groups and candidate[0] <= groups[-1][-1][0] + 1:
+                    groups[-1].append(candidate)
+                else:
+                    groups.append([candidate])
+
+            rules_by_page[page_number] = [
+                HorizontalRule(
+                    x_min=min(candidate[1] for candidate in group) / scale_x,
+                    y_min=min(candidate[0] for candidate in group) / scale_y,
+                    x_max=max(candidate[2] for candidate in group) / scale_x,
+                    y_max=(max(candidate[0] for candidate in group) + 1) / scale_y,
+                )
+                for group in groups
+            ]
+
+    return rules_by_page
 
 
 def render_source_pages(
@@ -860,6 +1063,7 @@ def build_open_tasks(
         }
         if number in points:
             question["points"] = points[number]
+            question["maxPoints"] = int(points[number].split()[0])
         questions.append(question)
     return [
         {
@@ -942,13 +1146,15 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     solution_key_destination = PAPER_ROOT / identifier / "solutions.pdf"
     write_if_changed(solution_key_destination, key_contents)
     expected_assets.add("solutions.pdf")
+    solution_crops, solution_points = find_solution_page_crops(key_contents, open_question_numbers)
     solution_images = render_source_pages(
         solution_key_destination,
         identifier,
-        find_solution_page_crops(key_contents, open_question_numbers),
+        solution_crops,
         page_prefix="solution-page",
         expected_assets=expected_assets,
     )
+    open_question_points = {**solution_points, **open_question_points}
     remove_unexpected_assets(identifier, expected_assets)
 
     return {

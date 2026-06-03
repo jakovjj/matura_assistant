@@ -1,8 +1,11 @@
 const archiveData = window.ASISTENT_ZA_MATURE_DATA;
 const englishReadingData = window.ASISTENT_ZA_MATURE_ENGLISH_READING;
 const englishListeningData = window.ASISTENT_ZA_MATURE_ENGLISH_LISTENING;
+const englishEssayData = window.ASISTENT_ZA_MATURE_ENGLISH_ESSAY;
 const physicsChoiceData = window.ASISTENT_ZA_MATURE_PHYSICS_CHOICE;
+const mathChoiceData = window.ASISTENT_ZA_MATURE_MATH_CHOICE;
 const croatianChoiceData = window.ASISTENT_ZA_MATURE_CROATIAN_CHOICE;
+const abcdChoiceData = window.ASISTENT_ZA_MATURE_ABCD_CHOICE;
 
 if (!archiveData || !Array.isArray(archiveData.exams)) {
   throw new Error("Nedostaje generirani indeks ispita.");
@@ -74,6 +77,37 @@ const subjectColors = {
   "Talijanski jezik": "#405e55",
   "Talijanski jezik i književnost": "#4b5a5f",
   Vjeronauk: "#4f5943",
+};
+
+const subjectImages = {
+  Biologija: "biology",
+  "Engleski jezik": "english-dictionary",
+  Etika: "ethics-justice",
+  Filozofija: "philosophy-thinker",
+  Fizika: "physics",
+  "Francuski jezik": "french-eiffel",
+  Geografija: "geography",
+  "Glazbena umjetnost": "music",
+  "Grčki jezik": "greek-columns",
+  "Hrvatski jezik": "croatian-writing",
+  Informatika: "informatics",
+  Kemija: "chemistry",
+  "Latinski jezik": "latin-rome",
+  "Likovna umjetnost": "art",
+  Logika: "logic-chess",
+  "Mađarski jezik": "hungarian-budapest",
+  "Mađarski jezik i književnost": "books",
+  Matematika: "mathematics",
+  "Njemački jezik": "german-brandenburg",
+  "Politika i gospodarstvo": "civics",
+  Povijest: "history-document",
+  Psihologija: "psychology-brain",
+  Sociologija: "sociology-crowd",
+  "Srpski jezik": "serbian-typewriter",
+  "Španjolski jezik": "spanish-madrid",
+  "Talijanski jezik": "italian-colosseum",
+  "Talijanski jezik i književnost": "literature-book",
+  Vjeronauk: "religion-bible",
 };
 
 const subjectAccusativeLabels = {
@@ -201,13 +235,27 @@ function englishListeningIdForTerm(exam, term) {
   return `engleski-${exam.level.toLocaleLowerCase("hr")}-${exam.year}-${slugPart(term)}`;
 }
 
+function englishEssayIdForTerm(exam, term) {
+  return `engleski-${exam.level.toLocaleLowerCase("hr")}-${exam.year}-${slugPart(term)}`;
+}
+
 function physicsChoiceIdForTerm(exam, term) {
   return `fizika-${exam.year}-${slugPart(term)}`;
+}
+
+function mathChoiceIdForTerm(exam, term) {
+  const level = exam.level ? `-${exam.level.toLocaleLowerCase("hr")}` : "";
+  return `matematika${level}-${exam.year}-${slugPart(term)}`;
 }
 
 function croatianChoiceIdForTerm(exam, term) {
   const level = exam.level ? `-${exam.level.toLocaleLowerCase("hr")}` : "";
   return `hrvatski${level}-${exam.year}-${slugPart(term)}`;
+}
+
+function abcdChoiceIdForTerm(exam, term) {
+  const level = exam.level ? `-${exam.level.toLocaleLowerCase("hr")}` : "";
+  return `${slugPart(exam.subject)}${level}-${exam.year}-${slugPart(term)}`;
 }
 
 function englishReadingStorageKeys(readingExam) {
@@ -232,6 +280,17 @@ function englishListeningStorageKeys(listeningExam) {
   return [...new Set(ids)].map((id) => `asistent-za-mature:english-listening:${id}`);
 }
 
+function englishEssayStorageKeys(essayExam) {
+  const ids = [
+    essayExam.id,
+    ...(legacyTermAliases[essayExam.term] || []).map((term) =>
+      englishEssayIdForTerm(essayExam, term),
+    ),
+  ];
+
+  return [...new Set(ids)].map((id) => `asistent-za-mature:english-essay:${id}`);
+}
+
 function physicsChoiceStorageKeys(choiceExam) {
   const ids = [
     choiceExam.id,
@@ -243,6 +302,25 @@ function physicsChoiceStorageKeys(choiceExam) {
   return [...new Set(ids)].map((id) => `asistent-za-mature:physics-choice:${id}`);
 }
 
+function physicsOpenScoreStorageKeys(choiceExam) {
+  return physicsChoiceStorageKeys(choiceExam).map((key) => `${key}:open-scores`);
+}
+
+function mathChoiceStorageKeys(choiceExam) {
+  const ids = [
+    choiceExam.id,
+    ...(legacyTermAliases[choiceExam.term] || []).map((term) =>
+      mathChoiceIdForTerm(choiceExam, term),
+    ),
+  ];
+
+  return [...new Set(ids)].map((id) => `asistent-za-mature:math-choice:${id}`);
+}
+
+function mathOpenScoreStorageKeys(choiceExam) {
+  return mathChoiceStorageKeys(choiceExam).map((key) => `${key}:open-scores`);
+}
+
 function croatianChoiceStorageKeys(choiceExam) {
   const ids = [
     choiceExam.id,
@@ -252,6 +330,17 @@ function croatianChoiceStorageKeys(choiceExam) {
   ];
 
   return [...new Set(ids)].map((id) => `asistent-za-mature:croatian-choice:${id}`);
+}
+
+function abcdChoiceStorageKeys(choiceExam) {
+  const ids = [
+    choiceExam.id,
+    ...(legacyTermAliases[choiceExam.term] || []).map((term) =>
+      abcdChoiceIdForTerm(choiceExam, term),
+    ),
+  ];
+
+  return [...new Set(ids)].map((id) => `asistent-za-mature:abcd-choice:${id}`);
 }
 
 const exams = archiveData.exams.map((exam) => {
@@ -281,6 +370,17 @@ const englishListeningExams = (englishListeningData?.exams || []).map((exam) => 
 const englishListeningByArchiveUrl = new Map(
   englishListeningExams.map((exam) => [exam.archiveUrl, exam]),
 );
+const englishEssayExams = (englishEssayData?.exams || []).map((exam) => {
+  const term = normalizeTerm(exam.term);
+  return {
+    ...exam,
+    term,
+    id: englishEssayIdForTerm(exam, term),
+  };
+});
+const englishEssayByArchiveUrl = new Map(
+  englishEssayExams.map((exam) => [exam.archiveUrl, exam]),
+);
 const physicsChoiceExams = (physicsChoiceData?.exams || []).map((exam) => {
   const term = normalizeTerm(exam.term);
   return {
@@ -292,6 +392,17 @@ const physicsChoiceExams = (physicsChoiceData?.exams || []).map((exam) => {
 const physicsChoiceByArchiveUrl = new Map(
   physicsChoiceExams.map((exam) => [exam.archiveUrl, exam]),
 );
+const mathChoiceExams = (mathChoiceData?.exams || []).map((exam) => {
+  const term = normalizeTerm(exam.term);
+  return {
+    ...exam,
+    term,
+    id: mathChoiceIdForTerm(exam, term),
+  };
+});
+const mathChoiceByArchiveUrl = new Map(
+  mathChoiceExams.map((exam) => [exam.archiveUrl, exam]),
+);
 const croatianChoiceExams = (croatianChoiceData?.exams || []).map((exam) => {
   const term = normalizeTerm(exam.term);
   return {
@@ -302,6 +413,17 @@ const croatianChoiceExams = (croatianChoiceData?.exams || []).map((exam) => {
 });
 const croatianChoiceByArchiveUrl = new Map(
   croatianChoiceExams.map((exam) => [exam.archiveUrl, exam]),
+);
+const abcdChoiceExams = (abcdChoiceData?.exams || []).map((exam) => {
+  const term = normalizeTerm(exam.term);
+  return {
+    ...exam,
+    term,
+    id: abcdChoiceIdForTerm(exam, term),
+  };
+});
+const abcdChoiceByArchiveUrl = new Map(
+  abcdChoiceExams.map((exam) => [exam.archiveUrl, exam]),
 );
 const englishPracticeParts = [
   {
@@ -490,6 +612,10 @@ function subjectColor(subject) {
   return subjectColors[subject] || "#001d4d";
 }
 
+function subjectImage(subject) {
+  return subjectImages[subject] || "books";
+}
+
 function subjectAccusative(subject) {
   return subjectAccusativeLabels[subject] || subject;
 }
@@ -541,16 +667,34 @@ function englishListeningUrl(listeningExam, simulation = false) {
   return `./engleski-slusanje.html?${params.toString()}`;
 }
 
+function englishEssayUrl(essayExam, simulation = false) {
+  const params = new URLSearchParams({ exam: essayExam.id });
+  if (simulation) params.set("nacin", "simulacija");
+  return `./engleski-esej.html?${params.toString()}`;
+}
+
 function physicsChoiceUrl(choiceExam, simulation = false) {
   const params = new URLSearchParams({ exam: choiceExam.id });
   if (simulation) params.set("nacin", "simulacija");
   return `./fizika.html?${params.toString()}`;
 }
 
+function mathChoiceUrl(choiceExam, simulation = false) {
+  const params = new URLSearchParams({ exam: choiceExam.id });
+  if (simulation) params.set("nacin", "simulacija");
+  return `./matematika.html?${params.toString()}`;
+}
+
 function croatianChoiceUrl(choiceExam, simulation = false) {
   const params = new URLSearchParams({ exam: choiceExam.id });
   if (simulation) params.set("nacin", "simulacija");
   return `./hrvatski.html?${params.toString()}`;
+}
+
+function abcdChoiceUrl(choiceExam, simulation = false) {
+  const params = new URLSearchParams({ exam: choiceExam.id });
+  if (simulation) params.set("nacin", "simulacija");
+  return `./abcd.html?${params.toString()}`;
 }
 
 function readingExamForArchive(exam) {
@@ -561,12 +705,24 @@ function listeningExamForArchive(exam) {
   return englishListeningByArchiveUrl.get(exam.url) || null;
 }
 
+function essayExamForArchive(exam) {
+  return englishEssayByArchiveUrl.get(exam.url) || null;
+}
+
 function physicsChoiceExamForArchive(exam) {
   return physicsChoiceByArchiveUrl.get(exam.url) || null;
 }
 
+function mathChoiceExamForArchive(exam) {
+  return mathChoiceByArchiveUrl.get(exam.url) || null;
+}
+
 function croatianChoiceExamForArchive(exam) {
   return croatianChoiceByArchiveUrl.get(exam.url) || null;
+}
+
+function abcdChoiceExamForArchive(exam) {
+  return abcdChoiceByArchiveUrl.get(exam.url) || null;
 }
 
 function unavailablePart(exam, part) {
@@ -688,10 +844,24 @@ function croatianPracticeParts(exam) {
   ];
 }
 
+function genericAbcdPart(exam, part) {
+  const choiceExam = abcdChoiceExamForArchive(exam);
+  return linkedPart(
+    exam,
+    {
+      ...part,
+      description: part.description || "Interaktivno su dostupni ABCD zadatci iz ispitne knjižice.",
+    },
+    choiceExam,
+    abcdChoiceUrl,
+  );
+}
+
 function interactiveParts(exam) {
   if (exam.subject === "Engleski jezik") {
     const readingExam = readingExamForArchive(exam);
     const listeningExam = listeningExamForArchive(exam);
+    const essayExam = essayExamForArchive(exam);
     const parts = withDurations(
       exam,
       englishPracticeParts.map((part) =>
@@ -716,6 +886,7 @@ function interactiveParts(exam) {
       const isListening = part.id === "slusanje";
       if (isReading) return linkedPart(exam, part, readingExam, englishReadingUrl);
       if (isListening) return linkedPart(exam, part, listeningExam, englishListeningUrl);
+      if (part.id === "esej") return linkedPart(exam, part, essayExam, englishEssayUrl);
       return unavailablePart(exam, part);
     });
   }
@@ -741,20 +912,55 @@ function interactiveParts(exam) {
     ];
   }
 
+  if (exam.subject === "Matematika") {
+    const choiceExam = mathChoiceExamForArchive(exam);
+    return [
+      linkedPart(
+        exam,
+        {
+          id: "matematika",
+          label: "Ispit",
+          description: "Zadatci višestrukoga izbora i otvoreni zadatci iz ispitne knjižice.",
+          durationMinutes: singleExamDuration(exam),
+        },
+        choiceExam,
+        mathChoiceUrl,
+      ),
+    ];
+  }
+
   if (modernForeignLanguageSubjects.has(exam.subject)) {
     return unavailableParts(exam, withDurations(exam, unavailableForeignLanguageParts));
   }
 
   if (literatureLanguageSubjects.has(exam.subject)) {
-    return unavailableParts(exam, withDurations(exam, literatureLanguageParts));
+    return withDurations(exam, literatureLanguageParts).map((part) =>
+      part.id === "knjizevnost-jezik"
+        ? genericAbcdPart(exam, part)
+        : unavailablePart(exam, part),
+    );
   }
 
   if (exam.subject === "Talijanski jezik i književnost") {
-    return unavailableParts(exam, italianLiteratureParts);
+    return italianLiteratureParts.map((part) =>
+      part.id === "strukturirani-ispit"
+        ? genericAbcdPart(exam, part)
+        : unavailablePart(exam, part),
+    );
   }
 
   if (exam.subject === "Glazbena umjetnost") {
     return unavailableParts(exam, musicPracticeParts);
+  }
+
+  const choiceExam = abcdChoiceExamForArchive(exam);
+  if (choiceExam) {
+    return [
+      genericAbcdPart(exam, {
+        ...withDurations(exam, [singleExamPart])[0],
+        description: "Interaktivno su dostupni ABCD zadatci iz ispitne knjižice.",
+      }),
+    ];
   }
 
   return unavailableParts(exam, withDurations(exam, [singleExamPart]));
@@ -836,6 +1042,31 @@ function englishListeningProgress(exam) {
   };
 }
 
+function readEnglishEssayDraft(essayExam) {
+  try {
+    for (const key of englishEssayStorageKeys(essayExam).reverse()) {
+      const stored = JSON.parse(localStorage.getItem(key) || "{}");
+      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+        return typeof stored.essayText === "string" ? stored.essayText : "";
+      }
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+function englishEssayProgress(exam) {
+  const essayExam = essayExamForArchive(exam);
+  if (!essayExam) return null;
+
+  return {
+    answered: readEnglishEssayDraft(essayExam).trim() ? 1 : 0,
+    id: essayExam.id,
+    total: 1,
+  };
+}
+
 function readPhysicsResponses(choiceExam) {
   const storedResponses = {};
   try {
@@ -851,10 +1082,29 @@ function readPhysicsResponses(choiceExam) {
   return storedResponses;
 }
 
+function readPhysicsOpenScores(choiceExam) {
+  const storedScores = {};
+  try {
+    for (const key of physicsOpenScoreStorageKeys(choiceExam).reverse()) {
+      const stored = JSON.parse(localStorage.getItem(key) || "{}");
+      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+        Object.assign(storedScores, stored);
+      }
+    }
+  } catch {
+    return {};
+  }
+  return storedScores;
+}
+
 function physicsQuestionNumbers(choiceExam) {
   return (choiceExam.tasks || []).flatMap((task) =>
     task.questions.map((question) => String(question.number)),
   );
+}
+
+function physicsOpenQuestions(choiceExam) {
+  return (choiceExam.openTasks || []).flatMap((task) => task.questions);
 }
 
 function physicsProgress(exam) {
@@ -867,11 +1117,97 @@ function physicsProgress(exam) {
     ([question, answer]) =>
       knownQuestions.has(question) && typeof answer === "string" && answer.trim(),
   ).length;
+  const openQuestions = new Map(
+    physicsOpenQuestions(choiceExam).map((question) => [
+      String(question.number),
+      Number(question.maxPoints),
+    ]),
+  );
+  const openScores = readPhysicsOpenScores(choiceExam);
+  const reviewed = Object.entries(openScores).filter(([question, score]) => {
+    const maximum = openQuestions.get(question);
+    return Number.isInteger(maximum)
+      && Number.isInteger(score)
+      && score >= 0
+      && score <= maximum;
+  }).length;
 
   return {
-    answered,
+    answered: answered + reviewed,
     id: choiceExam.id,
-    total: knownQuestions.size,
+    total: knownQuestions.size + openQuestions.size,
+  };
+}
+
+function readMathResponses(choiceExam) {
+  const storedResponses = {};
+  try {
+    for (const key of mathChoiceStorageKeys(choiceExam).reverse()) {
+      const stored = JSON.parse(localStorage.getItem(key) || "{}");
+      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+        Object.assign(storedResponses, stored);
+      }
+    }
+  } catch {
+    return {};
+  }
+  return storedResponses;
+}
+
+function readMathOpenScores(choiceExam) {
+  const storedScores = {};
+  try {
+    for (const key of mathOpenScoreStorageKeys(choiceExam).reverse()) {
+      const stored = JSON.parse(localStorage.getItem(key) || "{}");
+      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+        Object.assign(storedScores, stored);
+      }
+    }
+  } catch {
+    return {};
+  }
+  return storedScores;
+}
+
+function mathQuestionNumbers(choiceExam) {
+  return (choiceExam.tasks || []).flatMap((task) =>
+    task.questions.map((question) => String(question.number)),
+  );
+}
+
+function mathOpenQuestions(choiceExam) {
+  return (choiceExam.openTasks || []).flatMap((task) => task.questions);
+}
+
+function mathProgress(exam) {
+  const choiceExam = mathChoiceExamForArchive(exam);
+  if (!choiceExam) return null;
+
+  const knownQuestions = new Set(mathQuestionNumbers(choiceExam));
+  const responses = readMathResponses(choiceExam);
+  const answered = Object.entries(responses).filter(
+    ([question, answer]) =>
+      knownQuestions.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+  const openQuestions = new Map(
+    mathOpenQuestions(choiceExam).map((question) => [
+      String(question.number),
+      Number(question.maxPoints),
+    ]),
+  );
+  const openScores = readMathOpenScores(choiceExam);
+  const reviewed = Object.entries(openScores).filter(([question, score]) => {
+    const maximum = openQuestions.get(question);
+    return Number.isInteger(maximum)
+      && Number.isInteger(score)
+      && score >= 0
+      && score <= maximum;
+  }).length;
+
+  return {
+    answered: answered + reviewed,
+    id: choiceExam.id,
+    total: knownQuestions.size + openQuestions.size,
   };
 }
 
@@ -912,12 +1248,54 @@ function croatianProgress(exam) {
   };
 }
 
+function readAbcdChoiceResponses(choiceExam) {
+  const storedResponses = {};
+  try {
+    for (const key of abcdChoiceStorageKeys(choiceExam).reverse()) {
+      const stored = JSON.parse(localStorage.getItem(key) || "{}");
+      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+        Object.assign(storedResponses, stored);
+      }
+    }
+  } catch {
+    return {};
+  }
+  return storedResponses;
+}
+
+function abcdChoiceQuestionNumbers(choiceExam) {
+  return (choiceExam.questions || []).map(String);
+}
+
+function abcdChoiceProgress(exam) {
+  if (exam.subject === "Matematika") return null;
+
+  const choiceExam = abcdChoiceExamForArchive(exam);
+  if (!choiceExam) return null;
+
+  const knownQuestions = new Set(abcdChoiceQuestionNumbers(choiceExam));
+  const responses = readAbcdChoiceResponses(choiceExam);
+  const answered = Object.entries(responses).filter(
+    ([question, answer]) =>
+      knownQuestions.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+
+  return {
+    answered,
+    id: choiceExam.id,
+    total: knownQuestions.size,
+  };
+}
+
 function examProgress(exam) {
   const progressItems = [
     englishProgress(exam),
     englishListeningProgress(exam),
+    englishEssayProgress(exam),
     physicsProgress(exam),
+    mathProgress(exam),
     croatianProgress(exam),
+    abcdChoiceProgress(exam),
   ].filter(Boolean);
   const answered = progressItems.reduce((sum, item) => sum + item.answered, 0);
   const total = progressItems.reduce((sum, item) => sum + item.total, 0);
@@ -958,39 +1336,33 @@ function progressMeter(percent, label) {
   `;
 }
 
-function percentRange(from, to) {
-  return `${String(from).replace(".", ",")} - ${String(to).replace(".", ",")}%`;
+function minimumPercent(value) {
+  return `≥ ${value}%`;
 }
 
 function gradeThresholds(exam) {
   const passThreshold = twentyFivePercentPassSubjects.has(exam.subject) ? 25 : 30;
-  const failingUpper = passThreshold === 25 ? 24.99 : 29.99;
 
   return [
     {
-      grade: "1",
-      label: "Nedovoljan",
-      range: percentRange(0, failingUpper),
-    },
-    {
       grade: "2",
       label: "Dovoljan",
-      range: percentRange(passThreshold, 49.99),
+      range: minimumPercent(passThreshold),
     },
     {
       grade: "3",
       label: "Dobar",
-      range: percentRange(50, 69.99),
+      range: minimumPercent(50),
     },
     {
       grade: "4",
       label: "Vrlo dobar",
-      range: percentRange(70, 84.99),
+      range: minimumPercent(70),
     },
     {
       grade: "5",
       label: "Odličan",
-      range: percentRange(85, 100),
+      range: minimumPercent(85),
     },
   ];
 }
@@ -1113,8 +1485,12 @@ function renderSubjectGrid() {
 }
 
 function renderSubjectCard(subject) {
-  const colorStyle = ` style="--subject-color: ${subjectColor(subject)}"`;
+  const colorStyle = ` style="--subject-color: ${subjectColor(subject)}; --subject-image: url('./assets/subjects/${subjectImage(subject)}.webp')"`;
   const actionLabel = `Vježbaj ${subjectAccusative(subject)}`;
+  const implementationStatus =
+    subject === "Fizika" || subject === "Matematika"
+      ? `<span class="subject-card__status">Potpuno implementiran predmet</span>`
+      : "";
 
   return `
     <a class="subject-card" href="${subjectUrl(subject)}"${colorStyle}>
@@ -1123,6 +1499,7 @@ function renderSubjectCard(subject) {
       </span>
       <span class="subject-card__body">
         <strong>${escapeHtml(actionLabel)}</strong>
+        ${implementationStatus}
       </span>
       <span class="subject-card__action" aria-hidden="true">
         ${icon("arrow-right", "subject-card__action-icon")}
@@ -1394,7 +1771,6 @@ function renderSubjectExamRow(exam, hasLevels) {
     <tr>
       <td>
         <strong>${escapeHtml(formatTerm(exam.term))}</strong>
-        <small>${escapeHtml(exam.schoolYear)}</small>
       </td>
       ${hasLevels ? `<td>${levelBadge(exam.level)}</td>` : ""}
       <td class="subject-exam-table__progress-cell">
@@ -1407,7 +1783,7 @@ function renderSubjectExamRow(exam, hasLevels) {
       </td>
       <td>
         <div class="exam-actions">
-          <a class="primary-button" href="${examUrl(exam)}">Odaberi ispit</a>
+          <a class="primary-button" href="${examUrl(exam)}">Otvori maturu</a>
           <a
             class="download-icon-link"
             href="${escapeHtml(exam.url)}"

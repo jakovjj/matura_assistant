@@ -4,16 +4,20 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import shutil
+import struct
 import subprocess
 import sys
+import tempfile
 import unicodedata
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote, unquote, urlparse
+from xml.etree import ElementTree
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,8 +38,24 @@ TERM_ALIASES = {
 # The official keys from 2022 onward have a stable machine-readable layout.
 CHECKING_MIN_YEAR = 2022
 TASK_HEADING = re.compile(r"(?m)^\s*Task\s+(\d+)\s*$")
-BLANK_PAGE_PARTS = {"P", "ca", "ni", "ra", "st", "a", "zn", "00", "01", "02"}
+BLANK_PAGE_PARTS = {
+    "P",
+    "ca",
+    "ni",
+    "ra",
+    "st",
+    "a",
+    "zn",
+    "Prazna stranica",
+    "99",
+    "00",
+    "01",
+    "02",
+}
 AUDIO_SUFFIXES = {".mp3", ".m4a", ".ogg", ".wav"}
+SOURCE_RENDER_DPI = 144
+SOURCE_CROP_HORIZONTAL_MARGIN = 48
+SOURCE_CROP_VERTICAL_PADDING = 9
 
 
 @dataclass(frozen=True)
@@ -53,6 +73,40 @@ class Task:
             "kind": "choice",
             "options": list(self.options),
         }
+
+
+@dataclass(frozen=True)
+class PdfLine:
+    text: str
+    first_word: str
+    x_min: float
+    x_max: float
+    y_min: float
+    y_max: float
+
+
+@dataclass(frozen=True)
+class PdfPage:
+    number: int
+    width: float
+    height: float
+    lines: list[PdfLine]
+
+
+@dataclass(frozen=True)
+class TaskMarker:
+    number: int
+    page: PdfPage
+    y_min: float
+
+
+@dataclass(frozen=True)
+class SourceCrop:
+    page: PdfPage
+    x_min: float
+    y_min: float
+    x_max: float
+    y_max: float
 
 
 A_TASKS = (
@@ -127,6 +181,57 @@ def pdf_text(contents: bytes) -> str:
     return completed.stdout.decode("utf-8", errors="replace")
 
 
+def pdf_bbox_pages(contents: bytes) -> list[PdfPage]:
+    try:
+        completed = subprocess.run(
+            ["pdftotext", "-bbox-layout", "-", "-"],
+            input=contents,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("pdftotext is required to build English listening source images") from exc
+    except subprocess.CalledProcessError as exc:
+        message = exc.stderr.decode("utf-8", errors="replace")
+        raise RuntimeError(f"pdftotext -bbox-layout failed: {message}") from exc
+
+    xml = completed.stdout.decode("utf-8", errors="replace")
+    xml = "".join(character for character in xml if character in "\t\n\r" or ord(character) >= 32)
+    root = ElementTree.fromstring(xml)
+    pages: list[PdfPage] = []
+    for page_number, page_element in enumerate(root.findall(".//{*}page"), start=1):
+        lines: list[PdfLine] = []
+        for line_element in page_element.findall(".//{*}line"):
+            words = line_element.findall("./{*}word")
+            if not words:
+                continue
+            word_texts = ["".join(word.itertext()).strip() for word in words]
+            lines.append(
+                PdfLine(
+                    text=" ".join(word for word in word_texts if word),
+                    first_word=word_texts[0],
+                    x_min=float(words[0].attrib["xMin"]),
+                    x_max=float(words[-1].attrib["xMax"]),
+                    y_min=float(line_element.attrib["yMin"]),
+                    y_max=float(line_element.attrib["yMax"]),
+                )
+            )
+        pages.append(
+            PdfPage(
+                number=page_number,
+                width=float(page_element.attrib["width"]),
+                height=float(page_element.attrib["height"]),
+                lines=lines,
+            )
+        )
+    return pages
+
+
+def sorted_page_lines(page: PdfPage) -> list[PdfLine]:
+    return sorted(page.lines, key=lambda line: (line.y_min, line.x_min))
+
+
 def find_single_pdf(names: list[str], description: str, pattern: re.Pattern[str]) -> str:
     candidates = [
         name
@@ -191,10 +296,19 @@ def is_running_header_or_footer(line: str) -> bool:
     ):
         return True
 
-    if re.search(r"\bENG\s*[AB]\b.*(?:IK[- ]?2|D-S\d+)", stripped, flags=re.IGNORECASE):
+    if re.search(r"\bENG\s*[AB]\b.*(?:IK[- ]?\d|D[- ]?S\d+)", stripped, flags=re.IGNORECASE):
+        return True
+
+    if ".indd" in stripped:
+        return True
+
+    if re.fullmatch(r"\d{1,2}\.\d{1,2}\.\d{4}\.?\s+\d{1,2}:\d{2}:\d{2}", stripped):
         return True
 
     if re.fullmatch(r"\d+/\d+", stripped):
+        return True
+
+    if re.fullmatch(r"\d{1,2}", stripped):
         return True
 
     return stripped in BLANK_PAGE_PARTS
@@ -300,10 +414,252 @@ def write_if_changed(path: Path, contents: bytes) -> None:
     path.write_bytes(contents)
 
 
+def png_dimensions(contents: bytes) -> tuple[int, int]:
+    if contents[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR":
+        raise ValueError("Expected a PNG source page")
+    return struct.unpack(">II", contents[16:24])
+
+
+def find_task_source_crops(contents: bytes, tasks: tuple[Task, ...]) -> dict[int, list[SourceCrop]]:
+    pages = pdf_bbox_pages(contents)
+    task_numbers = {task.number for task in tasks}
+    markers: list[TaskMarker] = []
+
+    for page in pages:
+        for line in sorted_page_lines(page):
+            match = re.fullmatch(r"Task\s+(\d+)", line.text.strip(), flags=re.IGNORECASE)
+            if not match:
+                continue
+            number = int(match.group(1))
+            if number in task_numbers:
+                markers.append(TaskMarker(number=number, page=page, y_min=line.y_min))
+
+    markers.sort(key=lambda marker: (marker.page.number, marker.y_min))
+    found_numbers = [marker.number for marker in markers]
+    expected_numbers = [task.number for task in tasks]
+    if found_numbers != expected_numbers:
+        raise ValueError(
+            f"Could not locate English listening task crops: expected {expected_numbers}, "
+            f"found {found_numbers}"
+        )
+
+    crops: dict[int, list[SourceCrop]] = {}
+    for index, marker in enumerate(markers):
+        next_marker = markers[index + 1] if index + 1 < len(markers) else None
+        task_crops: list[SourceCrop] = []
+        for page in pages:
+            if page.number < marker.page.number:
+                continue
+            if next_marker and page.number > next_marker.page.number:
+                continue
+            if not next_marker and page.number < marker.page.number:
+                continue
+
+            relevant_lines = []
+            for line in sorted_page_lines(page):
+                if not line.text.strip():
+                    continue
+                if is_running_header_or_footer(line.text):
+                    continue
+                if page.number == marker.page.number and line.y_min < marker.y_min:
+                    continue
+                if next_marker and page.number == next_marker.page.number and line.y_min >= next_marker.y_min:
+                    continue
+                relevant_lines.append(line)
+
+            if not relevant_lines:
+                continue
+
+            y_min = max(0, relevant_lines[0].y_min - SOURCE_CROP_VERTICAL_PADDING)
+            y_max = min(page.height, relevant_lines[-1].y_max + SOURCE_CROP_VERTICAL_PADDING)
+            if y_max <= y_min:
+                raise ValueError(f"Task {marker.number} has an invalid crop on page {page.number}")
+
+            task_crops.append(
+                SourceCrop(
+                    page=page,
+                    x_min=SOURCE_CROP_HORIZONTAL_MARGIN,
+                    y_min=y_min,
+                    x_max=page.width - SOURCE_CROP_HORIZONTAL_MARGIN,
+                    y_max=y_max,
+                )
+            )
+
+            if next_marker and page.number == next_marker.page.number:
+                break
+
+        if not task_crops:
+            raise ValueError(f"Task {marker.number} has no visible source crop")
+        crops[marker.number] = task_crops
+
+    return crops
+
+
+def render_source_pages(
+    paper_path: Path,
+    identifier: str,
+    crops: dict[int, list[SourceCrop]],
+    expected_assets: set[str],
+) -> dict[int, list[dict[str, Any]]]:
+    destination = ASSET_ROOT / identifier
+    crops_by_page: dict[int, list[tuple[int, SourceCrop]]] = {}
+    for task_number, task_crops in crops.items():
+        for crop in task_crops:
+            crops_by_page.setdefault(crop.page.number, []).append((task_number, crop))
+
+    source_images: dict[int, list[dict[str, Any]]] = {}
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        temporary_root = Path(temporary_directory)
+        for page_number, page_crops in sorted(crops_by_page.items()):
+            filename = f"page-{page_number}.png"
+            temporary_prefix = temporary_root / f"page-{page_number}"
+            try:
+                subprocess.run(
+                    [
+                        "pdftocairo",
+                        "-png",
+                        "-singlefile",
+                        "-r",
+                        str(SOURCE_RENDER_DPI),
+                        "-f",
+                        str(page_number),
+                        "-l",
+                        str(page_number),
+                        str(paper_path),
+                        str(temporary_prefix),
+                    ],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=True,
+                )
+            except FileNotFoundError as exc:
+                raise RuntimeError("pdftocairo is required to build English listening source images") from exc
+            except subprocess.CalledProcessError as exc:
+                message = exc.stderr.decode("utf-8", errors="replace")
+                raise RuntimeError(f"pdftocairo failed: {message}") from exc
+
+            contents = temporary_prefix.with_suffix(".png").read_bytes()
+            image_width, image_height = png_dimensions(contents)
+            write_if_changed(destination / filename, contents)
+            expected_assets.add(filename)
+
+            for task_number, crop in page_crops:
+                scale_x = image_width / crop.page.width
+                scale_y = image_height / crop.page.height
+                x_min = max(0, math.floor(crop.x_min * scale_x))
+                y_min = max(0, math.floor(crop.y_min * scale_y))
+                x_max = min(image_width, math.ceil(crop.x_max * scale_x))
+                y_max = min(image_height, math.ceil(crop.y_max * scale_y))
+                source_images.setdefault(task_number, []).append(
+                    {
+                        "url": f"{ASSET_URL_PREFIX}/{quote(identifier)}/{filename}",
+                        "page": page_number,
+                        "width": image_width,
+                        "height": image_height,
+                        "crop": {
+                            "x": x_min,
+                            "y": y_min,
+                            "width": x_max - x_min,
+                            "height": y_max - y_min,
+                        },
+                    }
+                )
+
+    return source_images
+
+
+def remove_unexpected_files(destination: Path, expected_assets: set[str]) -> None:
+    if not destination.is_dir():
+        return
+    for path in destination.iterdir():
+        if path.is_file() and path.name not in expected_assets:
+            path.unlink()
+
+
 def audio_label(name: str, split_index: int, total: int) -> str:
     if total == 1 or "cijeli" in slugify(Path(name).stem):
         return "Cijela snimka"
     return f"Snimka {split_index}"
+
+
+def build_audio_plan(
+    audio_items: list[dict[str, str]], tasks: tuple[Task, ...]
+) -> dict[str, Any] | None:
+    if len(tasks) != 4:
+        return None
+
+    full_indexes = [
+        index
+        for index, audio in enumerate(audio_items)
+        if audio["label"] == "Cijela snimka"
+        or "cijeli" in slugify(audio["sourceName"])
+    ]
+    split_indexes = [
+        index for index in range(len(audio_items)) if index not in full_indexes
+    ]
+
+    if len(full_indexes) > 1 or len(split_indexes) != 9:
+        return None
+
+    for position, audio_index in enumerate(split_indexes, start=1):
+        if audio_items[audio_index]["label"] != f"Snimka {position}":
+            return None
+
+    plan: dict[str, Any] = {
+        "mode": "certified-task-tracks",
+        "introAudioIndex": split_indexes[0],
+        "closingAudioIndex": split_indexes[8],
+        "tasks": {
+            "1": [
+                {
+                    "audioIndex": split_indexes[1],
+                    "label": "Snimka zadatka",
+                    "kind": "task",
+                }
+            ],
+            "2": [
+                {
+                    "audioIndex": split_indexes[2],
+                    "label": "Uputa",
+                    "kind": "instruction",
+                },
+                {
+                    "audioIndex": split_indexes[3],
+                    "label": "Snimka zadatka",
+                    "kind": "task",
+                },
+            ],
+            "3": [
+                {
+                    "audioIndex": split_indexes[4],
+                    "label": "Uputa",
+                    "kind": "instruction",
+                },
+                {
+                    "audioIndex": split_indexes[5],
+                    "label": "Snimka zadatka",
+                    "kind": "task",
+                },
+            ],
+            "4": [
+                {
+                    "audioIndex": split_indexes[6],
+                    "label": "Uputa",
+                    "kind": "instruction",
+                },
+                {
+                    "audioIndex": split_indexes[7],
+                    "label": "Snimka zadatka",
+                    "kind": "task",
+                },
+            ],
+        },
+    }
+
+    if full_indexes:
+        plan["fullAudioIndex"] = full_indexes[0]
+
+    return plan
 
 
 def remove_orphaned_audio(audio_root: Path, expected_names: set[str]) -> None:
@@ -334,7 +690,14 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any] | None:
 
         identifier = exam_id(exam)
         destination = ASSET_ROOT / identifier
+        expected_assets = {"paper.pdf"}
         write_if_changed(destination / "paper.pdf", paper_contents)
+        source_images = render_source_pages(
+            destination / "paper.pdf",
+            identifier,
+            find_task_source_crops(paper_contents, tasks),
+            expected_assets,
+        )
 
         audio_items = []
         expected_audio_names = set()
@@ -354,12 +717,13 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any] | None:
                 }
             )
         remove_orphaned_audio(destination / "audio", expected_audio_names)
+        remove_unexpected_files(destination, expected_assets)
 
     task_texts = extract_task_texts(paper_text, tasks)
     has_checking = exam["year"] >= CHECKING_MIN_YEAR
     answers = parse_choice_answers(pdf_text(key_contents), tasks) if has_checking else {}
 
-    return {
+    built = {
         "id": identifier,
         "year": exam["year"],
         "schoolYear": exam["schoolYear"],
@@ -371,11 +735,19 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any] | None:
         "checkingSupported": has_checking,
         "audio": audio_items,
         "tasks": [
-            task.to_json() | {"text": task_texts[task.number]}
+            task.to_json() | {
+                "text": task_texts[task.number],
+                "sourceImages": source_images.get(task.number, []),
+            }
             for task in tasks
         ],
         "answers": answers,
     }
+    audio_plan = build_audio_plan(audio_items, tasks)
+    if audio_plan:
+        built["audioPlan"] = audio_plan
+
+    return built
 
 
 def remove_orphaned_assets(expected_ids: set[str]) -> None:

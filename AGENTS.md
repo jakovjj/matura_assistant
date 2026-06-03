@@ -33,19 +33,29 @@ This is a dependency-free static site:
 - `fizika.html`: standalone interactive Physics page
 - `fizika-abcd.html`: redirect kept for old links to Physics multiple choice
 - `physics-choice.js`: Physics solver UI and local answer storage
+- `matematika.html`: standalone interactive Mathematics page
+- `math-choice.js`: Mathematics solver UI and local answer storage
+- `hrvatski.html`: standalone interactive Croatian page
+- `croatian-choice.js`: Croatian solver UI and local answer storage
 - `exam-simulation.js`: shared timed simulation mode without persistent answers
 - `data/exams.js`: generated archive index; do not edit manually
 - `data/english-reading.js`: generated English reading index; do not edit manually
 - `data/english-listening.js`: generated English listening index; do not edit manually
 - `data/physics-choice.js`: generated Physics multiple-choice index; do not edit manually
+- `data/math-choice.js`: generated Mathematics index; do not edit manually
+- `data/croatian-choice.js`: generated Croatian index; do not edit manually
 - `files/ncvvo/`: mirrored ZIP packages from the public NCVVO archive
 - `files/interactive/english-reading/`: extracted PDFs for supported reading exams
 - `files/interactive/english-listening/`: extracted PDFs and audio for supported listening exams
 - `files/interactive/physics-choice/`: extracted PDFs and page images for supported Physics exams
+- `files/interactive/math-choice/`: extracted PDFs and page images for supported Mathematics exams
+- `files/interactive/croatian-choice/`: extracted PDFs and page images for supported Croatian exams
 - `scripts/fetch_ncvvo.py`: deterministic NCVVO archive scraper
 - `scripts/build_english_reading.py`: deterministic English reading data builder
 - `scripts/build_english_listening.py`: deterministic English listening data builder
 - `scripts/build_physics_choice.py`: deterministic Physics multiple-choice data builder
+- `scripts/build_math_choice.py`: deterministic Mathematics data builder
+- `scripts/build_croatian_choice.py`: deterministic Croatian data builder
 - `README.md`: local usage instructions
 
 Serve it locally with:
@@ -116,6 +126,25 @@ verified archive case requires a change.
 - Opening `Vježbaj` for an archive package must not create progress, mark the
   exam as started, or show a placeholder percentage. Progress is derived from
   saved answers in defined interactive exams.
+- For open-response tasks without an official automatic checker, use a
+  self-review flow. Place the `Otvori rješenje` button beside a blank points
+  input followed by `/<maximum points>`, where the maximum comes from the
+  official scoring for that task. The user reveals the official solution,
+  reviews their work, and enters the number of points they award themselves.
+  Render the points input without spinner arrows. Clamp values below zero to
+  `0` and values above the task maximum to that maximum.
+- Treat numbered tasks with multiple subitems, such as `36.1` and `36.2`, as
+  one visual group inside the solver. Preserve and render the shared parent
+  prompt, diagram, table, or other context before the subitems. Do not render
+  dependent subitems as unrelated standalone tasks without their shared
+  context.
+- Treat the sticky footer inside a solver as an exam-wide control surface, not
+  as a control for the currently visible task type. Show answered questions out
+  of the total across all task types. Provide one final `Provjeri rješenja`
+  action that opens a result modal with an animated check mark, the percentage,
+  and total points across the whole exam. The modal must have an `X` close
+  control so the user can review marked answers across every task type without
+  losing the checked state.
 - If an archive package has no defined interactive exam, show a clear Croatian
   message such as `Nema definiranog interaktivnog ispita za sada.` and leave the
   exam otherwise unchanged.
@@ -123,6 +152,10 @@ verified archive case requires a change.
   choose the part to solve. For English, show `Čitanje`, `Slušanje`, and `Esej`.
 - Available parts should start the correct solver directly. For English
   `Čitanje`, link straight to the English reading solver.
+- Return links from standalone solver pages must go back to the subject page in
+  the main flow, not to a standalone exam-picker page. For English reading and
+  listening, return to `./?predmet=Engleski%20jezik`; if a standalone solver URL
+  is opened without the required `exam` parameter, redirect to that subject page.
 - Unavailable parts should remain selectable and then show the same "not
   defined yet" message instead of starting any placeholder flow.
 

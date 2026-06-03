@@ -9,7 +9,7 @@
     />
     <title>Asistent za Mature - interaktivni ispiti za vježbu</title>
     <link rel="icon" type="image/webp" href="./assets/asistent_za_maturu.webp" />
-    <link rel="stylesheet" href="./styles.css?v=20260602-thresholds" />
+    <link rel="stylesheet" href="./styles.css?v=20260602-croatian-tasks" />
     <script>
       (() => {
         const params = new URLSearchParams(window.location.search);
@@ -78,44 +78,18 @@
 
     </main>
 
-    <footer class="site-footer">
-      <div class="container site-footer__inner">
-        <div class="footer-brand">
-          <img
-            class="footer-brand__mark"
-            src="./assets/asistent_za_maturu.webp"
-            alt=""
-            width="40"
-            height="40"
-            loading="lazy"
-            decoding="async"
-          />
-          <div>
-            <strong>Asistent za Mature</strong>
-            <p>Neslužbeni alat za pripremu državne mature.</p>
-          </div>
-        </div>
-        <div class="footer-meta">
-          <p>Copyright &copy; 2026 Asistent za Mature. Odgovorna osoba: Jakov Jandrić.</p>
-          <p>
-            Ispitni materijali:
-            <a
-              href="https://www.ncvvo.hr/kategorija/drzavna-matura/provedeni-ispiti/"
-              target="_blank"
-              rel="noreferrer"
-              >NCVVO</a
-            >
-          </p>
-        </div>
-      </div>
-    </footer>
+    <div data-site-footer></div>
+    <script src="./site-footer.js?v=20260602-footer"></script>
 
     <script src="./data/exams.js"></script>
     <script src="./data/english-reading.js"></script>
     <script src="./data/english-listening.js"></script>
+    <script src="./data/english-essay.js?v=20260602-english-essay"></script>
     <script src="./data/physics-choice.js"></script>
-    <script src="./data/croatian-choice.js?v=20260601-croatian-choice"></script>
-    <script src="./app.js?v=20260602-thresholds"></script>
+    <script src="./data/math-choice.js?v=20260602-math-groups"></script>
+    <script src="./data/croatian-choice.js?v=20260602-croatian-tasks"></script>
+    <script src="./data/abcd-choice.js?v=20260602-abcd-choice"></script>
+    <script src="./app.js?v=20260602-physics-status-text"></script>
     <script src="./auth-client.js"></script>
   </body>
 </html>

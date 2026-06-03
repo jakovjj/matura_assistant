@@ -10,6 +10,11 @@
       href: "./",
       label: "početna",
     },
+    {
+      id: "profile",
+      href: "./profil.html",
+      label: "profil",
+    },
   ];
   const hasActiveNavItem = navItems.some((item) => item.id === activePage);
   const navClass = hasActiveNavItem ? "main-nav" : "main-nav main-nav--no-active";

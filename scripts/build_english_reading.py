@@ -4,16 +4,20 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import shutil
+import struct
 import subprocess
 import sys
+import tempfile
 import unicodedata
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote, unquote, urlparse
+from xml.etree import ElementTree
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,6 +40,9 @@ TERM_ALIASES = {
 CHECKING_MIN_YEAR = 2022
 TASK_HEADING = re.compile(r"(?m)^\s*Task\s+(\d+)\s*$")
 BLANK_PAGE_PARTS = {"P", "ca", "ni", "ra", "st", "a", "zn", "00", "01", "02"}
+SOURCE_RENDER_DPI = 144
+SOURCE_CROP_HORIZONTAL_MARGIN = 48
+SOURCE_CROP_VERTICAL_PADDING = 9
 
 
 @dataclass(frozen=True)
@@ -54,6 +61,40 @@ class Task:
             "kind": self.kind,
             "options": list(self.options),
         }
+
+
+@dataclass(frozen=True)
+class PdfLine:
+    text: str
+    first_word: str
+    x_min: float
+    x_max: float
+    y_min: float
+    y_max: float
+
+
+@dataclass(frozen=True)
+class PdfPage:
+    number: int
+    width: float
+    height: float
+    lines: list[PdfLine]
+
+
+@dataclass(frozen=True)
+class TaskMarker:
+    number: int
+    page: PdfPage
+    y_min: float
+
+
+@dataclass(frozen=True)
+class SourceCrop:
+    page: PdfPage
+    x_min: float
+    y_min: float
+    x_max: float
+    y_max: float
 
 
 A_COMMON_TASKS = (
@@ -130,6 +171,57 @@ def pdf_text(contents: bytes) -> str:
     return completed.stdout.decode("utf-8", errors="replace")
 
 
+def pdf_bbox_pages(contents: bytes) -> list[PdfPage]:
+    try:
+        completed = subprocess.run(
+            ["pdftotext", "-bbox-layout", "-", "-"],
+            input=contents,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("pdftotext is required to build English reading source images") from exc
+    except subprocess.CalledProcessError as exc:
+        message = exc.stderr.decode("utf-8", errors="replace")
+        raise RuntimeError(f"pdftotext -bbox-layout failed: {message}") from exc
+
+    xml = completed.stdout.decode("utf-8", errors="replace")
+    xml = "".join(character for character in xml if character in "\t\n\r" or ord(character) >= 32)
+    root = ElementTree.fromstring(xml)
+    pages: list[PdfPage] = []
+    for page_number, page_element in enumerate(root.findall(".//{*}page"), start=1):
+        lines: list[PdfLine] = []
+        for line_element in page_element.findall(".//{*}line"):
+            words = line_element.findall("./{*}word")
+            if not words:
+                continue
+            word_texts = ["".join(word.itertext()).strip() for word in words]
+            lines.append(
+                PdfLine(
+                    text=" ".join(word for word in word_texts if word),
+                    first_word=word_texts[0],
+                    x_min=float(words[0].attrib["xMin"]),
+                    x_max=float(words[-1].attrib["xMax"]),
+                    y_min=float(line_element.attrib["yMin"]),
+                    y_max=float(line_element.attrib["yMax"]),
+                )
+            )
+        pages.append(
+            PdfPage(
+                number=page_number,
+                width=float(page_element.attrib["width"]),
+                height=float(page_element.attrib["height"]),
+                lines=lines,
+            )
+        )
+    return pages
+
+
+def sorted_page_lines(page: PdfPage) -> list[PdfLine]:
+    return sorted(page.lines, key=lambda line: (line.y_min, line.x_min))
+
+
 def parse_duration(text: str) -> int:
     match = re.search(
         r"Ispit\s+\w*itanja(?:\s+i\s+pisanja)?\s+traje\s+(\d+)\s+minuta",
@@ -156,6 +248,18 @@ def is_running_header_or_footer(line: str) -> bool:
         return True
 
     if re.search(r"\bENG[AB]\b.*Ispitna knjizica 1", stripped, flags=re.IGNORECASE):
+        return True
+
+    if ".indd" in stripped:
+        return True
+
+    if re.fullmatch(r"\d{1,2}\.\d{1,2}\.\d{4}\.?\s+\d{1,2}:\d{2}:\d{2}", stripped):
+        return True
+
+    if re.fullmatch(r"\d+/\d+", stripped):
+        return True
+
+    if re.fullmatch(r"\d{1,2}", stripped):
         return True
 
     return stripped in BLANK_PAGE_PARTS
@@ -274,6 +378,210 @@ def parse_choice_answers(text: str, tasks: tuple[Task, ...]) -> dict[str, str]:
     return {str(question): answers[question] for question in expected_questions}
 
 
+def png_dimensions(contents: bytes) -> tuple[int, int]:
+    if contents[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR":
+        raise ValueError("Expected a PNG source page")
+    return struct.unpack(">II", contents[16:24])
+
+
+def marker_position(marker: TaskMarker) -> tuple[int, float]:
+    return marker.page.number, marker.y_min
+
+
+def is_writing_section_marker(line: PdfLine) -> bool:
+    stripped = line.text.strip()
+    return bool(
+        re.fullmatch(r"ISPIT\s+PISANJA", stripped, flags=re.IGNORECASE)
+        or re.fullmatch(r"\(?Writing\s+Paper\)?(?:\s+Engleski\s+jezik)?", stripped, flags=re.IGNORECASE)
+    )
+
+
+def select_reading_task_markers(
+    markers: list[TaskMarker],
+    tasks: tuple[Task, ...],
+) -> list[TaskMarker]:
+    selected: list[TaskMarker] = []
+    cursor = (0, -1.0)
+    for task in tasks:
+        marker = next(
+            (
+                candidate
+                for candidate in markers
+                if candidate.number == task.number and marker_position(candidate) > cursor
+            ),
+            None,
+        )
+        if marker is None:
+            raise ValueError(f"Could not locate Task {task.number} in English reading paper")
+        selected.append(marker)
+        cursor = marker_position(marker)
+    return selected
+
+
+def find_reading_end_marker(pages: list[PdfPage], last_task_marker: TaskMarker) -> TaskMarker | None:
+    last_position = marker_position(last_task_marker)
+    for page in pages:
+        for line in sorted_page_lines(page):
+            if (page.number, line.y_min) <= last_position:
+                continue
+            if is_writing_section_marker(line):
+                return TaskMarker(number=0, page=page, y_min=line.y_min)
+    return None
+
+
+def find_task_source_crops(contents: bytes, tasks: tuple[Task, ...]) -> dict[int, list[SourceCrop]]:
+    pages = pdf_bbox_pages(contents)
+    task_numbers = {task.number for task in tasks}
+    markers: list[TaskMarker] = []
+
+    for page in pages:
+        for line in sorted_page_lines(page):
+            match = re.fullmatch(r"Task\s+(\d+)", line.text.strip(), flags=re.IGNORECASE)
+            if not match:
+                continue
+            number = int(match.group(1))
+            if number in task_numbers:
+                markers.append(TaskMarker(number=number, page=page, y_min=line.y_min))
+
+    markers.sort(key=marker_position)
+    selected_markers = select_reading_task_markers(markers, tasks)
+    reading_end_marker = find_reading_end_marker(pages, selected_markers[-1])
+
+    crops: dict[int, list[SourceCrop]] = {}
+    for index, marker in enumerate(selected_markers):
+        next_marker = (
+            selected_markers[index + 1]
+            if index + 1 < len(selected_markers)
+            else reading_end_marker
+        )
+        task_crops: list[SourceCrop] = []
+        for page in pages:
+            if page.number < marker.page.number:
+                continue
+            if next_marker and page.number > next_marker.page.number:
+                continue
+
+            relevant_lines = []
+            for line in sorted_page_lines(page):
+                if not line.text.strip():
+                    continue
+                if is_running_header_or_footer(line.text):
+                    continue
+                if page.number == marker.page.number and line.y_min < marker.y_min:
+                    continue
+                if next_marker and page.number == next_marker.page.number and line.y_min >= next_marker.y_min:
+                    continue
+                relevant_lines.append(line)
+
+            if not relevant_lines:
+                continue
+
+            y_min = max(0, relevant_lines[0].y_min - SOURCE_CROP_VERTICAL_PADDING)
+            y_max = min(page.height, relevant_lines[-1].y_max + SOURCE_CROP_VERTICAL_PADDING)
+            if y_max <= y_min:
+                raise ValueError(f"Task {marker.number} has an invalid crop on page {page.number}")
+
+            task_crops.append(
+                SourceCrop(
+                    page=page,
+                    x_min=SOURCE_CROP_HORIZONTAL_MARGIN,
+                    y_min=y_min,
+                    x_max=page.width - SOURCE_CROP_HORIZONTAL_MARGIN,
+                    y_max=y_max,
+                )
+            )
+
+            if next_marker and page.number == next_marker.page.number:
+                break
+
+        if not task_crops:
+            raise ValueError(f"Task {marker.number} has no visible source crop")
+        crops[marker.number] = task_crops
+
+    return crops
+
+
+def render_source_pages(
+    paper_path: Path,
+    identifier: str,
+    crops: dict[int, list[SourceCrop]],
+    expected_assets: set[str],
+) -> dict[int, list[dict[str, Any]]]:
+    destination = PAPER_ROOT / identifier
+    crops_by_page: dict[int, list[tuple[int, SourceCrop]]] = {}
+    for task_number, task_crops in crops.items():
+        for crop in task_crops:
+            crops_by_page.setdefault(crop.page.number, []).append((task_number, crop))
+
+    source_images: dict[int, list[dict[str, Any]]] = {}
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        temporary_root = Path(temporary_directory)
+        for page_number, page_crops in sorted(crops_by_page.items()):
+            filename = f"page-{page_number}.png"
+            temporary_prefix = temporary_root / f"page-{page_number}"
+            try:
+                subprocess.run(
+                    [
+                        "pdftocairo",
+                        "-png",
+                        "-singlefile",
+                        "-r",
+                        str(SOURCE_RENDER_DPI),
+                        "-f",
+                        str(page_number),
+                        "-l",
+                        str(page_number),
+                        str(paper_path),
+                        str(temporary_prefix),
+                    ],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=True,
+                )
+            except FileNotFoundError as exc:
+                raise RuntimeError("pdftocairo is required to build English reading source images") from exc
+            except subprocess.CalledProcessError as exc:
+                message = exc.stderr.decode("utf-8", errors="replace")
+                raise RuntimeError(f"pdftocairo failed: {message}") from exc
+
+            contents = temporary_prefix.with_suffix(".png").read_bytes()
+            image_width, image_height = png_dimensions(contents)
+            write_if_changed(destination / filename, contents)
+            expected_assets.add(filename)
+
+            for task_number, crop in page_crops:
+                scale_x = image_width / crop.page.width
+                scale_y = image_height / crop.page.height
+                x_min = max(0, math.floor(crop.x_min * scale_x))
+                y_min = max(0, math.floor(crop.y_min * scale_y))
+                x_max = min(image_width, math.ceil(crop.x_max * scale_x))
+                y_max = min(image_height, math.ceil(crop.y_max * scale_y))
+                source_images.setdefault(task_number, []).append(
+                    {
+                        "url": f"{PAPER_URL_PREFIX}/{quote(identifier)}/{filename}",
+                        "page": page_number,
+                        "width": image_width,
+                        "height": image_height,
+                        "crop": {
+                            "x": x_min,
+                            "y": y_min,
+                            "width": x_max - x_min,
+                            "height": y_max - y_min,
+                        },
+                    }
+                )
+
+    return source_images
+
+
+def remove_unexpected_files(destination: Path, expected_assets: set[str]) -> None:
+    if not destination.is_dir():
+        return
+    for path in destination.iterdir():
+        if path.is_file() and path.name not in expected_assets:
+            path.unlink()
+
+
 def write_if_changed(path: Path, contents: bytes) -> None:
     if path.is_file() and path.read_bytes() == contents:
         return
@@ -304,8 +612,16 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     task_texts = extract_task_texts(paper_text, tasks)
     term = normalize_term(exam["term"])
     identifier = exam_id(exam)
-    destination = PAPER_ROOT / identifier / "paper.pdf"
-    write_if_changed(destination, paper_contents)
+    destination = PAPER_ROOT / identifier
+    expected_assets = {"paper.pdf"}
+    write_if_changed(destination / "paper.pdf", paper_contents)
+    source_images = render_source_pages(
+        destination / "paper.pdf",
+        identifier,
+        find_task_source_crops(paper_contents, tasks),
+        expected_assets,
+    )
+    remove_unexpected_files(destination, expected_assets)
 
     has_checking = exam["year"] >= CHECKING_MIN_YEAR
     answers = parse_choice_answers(pdf_text(key_contents), tasks) if has_checking else {}
@@ -321,7 +637,10 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
         "durationMinutes": parse_duration(paper_text),
         "checkingSupported": has_checking,
         "tasks": [
-            task.to_json() | {"text": task_texts[task.number]}
+            task.to_json() | {
+                "text": task_texts[task.number],
+                "sourceImages": source_images.get(task.number, []),
+            }
             for task in tasks
         ],
         "answers": answers,

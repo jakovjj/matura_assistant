@@ -1,7 +1,9 @@
 .env
 node_modules/
 var/
+/var/*.sqlite*
 files/ncvvo/
+files/interactive/english-listening/**/audio/
 scripts/__pycache__/
 *.pyc
 AGENTS.md
