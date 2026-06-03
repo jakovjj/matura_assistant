@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import json
-import io
 import math
 import re
 import shutil
@@ -21,6 +20,8 @@ from urllib.parse import quote, unquote, urlparse
 from xml.etree import ElementTree
 
 from PIL import Image
+
+from crop_utils import grayscale_image_from_png, trim_crop_bottom_whitespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -791,30 +792,6 @@ def region_is_blank_or_rules_only(
     )
 
 
-def trim_blank_crop_bottom(
-    image: Image.Image,
-    x_min: int,
-    y_min: int,
-    x_max: int,
-    y_max: int,
-    minimum_y_max: int,
-) -> int:
-    inner_margin = 8
-    if x_max - x_min <= inner_margin * 2 or y_max <= y_min:
-        return y_max
-
-    inner_box = (x_min + inner_margin, y_min, x_max - inner_margin, y_max)
-    row_counts = row_dark_counts(image, inner_box, SOURCE_BLANK_PIXEL_THRESHOLD)
-    if not row_counts:
-        return y_max
-
-    min_row_ink = max(2, int((inner_box[2] - inner_box[0]) * 0.0015))
-    for index in range(len(row_counts) - 1, -1, -1):
-        if row_counts[index] >= min_row_ink:
-            return max(minimum_y_max, min(y_max, y_min + index + int(SOURCE_BLANK_TRIM_PADDING * 2)))
-    return y_max
-
-
 def refine_history_crop_box(
     image: Image.Image,
     crop: QuestionCrop,
@@ -867,13 +844,16 @@ def refine_history_crop_box(
                 minimum_y_max = max(y_min + 48, candidate_y_max)
                 refined_y_max = minimum_y_max
 
-    refined_y_max = trim_blank_crop_bottom(
+    _, _, _, refined_y_max = trim_crop_bottom_whitespace(
         image,
         x_min,
         y_min,
         x_max,
         refined_y_max,
-        min(minimum_y_max, refined_y_max),
+        padding=SOURCE_BLANK_TRIM_PADDING * 2,
+        minimum_y_max=min(minimum_y_max, refined_y_max),
+        threshold=SOURCE_BLANK_PIXEL_THRESHOLD,
+        min_trim=18,
     )
     return x_min, y_min, x_max, max(y_min + 48, refined_y_max)
 
@@ -928,7 +908,7 @@ def render_source_pages(
             image_width, image_height = png_dimensions(contents)
             write_if_changed(image_path, contents)
             expected_assets.add(filename)
-            page_image = Image.open(io.BytesIO(contents)).convert("L")
+            page_image = grayscale_image_from_png(contents)
 
             for key, crop in page_crops:
                 scale_x = image_width / crop.page.width

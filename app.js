@@ -1743,7 +1743,7 @@ function renderSubjectGrid() {
   subjectList.innerHTML = `
     <section class="subject-group">
       <div class="subject-group__heading">
-        <h3>Obavezni predmeti</h3>
+        <h3>Obavezne mature</h3>
       </div>
       <div class="subject-grid subject-grid--mandatory">
         ${
@@ -1751,7 +1751,7 @@ function renderSubjectGrid() {
             ? visibleMandatorySubjects.map(renderSubjectCard).join("")
             : `
               <div class="empty-state subject-grid__empty">
-                <h3>Nema obaveznih predmeta</h3>
+                <h3>Nema obaveznih matura</h3>
                 <p>Trenutačno nema predmeta u ovoj skupini.</p>
               </div>
             `
@@ -1761,7 +1761,7 @@ function renderSubjectGrid() {
 
     <section class="subject-group">
       <div class="subject-group__heading">
-        <h3>Ostali predmeti <span class="subject-group__note">(Dostupni prvo)</span></h3>
+        <h3>Izborne mature</h3>
       </div>
       <div class="subject-grid">
         ${
@@ -1769,7 +1769,7 @@ function renderSubjectGrid() {
             ? visibleOptionalSubjects.map(renderSubjectCard).join("")
             : `
               <div class="empty-state subject-grid__empty">
-                <h3>Nema ostalih predmeta</h3>
+                <h3>Nema izbornih matura</h3>
                 <p>Trenutačno nema predmeta u ovoj skupini.</p>
               </div>
             `

@@ -18,6 +18,8 @@ from typing import Any
 from urllib.parse import quote, unquote, urlparse
 from xml.etree import ElementTree
 
+from crop_utils import grayscale_image_from_png, trim_crop_bottom_whitespace
+
 
 ROOT = Path(__file__).resolve().parents[1]
 ARCHIVE_INDEX = ROOT / "data" / "exams.js"
@@ -366,6 +368,7 @@ def render_source_page(paper_path: Path, identifier: str, crop: SourceCrop) -> d
 
     image_width, image_height = png_dimensions(contents)
     (destination / filename).write_bytes(contents)
+    page_image = grayscale_image_from_png(contents)
 
     scale_x = image_width / crop.page.width
     scale_y = image_height / crop.page.height
@@ -373,6 +376,13 @@ def render_source_page(paper_path: Path, identifier: str, crop: SourceCrop) -> d
     y_min = max(0, math.floor(crop.y_min * scale_y))
     x_max = min(image_width, math.ceil(crop.x_max * scale_x))
     y_max = min(image_height, math.ceil(crop.y_max * scale_y))
+    x_min, y_min, x_max, y_max = trim_crop_bottom_whitespace(
+        page_image,
+        x_min,
+        y_min,
+        x_max,
+        y_max,
+    )
 
     return {
         "url": f"{ASSET_URL_PREFIX}/{quote(identifier)}/{filename}",
