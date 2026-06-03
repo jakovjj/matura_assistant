@@ -4,14 +4,19 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import shutil
+import struct
 import subprocess
+import tempfile
 import unicodedata
 import zipfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
+from urllib.parse import quote, unquote, urlparse
+from xml.etree import ElementTree
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,6 +37,37 @@ COMMON_TEXT_FIXES = {
     "schoo/s": "schools",
     "Sfudenfs": "Students",
 }
+SOURCE_RENDER_DPI = 144
+SOURCE_CROP_HORIZONTAL_MARGIN = 48
+SOURCE_CROP_VERTICAL_PADDING = 9
+SOURCE_FOOTER_MARGIN = 65
+
+
+@dataclass(frozen=True)
+class PdfLine:
+    text: str
+    first_word: str
+    x_min: float
+    x_max: float
+    y_min: float
+    y_max: float
+
+
+@dataclass(frozen=True)
+class PdfPage:
+    number: int
+    width: float
+    height: float
+    lines: list[PdfLine]
+
+
+@dataclass(frozen=True)
+class SourceCrop:
+    page: PdfPage
+    x_min: float
+    y_min: float
+    x_max: float
+    y_max: float
 
 
 def load_archive_index() -> dict[str, Any]:
@@ -89,6 +125,57 @@ def pdf_text(contents: bytes) -> str:
         raise RuntimeError(f"pdftotext failed: {message}") from exc
 
     return completed.stdout.decode("utf-8", errors="replace")
+
+
+def pdf_bbox_pages(contents: bytes) -> list[PdfPage]:
+    try:
+        completed = subprocess.run(
+            ["pdftotext", "-bbox-layout", "-", "-"],
+            input=contents,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("pdftotext is required to build English essay source images") from exc
+    except subprocess.CalledProcessError as exc:
+        message = exc.stderr.decode("utf-8", errors="replace")
+        raise RuntimeError(f"pdftotext -bbox-layout failed: {message}") from exc
+
+    xml = completed.stdout.decode("utf-8", errors="replace")
+    xml = "".join(character for character in xml if character in "\t\n\r" or ord(character) >= 32)
+    root = ElementTree.fromstring(xml)
+    pages: list[PdfPage] = []
+    for page_number, page_element in enumerate(root.findall(".//{*}page"), start=1):
+        lines: list[PdfLine] = []
+        for line_element in page_element.findall(".//{*}line"):
+            words = line_element.findall("./{*}word")
+            if not words:
+                continue
+            word_texts = ["".join(word.itertext()).strip() for word in words]
+            lines.append(
+                PdfLine(
+                    text=" ".join(word for word in word_texts if word),
+                    first_word=word_texts[0],
+                    x_min=float(words[0].attrib["xMin"]),
+                    x_max=float(words[-1].attrib["xMax"]),
+                    y_min=float(line_element.attrib["yMin"]),
+                    y_max=float(line_element.attrib["yMax"]),
+                )
+            )
+        pages.append(
+            PdfPage(
+                number=page_number,
+                width=float(page_element.attrib["width"]),
+                height=float(page_element.attrib["height"]),
+                lines=lines,
+            )
+        )
+    return pages
+
+
+def sorted_page_lines(page: PdfPage) -> list[PdfLine]:
+    return sorted(page.lines, key=lambda line: (line.y_min, line.x_min))
 
 
 def is_blocked_pdf_name(name: str) -> bool:
@@ -177,6 +264,137 @@ def parse_task_text(text: str) -> str:
     return task_text
 
 
+def find_essay_task_crop(contents: bytes) -> SourceCrop:
+    pages = pdf_bbox_pages(contents)
+
+    for page in pages:
+        lines = [
+            line
+            for line in sorted_page_lines(page)
+            if line.text.strip() and not should_skip_task_line(line.text.strip())
+        ]
+        start_index = next(
+            (
+                index
+                for index, line in enumerate(lines)
+                if re.search(r"Write an essay of\s+200\s*[-–]\s*250\s+words", line.text)
+            ),
+            None,
+        )
+        if start_index is None:
+            continue
+
+        heading_index = next(
+            (
+                index
+                for index in range(start_index - 1, max(-1, start_index - 9), -1)
+                if re.search(
+                    r"Writing\s+Paper|ISPIT\s+PISANJA|Task\s+\d+|Question\s+\d+",
+                    lines[index].text,
+                    flags=re.IGNORECASE,
+                )
+            ),
+            start_index,
+        )
+        start_line = lines[heading_index]
+        end_line: PdfLine | None = None
+
+        for line in lines[start_index:]:
+            if line.y_min >= page.height - SOURCE_FOOTER_MARGIN:
+                break
+            if re.search(
+                r"Esej obvez|List za [čc]istopis|Način ispunjavanja",
+                line.text,
+                flags=re.IGNORECASE,
+            ):
+                break
+            end_line = line
+            if re.search(r"own opinion\.", line.text, flags=re.IGNORECASE):
+                break
+
+        if end_line is None:
+            raise ValueError("Could not locate the end of the English essay task crop")
+
+        y_min = max(0, start_line.y_min - SOURCE_CROP_VERTICAL_PADDING)
+        y_max = min(page.height, end_line.y_max + SOURCE_CROP_VERTICAL_PADDING)
+        if y_max <= y_min:
+            raise ValueError("English essay task crop has invalid bounds")
+
+        return SourceCrop(
+            page=page,
+            x_min=SOURCE_CROP_HORIZONTAL_MARGIN,
+            y_min=y_min,
+            x_max=page.width - SOURCE_CROP_HORIZONTAL_MARGIN,
+            y_max=y_max,
+        )
+
+    raise ValueError("Could not locate English essay task crop")
+
+
+def png_dimensions(contents: bytes) -> tuple[int, int]:
+    if contents[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR":
+        raise ValueError("Expected a PNG source page")
+    return struct.unpack(">II", contents[16:24])
+
+
+def render_source_page(paper_path: Path, identifier: str, crop: SourceCrop) -> dict[str, Any]:
+    filename = f"page-{crop.page.number}.png"
+    destination = ASSET_ROOT / identifier
+
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        temporary_root = Path(temporary_directory)
+        temporary_prefix = temporary_root / f"page-{crop.page.number}"
+        try:
+            subprocess.run(
+                [
+                    "pdftocairo",
+                    "-png",
+                    "-singlefile",
+                    "-r",
+                    str(SOURCE_RENDER_DPI),
+                    "-f",
+                    str(crop.page.number),
+                    "-l",
+                    str(crop.page.number),
+                    str(paper_path),
+                    str(temporary_prefix),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError("pdftocairo is required to build English essay source images") from exc
+        except subprocess.CalledProcessError as exc:
+            message = exc.stderr.decode("utf-8", errors="replace")
+            raise RuntimeError(f"pdftocairo failed: {message}") from exc
+
+        contents = temporary_prefix.with_suffix(".png").read_bytes()
+
+    image_width, image_height = png_dimensions(contents)
+    (destination / filename).write_bytes(contents)
+
+    scale_x = image_width / crop.page.width
+    scale_y = image_height / crop.page.height
+    x_min = max(0, math.floor(crop.x_min * scale_x))
+    y_min = max(0, math.floor(crop.y_min * scale_y))
+    x_max = min(image_width, math.ceil(crop.x_max * scale_x))
+    y_max = min(image_height, math.ceil(crop.y_max * scale_y))
+
+    return {
+        "url": f"{ASSET_URL_PREFIX}/{quote(identifier)}/{filename}",
+        "page": crop.page.number,
+        "width": image_width,
+        "height": image_height,
+        "crop": {
+            "x": x_min,
+            "y": y_min,
+            "width": x_max - x_min,
+            "height": y_max - y_min,
+        },
+    }
+
+
 def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     archive_path = local_archive_path(exam["url"])
     with zipfile.ZipFile(archive_path) as archive:
@@ -186,7 +404,9 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     essay_id = exam_id(exam)
     target_dir = ASSET_ROOT / essay_id
     target_dir.mkdir(parents=True, exist_ok=True)
-    (target_dir / "paper.pdf").write_bytes(contents)
+    paper_path = target_dir / "paper.pdf"
+    paper_path.write_bytes(contents)
+    source_image = render_source_page(paper_path, essay_id, find_essay_task_crop(contents))
 
     return {
         "id": essay_id,
@@ -201,6 +421,7 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
         "wordRange": {"min": 200, "max": 250},
         "maxScore": 20,
         "taskText": parse_task_text(text),
+        "sourceImages": [source_image],
     }
 
 

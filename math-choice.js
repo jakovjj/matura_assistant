@@ -23,7 +23,6 @@ const legacyTermAliases = {
   "jesenski rok": ["drugi rok"],
 };
 
-const mathSubjectColor = "#4f4b78";
 const taskTypes = {
   choice: "visestruki-izbor",
   open: "otvoreni-zadatci",
@@ -385,18 +384,23 @@ function renderSolver(exam, taskTypeId = "visestruki-izbor") {
 
   app.innerHTML = `
     ${renderSolverHeader({
-      subjectColor: mathSubjectColor,
+      subject: "Matematika",
+      exam,
       backHref: mathSubjectUrl(),
       backLabel: "← Odaberi drugi ispit",
       paperUrl: exam.paperUrl,
       archiveUrl: exam.archiveUrl,
-      eyebrow: "Matematika",
-      title: `${exam.year}. · ${formatTerm(exam.term)} · ${exam.level ? `${exam.level} razina` : "Bez razine"}`,
-      iconName: "sigma",
       summaryHtml: `
         ${simulation.renderTimer()}
         <strong id="answer-progress"></strong>
         <span id="score-summary"></span>
+      `,
+      navigationHtml: `
+        <nav
+          class="task-navigation solver-header__task-navigation"
+          data-task-type-navigation
+          aria-label="Vrste zadataka u ispitnom zaglavlju"
+        ></nav>
       `,
     })}
 
@@ -406,7 +410,11 @@ function renderSolver(exam, taskTypeId = "visestruki-izbor") {
 
     <footer class="solver-sticky-footer">
       <div class="solver-sticky-footer__inner">
-        <nav class="task-navigation" id="task-type-navigation" aria-label="Vrste zadataka u ispitu"></nav>
+        <nav
+          class="task-navigation"
+          data-task-type-navigation
+          aria-label="Vrste zadataka u ispitu"
+        ></nav>
         <div class="solver-sticky-footer__controls">
           <div class="solver-sticky-footer__status">
             ${icon("list-checks", "solver-sticky-footer__status-icon")}
@@ -482,7 +490,7 @@ function renderTaskTypeNavigation() {
       </a>`
     : "";
 
-  document.querySelector("#task-type-navigation").innerHTML = `
+  const navigationHtml = `
     <a
       class="task-button${activeTaskTypeId === taskTypes.choice ? " task-button--active" : ""}"
       href="${examUrl(solverExam)}"
@@ -494,6 +502,10 @@ function renderTaskTypeNavigation() {
     </a>
     ${openNavigation}
   `;
+
+  document.querySelectorAll("[data-task-type-navigation]").forEach((navigation) => {
+    navigation.innerHTML = navigationHtml;
+  });
   bindTaskTypeNavigation();
 }
 

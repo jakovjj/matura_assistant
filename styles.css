@@ -2195,10 +2195,22 @@ a:focus-visible {
   font-weight: 600;
 }
 
+.solver-header__footer .task-navigation {
+  padding: 0;
+}
+
+.solver-header__footer .task-navigation:empty {
+  display: none;
+}
+
+.solver-header__task-navigation {
+  max-width: 100%;
+}
+
 .solver-page .solver-header__footer,
 .physics-solver-active .solver-header__footer,
 .croatian-solver-active .solver-header__footer {
-  padding-left: 64px;
+  padding-left: var(--solver-header-title-offset, 0);
 }
 
 .solver-summary {
@@ -2266,7 +2278,7 @@ a:focus-visible {
 
 .essay-practice-layout {
   display: grid;
-  grid-template-columns: minmax(280px, 0.86fr) minmax(420px, 1.14fr);
+  grid-template-columns: minmax(280px, 0.78fr) minmax(480px, 1.22fr);
   gap: 18px;
   align-items: start;
   margin-top: 18px;
@@ -2302,6 +2314,15 @@ a:focus-visible {
 
 .essay-task-text p {
   margin: 0;
+}
+
+.essay-task-source.pdf-source-list {
+  margin-top: 14px;
+  padding: 0;
+}
+
+.essay-task-source .pdf-source-crop {
+  width: min(100%, 760px);
 }
 
 .essay-instructions,
@@ -2371,48 +2392,39 @@ a:focus-visible {
 
 .essay-word-pill {
   flex: 0 0 auto;
-  padding: 5px 8px;
   color: var(--muted);
-  background: var(--soft);
-  border: 1px solid var(--line-dark);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .essay-word-pill[data-state="ok"] {
   color: #1c6138;
-  background: #edf8f0;
-  border-color: #b7d8c1;
 }
 
 .essay-word-pill[data-state="warn"] {
   color: #7a4b00;
-  background: #fff7df;
-  border-color: #e3c46f;
 }
 
 .essay-textarea-field {
-  display: grid;
-  gap: 7px;
-}
-
-.essay-textarea-field span {
-  color: var(--navy);
-  font-size: 13px;
-  font-weight: 700;
+  display: block;
 }
 
 .essay-textarea-field textarea {
   width: 100%;
-  min-height: 520px;
+  min-height: 610px;
   padding: 14px;
   color: var(--ink);
   background: #fff;
   border: 1px solid var(--line-dark);
   font: inherit;
-  font-size: 16px;
-  line-height: 1.6;
+  font-size: 18px;
+  line-height: 1.65;
   resize: vertical;
+}
+
+.essay-textarea-field textarea::placeholder {
+  color: #8796ad;
+  font-style: italic;
 }
 
 .essay-textarea-field textarea:focus {
@@ -2420,25 +2432,19 @@ a:focus-visible {
   outline: 3px solid rgba(42, 91, 153, 0.16);
 }
 
-.essay-photo-upload {
+.essay-ocr-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-top: 14px;
-  padding: 12px;
-  background: var(--soft);
-  border: 1px solid var(--line);
+  margin-bottom: 10px;
 }
 
-.essay-photo-upload strong {
-  color: var(--navy);
-}
-
-.essay-photo-upload p {
-  margin: 3px 0 0;
+.essay-ocr-row p {
+  margin: 0;
   color: var(--muted);
   font-size: 13px;
+  line-height: 1.4;
 }
 
 .essay-photo-upload__button {
@@ -2453,6 +2459,20 @@ a:focus-visible {
   inset: 0;
   opacity: 0;
   pointer-events: none;
+}
+
+.essay-ocr-status {
+  min-height: 0;
+}
+
+.essay-ocr-message {
+  margin: -2px 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.essay-ocr-message--error {
+  color: #7a1d1d;
 }
 
 .essay-photo-preview {
@@ -2569,9 +2589,8 @@ a:focus-visible {
   margin-top: 7px;
 }
 
-.solver-page,
-.physics-solver-active {
-  padding-bottom: 86px;
+body.solver-page {
+  padding-bottom: var(--solver-sticky-footer-height, 86px);
 }
 
 .solver-sticky-footer {
@@ -3382,6 +3401,182 @@ a:focus-visible {
   width: 42px;
 }
 
+.croatian-completion-crop {
+  isolation: isolate;
+}
+
+.croatian-completion-blank {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  padding: 1px 3px 2px 3px;
+  color: #20242a;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #7fa4d6;
+  border-bottom: 2px solid var(--blue);
+  border-radius: 2px;
+  box-shadow: none;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.05;
+  text-align: left;
+  cursor: pointer;
+}
+
+.croatian-completion-blank:hover {
+  background: #f8fbff;
+  border-color: var(--blue);
+}
+
+.croatian-completion-blank:focus-visible {
+  outline: 3px solid rgba(46, 93, 172, 0.35);
+  outline-offset: 2px;
+}
+
+.croatian-completion-blank:disabled {
+  color: var(--muted);
+  background: rgba(248, 250, 252, 0.96);
+  border-color: var(--line-dark);
+  cursor: not-allowed;
+}
+
+.croatian-completion-blank--answered {
+  color: #20242a;
+  background: rgba(255, 255, 255, 0.98);
+  border-color: var(--blue);
+}
+
+.croatian-completion-blank--correct {
+  color: #15552e;
+  background: #e4f6e8;
+  border-color: #74b486;
+}
+
+.croatian-completion-blank--wrong {
+  color: #8a2020;
+  background: #fbe7e7;
+  border-color: #d69494;
+}
+
+.croatian-completion-blank span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.croatian-completion-blank__chevron {
+  flex: 0 0 auto;
+  width: 0;
+  height: 0;
+  border-top: 4px solid currentColor;
+  border-right: 3px solid transparent;
+  border-left: 3px solid transparent;
+  opacity: 0.68;
+}
+
+.croatian-completion-popover {
+  position: fixed;
+  z-index: 60;
+  width: min(360px, calc(100vw - 24px));
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--line-dark);
+  box-shadow: 0 14px 38px rgba(16, 35, 63, 0.22);
+}
+
+.croatian-completion-popover__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px;
+  color: var(--white);
+  background: var(--navy);
+}
+
+.croatian-completion-popover__heading strong {
+  font-size: 13px;
+}
+
+.croatian-completion-popover__heading button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  color: var(--white);
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.croatian-completion-popover__heading button:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.croatian-completion-popover__options {
+  display: grid;
+}
+
+.croatian-completion-popover__option {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  padding: 9px 10px;
+  color: var(--ink);
+  background: var(--white);
+  border: 0;
+  border-top: 1px solid var(--line);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.croatian-completion-popover__option:hover,
+.croatian-completion-popover__option:focus-visible {
+  background: var(--pale-blue);
+}
+
+.croatian-completion-popover__option:focus-visible {
+  outline: 3px solid rgba(46, 93, 172, 0.35);
+  outline-offset: -3px;
+}
+
+.croatian-completion-popover__option strong {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  color: var(--navy);
+  background: var(--soft);
+  border: 1px solid var(--line-dark);
+  font-size: 12px;
+}
+
+.croatian-completion-popover__option span {
+  min-width: 0;
+  font-size: 14px;
+}
+
+.croatian-completion-popover__option--selected {
+  background: #edf3f8;
+}
+
+.croatian-completion-popover__option--selected strong {
+  color: var(--white);
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
 .physics-source-question {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
@@ -3810,7 +4005,7 @@ a:focus-visible {
   }
 
   .essay-textarea-field textarea {
-    min-height: 420px;
+    min-height: 520px;
   }
 
   .croatian-practice-layout {
@@ -4134,7 +4329,7 @@ a:focus-visible {
   }
 
   .essay-writing-panel__heading,
-  .essay-photo-upload {
+  .essay-ocr-row {
     display: grid;
   }
 
@@ -4174,9 +4369,8 @@ a:focus-visible {
     min-width: 620px;
   }
 
-  .solver-page,
-  .physics-solver-active {
-    padding-bottom: 154px;
+  body.solver-page {
+    padding-bottom: var(--solver-sticky-footer-height, 154px);
   }
 
   .solver-sticky-footer__inner {

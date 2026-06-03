@@ -61,6 +61,14 @@ const essayScoreSchema = {
     "insufficientLength",
   ],
 };
+const essayOcrSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    text: { type: "string" },
+  },
+  required: ["text"],
+};
 
 let store = {
   sessions: {},
@@ -161,6 +169,11 @@ async function handleRequest(request, response) {
 
   if (url.pathname === "/api/english-essay/grade") {
     await handleEnglishEssayGrade(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/english-essay/ocr") {
+    await handleEnglishEssayOcr(request, response);
     return;
   }
 
@@ -479,6 +492,61 @@ async function handleEnglishEssayGrade(request, response) {
   }
 }
 
+async function handleEnglishEssayOcr(request, response) {
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
+    return;
+  }
+
+  const session = currentSession(request);
+  const user = session ? store.users[session.userId] : null;
+  if (!session || !user) {
+    sendJson(response, 401, { error: "Prijava je potrebna za OCR fotografije." });
+    return;
+  }
+
+  let apiKey;
+  try {
+    apiKey = decryptAgentKey(user.agentKey);
+  } catch (error) {
+    console.error("OpenAI API ključ nije moguće pročitati:", error.message);
+    sendJson(response, 400, { error: "Spremljeni OpenAI API ključ nije moguće pročitati." });
+    return;
+  }
+
+  if (!apiKey) {
+    sendJson(response, 400, { error: "Spremi OpenAI API ključ u profilu prije OCR-a." });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request, 12 * 1024 * 1024);
+  } catch {
+    sendJson(response, 400, { error: "Zahtjev nema ispravan JSON zapis." });
+    return;
+  }
+
+  const image = normalizeEssayImage(body?.image);
+  if (!image) {
+    sendJson(response, 400, { error: "Fotografija eseja nije ispravna ili je prevelika." });
+    return;
+  }
+
+  try {
+    const text = await transcribeEnglishEssayImageWithOpenAI({ apiKey, image });
+    sendJson(response, 200, {
+      text,
+      model: config.essayModel,
+    });
+  } catch (error) {
+    console.error("OCR fotografije eseja nije uspio:", error.message);
+    sendJson(response, 502, {
+      error: "OpenAI OCR nije uspio. Provjeri API ključ i pokušaj ponovno.",
+    });
+  }
+}
+
 function upsertGoogleUser(profile) {
   const now = new Date().toISOString();
   let user =
@@ -780,6 +848,63 @@ async function gradeEnglishEssayWithOpenAI({ apiKey, essayExam, essayText, image
   const responseText = extractOpenAiOutputText(payload);
   if (!responseText) throw new Error("OpenAI response did not contain output text.");
   return normalizeEssayGrade(JSON.parse(responseText));
+}
+
+async function transcribeEnglishEssayImageWithOpenAI({ apiKey, image }) {
+  const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
+    body: JSON.stringify({
+      model: config.essayModel,
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: `
+Transcribe the English handwritten or photographed essay in the image.
+Return only JSON matching the schema. Do not grade, correct, rewrite, or explain the text.
+Preserve paragraph breaks where they are visible. If a word is uncertain, transcribe the most likely reading.
+If the image does not contain an essay text, return an empty string.
+              `.trim(),
+            },
+            {
+              type: "input_image",
+              image_url: image.dataUrl,
+              detail: "high",
+            },
+          ],
+        },
+      ],
+      max_output_tokens: 4000,
+      text: {
+        format: {
+          type: "json_schema",
+          name: "english_essay_ocr",
+          strict: true,
+          schema: essayOcrSchema,
+        },
+      },
+      temperature: 0,
+    }),
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+    signal: AbortSignal.timeout(45_000),
+  });
+
+  const payload = await openAiResponse.json().catch(() => ({}));
+  if (!openAiResponse.ok) {
+    const message = payload?.error?.message || `HTTP ${openAiResponse.status}`;
+    throw new Error(`OpenAI response error: ${message}`);
+  }
+
+  const responseText = extractOpenAiOutputText(payload);
+  if (!responseText) throw new Error("OpenAI response did not contain output text.");
+
+  const parsed = JSON.parse(responseText);
+  return normalizeEssayText(parsed?.text);
 }
 
 function buildEssayGradingPrompt({ essayExam, essayText, hasImage }) {

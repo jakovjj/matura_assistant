@@ -703,12 +703,13 @@ function renderSolver(exam) {
 
   app.innerHTML = `
     ${renderSolverHeader({
+      subject: "Engleski",
+      part: "Čitanje",
+      exam,
       backHref: englishSubjectUrl,
       backLabel: "← Natrag na Engleski jezik",
       paperUrl: exam.paperUrl,
       archiveUrl: exam.archiveUrl,
-      eyebrow: "Engleski - čitanje",
-      title: `${exam.year}. · ${formatTerm(exam.term)} · ${exam.level} razina`,
       summaryHtml: `
         ${simulation.renderTimer()}
         <strong id="answer-progress"></strong>

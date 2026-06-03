@@ -5,6 +5,8 @@
 Asistent za Mature is a Croatian website for easier preparation and, later, online live
 solving of state graduation exams (`državna matura`).
 
+The public domain is `https://matura.com.hr`.
+
 The current milestone is intentionally narrow:
 
 - provide a clean archive of downloadable exam packages

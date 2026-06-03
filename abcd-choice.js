@@ -23,50 +23,6 @@ const legacyTermAliases = {
   "jesenski rok": ["drugi rok"],
 };
 
-const subjectColors = {
-  Biologija: "#2f5d50",
-  Etika: "#5b4b63",
-  Filozofija: "#574d3f",
-  Geografija: "#3f5f3b",
-  "Grčki jezik": "#4d5370",
-  Informatika: "#2e5c72",
-  Kemija: "#315f69",
-  "Latinski jezik": "#5b5140",
-  "Likovna umjetnost": "#6a4f3d",
-  Matematika: "#4f4b78",
-  "Mađarski jezik": "#4e5d47",
-  "Mađarski jezik i književnost": "#465a4f",
-  "Politika i gospodarstvo": "#5c4a42",
-  Povijest: "#6a4b3d",
-  Psihologija: "#5a4968",
-  Sociologija: "#4e5960",
-  "Srpski jezik": "#574a70",
-  "Talijanski jezik i književnost": "#4b5a5f",
-  Vjeronauk: "#4f5943",
-};
-
-const subjectIcons = {
-  Biologija: "dna",
-  Etika: "scale",
-  Filozofija: "lightbulb",
-  Geografija: "earth",
-  "Grčki jezik": "omega",
-  Informatika: "binary",
-  Kemija: "flask-conical",
-  "Latinski jezik": "amphora",
-  "Likovna umjetnost": "palette",
-  Matematika: "sigma",
-  "Mađarski jezik": "languages",
-  "Mađarski jezik i književnost": "library",
-  "Politika i gospodarstvo": "landmark",
-  Povijest: "history",
-  Psihologija: "brain",
-  Sociologija: "users-round",
-  "Srpski jezik": "languages",
-  "Talijanski jezik i književnost": "library",
-  Vjeronauk: "church",
-};
-
 let solverExam;
 let responses = {};
 let activeQuestionNumber;
@@ -191,10 +147,6 @@ function subjectUrl(exam = solverExam) {
   return `./?predmet=${encodeURIComponent(exam?.subject || "")}`;
 }
 
-function levelText(exam) {
-  return exam.level ? `${exam.level} razina` : "Bez razine";
-}
-
 function allQuestions(exam) {
   return questionIds(exam);
 }
@@ -264,18 +216,14 @@ function renderSolver(exam) {
   activeQuestionNumber = questionIds(exam)[0];
   checked = false;
 
-  const subjectColor = subjectColors[exam.subject] || "#001d4d";
-  const subjectIcon = subjectIcons[exam.subject] || "book-open";
   app.innerHTML = `
     ${renderSolverHeader({
-      subjectColor,
+      subject: exam.subject,
+      exam,
       backHref: subjectUrl(exam),
       backLabel: "← Odaberi drugi ispit",
       paperUrl: exam.paperUrl,
       archiveUrl: exam.archiveUrl,
-      eyebrow: exam.subject,
-      title: `${exam.year}. · ${formatTerm(exam.term)} · ${levelText(exam)}`,
-      iconName: subjectIcon,
       summaryHtml: `
         ${simulation.renderTimer()}
         <strong id="answer-progress"></strong>
@@ -428,10 +376,6 @@ function renderAnswerPanel() {
       </div>
       <small>${complete}/${total}</small>
     </div>
-    <p class="answer-panel__hint">
-      Odaberi jedan odgovor za svako pitanje. Polazni tekstovi i grafički prilozi ostaju u PDF knjižici.
-    </p>
-
     <div class="response-list croatian-response-list">
       ${questionIds().map((question) => renderQuestion(question)).join("")}
     </div>

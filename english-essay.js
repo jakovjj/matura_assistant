@@ -34,7 +34,8 @@ const rubricRows = [
 
 let solverExam;
 let essayText = "";
-let selectedImage = null;
+let ocrPending = false;
+let ocrError = "";
 let gradingPending = false;
 let gradingResult = null;
 let gradingError = "";
@@ -169,6 +170,65 @@ function renderTaskText(text) {
     .join("");
 }
 
+function hasValidSourceImage(source) {
+  const crop = source?.crop;
+  return (
+    Boolean(source?.url) &&
+    Number(source?.width) > 0 &&
+    Number(source?.height) > 0 &&
+    Number(crop?.width) > 0 &&
+    Number(crop?.height) > 0
+  );
+}
+
+function renderCroppedImage(source, alt) {
+  if (!hasValidSourceImage(source)) return "";
+
+  const crop = source.crop;
+  const width = (source.width / crop.width) * 100;
+  const offsetX = (-crop.x / source.width) * 100;
+  const offsetY = (-crop.y / source.height) * 100;
+
+  return `
+    <figure class="pdf-source-figure">
+      <div
+        class="pdf-source-crop"
+        style="aspect-ratio: ${crop.width} / ${crop.height}"
+      >
+        <img
+          src="${escapeHtml(source.url)}"
+          alt="${escapeHtml(alt)}"
+          loading="lazy"
+          style="
+            width: ${width}%;
+            max-width: none;
+            transform: translate(${offsetX}%, ${offsetY}%);
+          "
+        />
+      </div>
+    </figure>
+  `;
+}
+
+function renderTaskSourceImages(exam) {
+  const images = Array.isArray(exam.sourceImages) ? exam.sourceImages : [];
+  const rendered = images
+    .map((source, index) => renderCroppedImage(source, `Službeni prikaz zadatka za esej, stranica ${index + 1}.`))
+    .filter(Boolean);
+
+  if (!rendered.length) return "";
+  return `<div class="essay-task-source pdf-source-list">${rendered.join("")}</div>`;
+}
+
+function renderTaskSourceContent(exam) {
+  return (
+    renderTaskSourceImages(exam) ||
+    `<div class="essay-task-text">
+      ${renderTaskText(exam.taskText)}
+    </div>`
+  );
+}
+
 function renderRubric() {
   return `
     <div class="essay-rubric">
@@ -208,7 +268,8 @@ function renderSolver(exam) {
   document.body.classList.add("solver-page", "essay-solver-active");
   solverExam = exam;
   essayText = simulation.active ? "" : loadDraft(exam);
-  selectedImage = null;
+  ocrPending = false;
+  ocrError = "";
   gradingPending = false;
   gradingResult = null;
   gradingError = "";
@@ -216,13 +277,13 @@ function renderSolver(exam) {
 
   app.innerHTML = `
     ${renderSolverHeader({
-      subjectColor: "#36517c",
+      subject: "Engleski",
+      part: "Esej",
+      exam,
       backHref: englishSubjectUrl,
       backLabel: "← Natrag na Engleski jezik",
       paperUrl: exam.paperUrl,
       archiveUrl: exam.archiveUrl,
-      eyebrow: "Engleski - esej",
-      title: `${exam.year}. · ${formatTerm(exam.term)} · ${exam.level} razina`,
       summaryHtml: `
         ${simulation.renderTimer()}
         <strong id="essay-word-summary"></strong>
@@ -236,9 +297,7 @@ function renderSolver(exam) {
       <section class="essay-task-panel" aria-labelledby="essay-task-title">
         <p class="eyebrow">Zadatak</p>
         <h3 id="essay-task-title">Writing paper</h3>
-        <div class="essay-task-text">
-          ${renderTaskText(exam.taskText)}
-        </div>
+        ${renderTaskSourceContent(exam)}
         <div class="essay-instructions">
           <h3>Upute</h3>
           <ul>
@@ -252,30 +311,14 @@ function renderSolver(exam) {
 
       <section class="essay-writing-panel" aria-labelledby="essay-writing-title">
         <div class="essay-writing-panel__heading">
-          <div>
-            <p class="eyebrow">Odgovor</p>
-            <h3 id="essay-writing-title">Tvoj esej</h3>
-          </div>
+          <h3 id="essay-writing-title">Tvoj esej</h3>
           <span id="essay-word-pill" class="essay-word-pill"></span>
         </div>
 
-        <label class="essay-textarea-field">
-          <span>Esej</span>
-          <textarea
-            id="essay-text"
-            rows="18"
-            spellcheck="false"
-            ${simulation.inputDisabledAttribute()}
-          >${escapeHtml(essayText)}</textarea>
-        </label>
-
-        <div class="essay-photo-upload">
-          <div>
-            <strong>Fotografija rukopisa</strong>
-            <p>Dodaj sliku ako si esej pisao na papiru.</p>
-          </div>
+        <div class="essay-ocr-row">
+          <p>Fotografija služi samo za OCR: iščitani tekst upisuje se u polje eseja.</p>
           <label class="secondary-button essay-photo-upload__button">
-            Odaberi sliku
+            <span id="essay-photo-label">Iščitaj fotografiju</span>
             <input
               id="essay-photo"
               type="file"
@@ -285,7 +328,18 @@ function renderSolver(exam) {
             />
           </label>
         </div>
-        <div id="essay-photo-preview"></div>
+        <div id="essay-ocr-status" class="essay-ocr-status" aria-live="polite"></div>
+
+        <label class="essay-textarea-field">
+          <textarea
+            id="essay-text"
+            aria-label="Esej"
+            placeholder="Napiši svoj esej ovdje..."
+            rows="18"
+            spellcheck="false"
+            ${simulation.inputDisabledAttribute()}
+          >${escapeHtml(essayText)}</textarea>
+        </label>
 
         <div id="essay-grading-panel"></div>
       </section>
@@ -319,10 +373,9 @@ function renderSolver(exam) {
   document.querySelector("#essay-text").addEventListener("input", handleEssayInput);
   document.querySelector("#essay-photo").addEventListener("change", handlePhotoSelection);
   document.querySelector("#grade-essay").addEventListener("click", gradeEssay);
-  app.addEventListener("click", handleEssayClick);
 
   renderEssaySummary();
-  renderPhotoPreview();
+  renderOcrStatus();
   renderGradingPanel();
   simulation.start(exam.durationMinutes);
 }
@@ -336,82 +389,110 @@ function handleEssayInput(event) {
   renderGradingPanel();
 }
 
-function handleEssayClick(event) {
-  const removeButton = event.target.closest("[data-remove-photo]");
-  if (!removeButton) return;
-  selectedImage = null;
-  const input = document.querySelector("#essay-photo");
-  if (input) input.value = "";
-  renderPhotoPreview();
-}
-
-function handlePhotoSelection(event) {
+async function handlePhotoSelection(event) {
+  const input = event.target;
   const [file] = event.target.files || [];
   gradingResult = null;
   gradingError = "";
+  ocrError = "";
 
   if (!file) {
-    selectedImage = null;
-    renderPhotoPreview();
+    renderOcrStatus();
     renderGradingPanel();
     return;
   }
 
+  if (
+    essayText.trim() &&
+    !window.confirm("Zamijeniti postojeći tekst eseja tekstom iščitanim s fotografije?")
+  ) {
+    input.value = "";
+    renderOcrStatus();
+    return;
+  }
+
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-    selectedImage = null;
-    gradingError = "Podržane su samo JPEG, PNG i WEBP slike.";
-    renderPhotoPreview();
+    ocrError = "Podržane su samo JPEG, PNG i WEBP slike.";
+    input.value = "";
+    renderOcrStatus();
     renderGradingPanel();
     return;
   }
 
   if (file.size > maximumImageBytes) {
-    selectedImage = null;
-    gradingError = "Slika je prevelika. Najveća dopuštena veličina je 8 MB.";
-    renderPhotoPreview();
+    ocrError = "Slika je prevelika. Najveća dopuštena veličina je 8 MB.";
+    input.value = "";
+    renderOcrStatus();
     renderGradingPanel();
     return;
   }
 
-  const reader = new FileReader();
-  reader.addEventListener("load", () => {
-    selectedImage = {
-      dataUrl: String(reader.result || ""),
+  ocrPending = true;
+  updateOcrControls();
+  updateGradeButton();
+  renderOcrStatus();
+  renderGradingPanel();
+
+  try {
+    const dataUrl = await readImageAsDataUrl(file);
+    const payload = await requestEssayOcr({
+      dataUrl,
       name: file.name,
-      size: file.size,
       type: file.type,
-    };
-    renderPhotoPreview();
+    });
+    const extractedText = String(payload.text || "").trim();
+    if (!extractedText) {
+      throw new Error("Na fotografiji nije pronađen tekst eseja.");
+    }
+
+    essayText = extractedText;
+    const textarea = document.querySelector("#essay-text");
+    if (textarea) textarea.value = essayText;
+    saveDraft();
+  } catch (error) {
+    ocrError = error.message || "Tekst s fotografije nije moguće iščitati.";
+  } finally {
+    ocrPending = false;
+    input.value = "";
+    updateOcrControls();
+    updateGradeButton();
+    renderOcrStatus();
+    renderEssaySummary();
     renderGradingPanel();
-  });
-  reader.addEventListener("error", () => {
-    selectedImage = null;
-    gradingError = "Sliku nije moguće učitati.";
-    renderPhotoPreview();
-    renderGradingPanel();
-  });
-  reader.readAsDataURL(file);
+  }
 }
 
-function renderPhotoPreview() {
-  const target = document.querySelector("#essay-photo-preview");
+function readImageAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(String(reader.result || "")));
+    reader.addEventListener("error", () => reject(new Error("Sliku nije moguće učitati.")));
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderOcrStatus() {
+  const target = document.querySelector("#essay-ocr-status");
   if (!target) return;
 
-  if (!selectedImage) {
-    target.innerHTML = "";
+  if (ocrPending) {
+    target.innerHTML = `<p class="essay-ocr-message">Iščitavam tekst s fotografije.</p>`;
     return;
   }
 
-  target.innerHTML = `
-    <div class="essay-photo-preview">
-      <img src="${escapeHtml(selectedImage.dataUrl)}" alt="Odabrana fotografija eseja" />
-      <div>
-        <strong>${escapeHtml(selectedImage.name || "Fotografija eseja")}</strong>
-        <span>${Math.ceil(selectedImage.size / 1024)} KB</span>
-        <button class="secondary-button" type="button" data-remove-photo>Ukloni</button>
-      </div>
-    </div>
-  `;
+  if (ocrError) {
+    target.innerHTML = `<p class="essay-ocr-message essay-ocr-message--error">${escapeHtml(ocrError)}</p>`;
+    return;
+  }
+
+  target.innerHTML = "";
+}
+
+function updateOcrControls() {
+  const input = document.querySelector("#essay-photo");
+  const label = document.querySelector("#essay-photo-label");
+  if (input) input.disabled = ocrPending || simulation.finished;
+  if (label) label.textContent = ocrPending ? "Iščitavam..." : "Iščitaj fotografiju";
 }
 
 function scorePercentage(result) {
@@ -515,15 +596,15 @@ function updateGradeButton() {
   const label = document.querySelector("#grade-essay-label");
   if (!button || !label) return;
 
-  button.disabled = gradingPending;
+  button.disabled = gradingPending || ocrPending;
   label.textContent = simulation.active && !simulation.finished ? "Predaj i ocijeni" : "Ocijeni esej";
 }
 
 async function gradeEssay() {
-  if (gradingPending) return;
+  if (gradingPending || ocrPending) return;
 
-  if (!essayText.trim() && !selectedImage) {
-    gradingError = "Upiši esej ili dodaj fotografiju rukopisa prije ocjenjivanja.";
+  if (!essayText.trim()) {
+    gradingError = "Upiši esej ili prvo iščitaj fotografiju rukopisa.";
     renderGradingPanel();
     return;
   }
@@ -553,18 +634,30 @@ async function gradeEssay() {
   }
 }
 
+async function requestEssayOcr(image) {
+  const response = await fetch("/api/english-essay/ocr", {
+    body: JSON.stringify({ image }),
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new Error("API za OCR nije dostupan. Pokreni stranicu preko Node servera.");
+  }
+
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "OCR fotografije nije uspio.");
+  return payload;
+}
+
 async function requestEssayGrade() {
   const response = await fetch("/api/english-essay/grade", {
     body: JSON.stringify({
       examId: solverExam.id,
       essayText,
-      image: selectedImage
-        ? {
-            dataUrl: selectedImage.dataUrl,
-            name: selectedImage.name,
-            type: selectedImage.type,
-          }
-        : null,
     }),
     credentials: "same-origin",
     headers: {
@@ -584,6 +677,7 @@ async function requestEssayGrade() {
 
 function finishSimulation(reason) {
   setInputsDisabled(true);
+  updateOcrControls();
   updateGradeButton();
 
   if (reason === "expired") {
@@ -607,7 +701,7 @@ function recordSubmittedSimulation() {
     level: solverExam.level,
     schoolYear: solverExam.schoolYear,
     durationMinutes: solverExam.durationMinutes,
-    answered: essayText.trim() || selectedImage ? 1 : 0,
+    answered: essayText.trim() ? 1 : 0,
     totalQuestions: 1,
     score: gradingResult?.total ?? null,
     maxScore: solverExam.maxScore,

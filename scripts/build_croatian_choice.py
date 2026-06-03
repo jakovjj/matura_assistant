@@ -50,6 +50,15 @@ POINT_VALUE_RE = re.compile(r"\(\s*\d+\s+bod(?:a|ova)?\s*\)", flags=re.IGNORECAS
 
 
 @dataclass(frozen=True)
+class PdfWord:
+    text: str
+    x_min: float
+    x_max: float
+    y_min: float
+    y_max: float
+
+
+@dataclass(frozen=True)
 class PdfLine:
     text: str
     first_word: str
@@ -57,6 +66,7 @@ class PdfLine:
     x_max: float
     y_min: float
     y_max: float
+    words: tuple[PdfWord, ...]
 
 
 @dataclass(frozen=True)
@@ -206,7 +216,17 @@ def pdf_bbox_pages(contents: bytes) -> list[PdfPage]:
             words = line_element.findall("./{*}word")
             if not words:
                 continue
-            word_texts = ["".join(word.itertext()).strip() for word in words]
+            pdf_words = tuple(
+                PdfWord(
+                    text="".join(word.itertext()).strip(),
+                    x_min=float(word.attrib["xMin"]),
+                    x_max=float(word.attrib["xMax"]),
+                    y_min=float(word.attrib["yMin"]),
+                    y_max=float(word.attrib["yMax"]),
+                )
+                for word in words
+            )
+            word_texts = [word.text for word in pdf_words]
             lines.append(
                 PdfLine(
                     text=" ".join(word for word in word_texts if word),
@@ -215,6 +235,7 @@ def pdf_bbox_pages(contents: bytes) -> list[PdfPage]:
                     x_max=float(line_element.attrib["xMax"]),
                     y_min=float(line_element.attrib["yMin"]),
                     y_max=float(line_element.attrib["yMax"]),
+                    words=pdf_words,
                 )
             )
         pages.append(
@@ -446,6 +467,342 @@ def completion_context_crops(
     ]
 
 
+def completion_text_crops(
+    pages: list[PdfPage],
+    questions: list[str],
+) -> list[QuestionCrop]:
+    completion_questions = {question for question in questions if "." in question}
+    if not completion_questions:
+        return []
+
+    regular_questions = [int(question) for question in questions if "." not in question]
+    if not regular_questions:
+        return []
+    parent_number = str(max(regular_questions) + 1)
+    section_page = first_page_containing(
+        pages,
+        r"Zadatak\s+vi[šs]estrukoga\s+izbora\s+s\s+nadopunjavanjem",
+    )
+    if not section_page:
+        return completion_context_crops(pages, questions)
+    first_instruction_line = next(
+        line
+        for line in sorted_page_lines(section_page)
+        if re.search(
+            r"Zadatak\s+vi[šs]estrukoga\s+izbora\s+s\s+nadopunjavanjem",
+            line.text,
+            flags=re.IGNORECASE,
+        )
+    )
+
+    parent_marker: tuple[PdfPage, PdfLine] | None = None
+    completion_markers: list[tuple[PdfPage, PdfLine]] = []
+    for page in pages:
+        for line in sorted_page_lines(page):
+            token = question_token(line)
+            if token == parent_number and parent_marker is None:
+                parent_marker = (page, line)
+            if token in completion_questions:
+                completion_markers.append((page, line))
+
+    if parent_marker is None or not completion_markers:
+        return completion_context_crops(pages, questions)
+
+    parent_page, parent_line = parent_marker
+    following_completion_markers = [
+        (page, line)
+        for page, line in completion_markers
+        if page.number > parent_page.number
+        or (page.number == parent_page.number and line.y_min > parent_line.y_min)
+    ]
+    if not following_completion_markers:
+        return completion_context_crops(pages, questions)
+
+    first_marker_page, first_marker_line = min(
+        following_completion_markers,
+        key=lambda item: (item[0].number, item[1].y_min, item[1].x_min),
+    )
+    crops: list[QuestionCrop] = []
+
+    instruction_last_page_number = (
+        parent_page.number if section_page.number == parent_page.number else parent_page.number - 1
+    )
+    for page_number in range(section_page.number, instruction_last_page_number + 1):
+        page = pages[page_number - 1]
+        y_min = (
+            max(
+                SOURCE_CONTENT_TOP_MARGIN,
+                running_header_bottom(page) + SOURCE_CROP_VERTICAL_PADDING,
+                first_instruction_line.y_min - SOURCE_CROP_VERTICAL_PADDING,
+            )
+            if page_number == section_page.number
+            else max(
+                SOURCE_CONTENT_TOP_MARGIN,
+                running_header_bottom(page) + SOURCE_CROP_VERTICAL_PADDING,
+            )
+        )
+        y_max = (
+            parent_line.y_min - SOURCE_CROP_VERTICAL_PADDING
+            if page_number == parent_page.number
+            else full_content_crop(page, y_min).y_max
+        )
+        if y_max <= y_min:
+            continue
+        crops.append(
+            QuestionCrop(
+                page=page,
+                x_min=SOURCE_CROP_HORIZONTAL_MARGIN,
+                y_min=y_min,
+                x_max=page.width - SOURCE_CROP_HORIZONTAL_MARGIN,
+                y_max=y_max,
+            )
+        )
+
+    for page_number in range(parent_page.number, first_marker_page.number + 1):
+        page = pages[page_number - 1]
+        y_min = (
+            max(
+                SOURCE_CONTENT_TOP_MARGIN,
+                running_header_bottom(page) + SOURCE_CROP_VERTICAL_PADDING,
+                parent_line.y_min - SOURCE_CROP_VERTICAL_PADDING,
+            )
+            if page_number == parent_page.number
+            else max(
+                SOURCE_CONTENT_TOP_MARGIN,
+                running_header_bottom(page) + SOURCE_CROP_VERTICAL_PADDING,
+            )
+        )
+        y_max = (
+            first_marker_line.y_min - SOURCE_CROP_VERTICAL_PADDING
+            if page_number == first_marker_page.number
+            else page.height - SOURCE_FOOTER_MARGIN
+        )
+        if y_max <= y_min:
+            continue
+        crops.append(
+            QuestionCrop(
+                page=page,
+                x_min=SOURCE_CROP_HORIZONTAL_MARGIN,
+                y_min=y_min,
+                x_max=page.width - SOURCE_CROP_HORIZONTAL_MARGIN,
+                y_max=y_max,
+            )
+        )
+
+    return crops or completion_context_crops(pages, questions)
+
+
+def completion_question_by_gap_index(questions: list[str]) -> dict[int, str]:
+    mapping: dict[int, str] = {}
+    for question in questions:
+        if "." not in question:
+            continue
+        _, decimal = question.split(".", 1)
+        if decimal.isdigit():
+            mapping[int(decimal)] = question
+    return mapping
+
+
+def crop_relative_region(
+    source_image: dict[str, Any],
+    crop: QuestionCrop,
+    x_min: float,
+    y_min: float,
+    x_max: float,
+    y_max: float,
+) -> dict[str, int] | None:
+    image_crop = source_image.get("crop")
+    if not image_crop:
+        return None
+
+    scale_x = source_image["width"] / crop.page.width
+    scale_y = source_image["height"] / crop.page.height
+    pixel_x_min = math.floor(x_min * scale_x) - image_crop["x"]
+    pixel_y_min = math.floor(y_min * scale_y) - image_crop["y"]
+    pixel_x_max = math.ceil(x_max * scale_x) - image_crop["x"]
+    pixel_y_max = math.ceil(y_max * scale_y) - image_crop["y"]
+
+    relative_x = max(0, min(image_crop["width"], pixel_x_min))
+    relative_y = max(0, min(image_crop["height"], pixel_y_min))
+    relative_x_max = max(relative_x, min(image_crop["width"], pixel_x_max))
+    relative_y_max = max(relative_y, min(image_crop["height"], pixel_y_max))
+    width = relative_x_max - relative_x
+    height = relative_y_max - relative_y
+    if width <= 0 or height <= 0:
+        return None
+
+    return {
+        "x": relative_x,
+        "y": relative_y,
+        "width": width,
+        "height": height,
+    }
+
+
+def completion_blank_regions(
+    completion_crops: list[QuestionCrop],
+    completion_questions: list[str],
+    source_images: dict[str, dict[str, Any]],
+    source_prefix: str = "completion",
+) -> dict[str, dict[str, int]]:
+    questions_by_gap = completion_question_by_gap_index(completion_questions)
+    blanks: dict[str, dict[str, int]] = {}
+
+    for index, crop in enumerate(completion_crops):
+        source_image = source_images.get(f"{source_prefix}:{index}")
+        if not source_image:
+            continue
+
+        for line in sorted_page_lines(crop.page):
+            if line.y_min < crop.y_min or line.y_max > crop.y_max:
+                continue
+
+            for word_index, word in enumerate(line.words):
+                embedded_match = re.fullmatch(r"\((\d+)\.\)(_+[.,]?)", word.text)
+                if embedded_match:
+                    gap_index = int(embedded_match.group(1))
+                    underscore_text = embedded_match.group(2).rstrip(".,")
+                    visible_text = word.text.rstrip(".,")
+                    prefix_width = (
+                        (len(visible_text) - len(underscore_text)) / len(visible_text)
+                    ) * (word.x_max - word.x_min)
+                    x_min = word.x_min + prefix_width
+                    x_max = word.x_max
+                else:
+                    if not re.fullmatch(r"_+[.,]?", word.text):
+                        continue
+
+                    previous = " ".join(
+                        item.text for item in line.words[max(0, word_index - 3) : word_index]
+                    )
+                    match = re.search(r"\((\d+)\.\)\s*$", previous)
+                    if not match:
+                        continue
+                    gap_index = int(match.group(1))
+                    x_min = word.x_min
+                    x_max = word.x_max
+
+                question = questions_by_gap.get(gap_index)
+                if not question:
+                    continue
+
+                region = crop_relative_region(
+                    source_image,
+                    crop,
+                    x_min,
+                    word.y_min,
+                    x_max,
+                    word.y_max,
+                )
+                if region:
+                    blanks[question] = {"sourceImageIndex": index, **region}
+
+    return blanks
+
+
+def completion_question_markers(
+    pages: list[PdfPage],
+    completion_questions: list[str],
+) -> dict[str, tuple[PdfPage, PdfLine]]:
+    wanted = set(completion_questions)
+    markers: dict[str, tuple[PdfPage, PdfLine]] = {}
+    for page in pages:
+        for line in sorted_page_lines(page):
+            token = question_token(line)
+            if token in wanted:
+                markers[token] = (page, line)
+    return markers
+
+
+def option_column_x_max(
+    page: PdfPage,
+    marker_line: PdfLine,
+    markers: dict[str, tuple[PdfPage, PdfLine]],
+) -> float:
+    right_markers = [
+        other_line.x_min
+        for other_page, other_line in markers.values()
+        if other_page == page and other_line.x_min > marker_line.x_min + 40
+    ]
+    if right_markers:
+        return min(right_markers) - 12
+    return page.width - SOURCE_CROP_HORIZONTAL_MARGIN
+
+
+def option_y_max(
+    page: PdfPage,
+    marker_line: PdfLine,
+    markers: dict[str, tuple[PdfPage, PdfLine]],
+) -> float:
+    next_markers = [
+        other_line.y_min
+        for other_page, other_line in markers.values()
+        if other_page == page
+        and abs(other_line.x_min - marker_line.x_min) < 80
+        and other_line.y_min > marker_line.y_min
+    ]
+    if next_markers:
+        return min(next_markers) - SOURCE_CROP_VERTICAL_PADDING
+    return page.height - SOURCE_FOOTER_MARGIN
+
+
+def option_text_for_label(
+    page: PdfPage,
+    label_line: PdfLine,
+    x_max: float,
+) -> str:
+    same_row = [
+        line
+        for line in page.lines
+        if abs(line.y_min - label_line.y_min) < 3
+        and line.x_min > label_line.x_max
+        and line.x_min < x_max
+        and line.text.strip()
+    ]
+    if same_row:
+        return sorted(same_row, key=lambda line: line.x_min)[0].text.strip()
+
+    inline_match = re.match(r"^[A-D]\.\s+(.+)$", label_line.text.strip())
+    return inline_match.group(1).strip() if inline_match else ""
+
+
+def completion_option_texts(
+    pages: list[PdfPage],
+    completion_questions: list[str],
+) -> dict[str, dict[str, str]]:
+    markers = completion_question_markers(pages, completion_questions)
+    options_by_question: dict[str, dict[str, str]] = {}
+
+    for question, (page, marker_line) in markers.items():
+        x_min = marker_line.x_min - 4
+        x_max = option_column_x_max(page, marker_line, markers)
+        y_min = marker_line.y_min
+        y_max = option_y_max(page, marker_line, markers)
+        options: dict[str, str] = {}
+
+        for line in sorted_page_lines(page):
+            if not (y_min < line.y_min < y_max and x_min <= line.x_min < x_max):
+                continue
+
+            label_match = re.fullmatch(r"([A-D])\.", line.text.strip())
+            inline_match = re.match(r"^([A-D])\.\s+(.+)$", line.text.strip())
+            if label_match:
+                option = label_match.group(1)
+                options[option] = option_text_for_label(page, line, x_max)
+            elif inline_match:
+                option = inline_match.group(1)
+                options[option] = inline_match.group(2).strip()
+
+        if options:
+            options_by_question[question] = {
+                option: options[option]
+                for option in ["A", "B", "C", "D"]
+                if options.get(option)
+            }
+
+    return options_by_question
+
+
 def parse_duration(text: str) -> int:
     match = re.search(r"Ispit\s+traje\s+(\d+)\s+minuta", text, flags=re.IGNORECASE)
     if not match:
@@ -630,6 +987,9 @@ def build_tasks(
     question_crops = find_regular_question_crops(markers)
     contexts = reading_context_crops(pages, markers, last_reading_question)
     completion_crops = completion_context_crops(pages, questions)
+    completion_text_source_crops = completion_text_crops(pages, questions)
+    regular_questions = [question for question in questions if "." not in question]
+    completion_questions = [question for question in questions if "." in question]
     all_crops = {
         **{f"question:{question}": crop for question, crop in question_crops.items()},
         **{
@@ -641,6 +1001,10 @@ def build_tasks(
             f"completion:{index}": crop
             for index, crop in enumerate(completion_crops)
         },
+        **{
+            f"completionText:{index}": crop
+            for index, crop in enumerate(completion_text_source_crops)
+        },
     }
     source_images, expected_assets = render_source_pages(
         paper_path,
@@ -649,12 +1013,23 @@ def build_tasks(
         force_render,
     )
     remove_unexpected_assets(identifier, expected_assets)
+    completion_blanks = completion_blank_regions(
+        completion_text_source_crops,
+        completion_questions,
+        source_images,
+        source_prefix="completionText",
+    )
+    completion_options = completion_option_texts(pages, completion_questions)
 
     def build_question(number: str) -> dict[str, Any]:
         question: dict[str, Any] = {"number": number}
         source_image = source_images.get(f"question:{number}")
         if source_image:
             question["sourceImage"] = source_image
+        if number in completion_blanks:
+            question["blank"] = completion_blanks[number]
+        if number in completion_options:
+            question["options"] = completion_options[number]
         question_contexts = [
             source_images[f"context:{number}:{index}"]
             for index in range(len(contexts.get(number, [])))
@@ -663,8 +1038,6 @@ def build_tasks(
             question["contextImages"] = question_contexts
         return question
 
-    regular_questions = [question for question in questions if "." not in question]
-    completion_questions = [question for question in questions if "." in question]
     reading_questions = [
         build_question(question)
         for question in regular_questions
@@ -698,6 +1071,10 @@ def build_tasks(
                 "sourceImages": [
                     source_images[f"completion:{index}"]
                     for index in range(len(completion_crops))
+                ],
+                "textImages": [
+                    source_images[f"completionText:{index}"]
+                    for index in range(len(completion_text_source_crops))
                 ],
                 "questions": [build_question(question) for question in completion_questions],
             }
@@ -774,7 +1151,7 @@ def main() -> None:
     remove_orphaned_papers({exam["id"] for exam in exams})
 
     payload = {
-        "version": 2,
+        "version": 3,
         "exams": exams,
     }
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)

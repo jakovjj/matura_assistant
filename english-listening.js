@@ -536,12 +536,13 @@ function renderSolver(exam) {
 
   app.innerHTML = `
     ${renderSolverHeader({
+      subject: "Engleski",
+      part: "Slušanje",
+      exam,
       backHref: englishSubjectUrl,
       backLabel: "← Natrag na Engleski jezik",
       paperUrl: exam.paperUrl,
       archiveUrl: exam.archiveUrl,
-      eyebrow: "Engleski - slušanje",
-      title: `${exam.year}. · ${formatTerm(exam.term)} · ${exam.level} razina`,
       summaryHtml: `
         ${simulation.renderTimer()}
         <strong id="answer-progress"></strong>
@@ -746,8 +747,6 @@ function renderAnswerPanel() {
       </div>
       <small>Pitanja ${task.firstQuestion}–${task.lastQuestion}</small>
     </div>
-    <p class="answer-panel__hint">Odaberi jedan odgovor za svako pitanje.</p>
-
     <div class="response-list">
       ${taskQuestions(task).map((question) => renderQuestion(task, question)).join("")}
     </div>

@@ -23,7 +23,6 @@ const legacyTermAliases = {
   "jesenski rok": ["drugi rok"],
 };
 
-const croatianSubjectColor = "#7a3f4a";
 const defaultTaskTypeId = "citanje-s-polaznim-tekstom";
 const taskTypeAliases = {
   abcd: defaultTaskTypeId,
@@ -40,6 +39,7 @@ let activeTaskTypeId = defaultTaskTypeId;
 let activeQuestionNumber;
 let checked = false;
 let quickSelectFrame;
+const completionOptionLetters = ["A", "B", "C", "D"];
 const simulation = window.createExamSimulation({ onFinish: finishSimulation });
 
 function escapeHtml(value) {
@@ -198,10 +198,6 @@ function croatianSubjectUrl() {
   return "./?predmet=Hrvatski%20jezik";
 }
 
-function levelText(exam) {
-  return exam.level ? `${exam.level} razina` : "Bez razine";
-}
-
 function correctAnswers(question) {
   const answer = solverExam.answers[question];
   return Array.isArray(answer) ? answer : [answer].filter(Boolean);
@@ -274,18 +270,23 @@ function renderSolver(exam, taskTypeId) {
 
   app.innerHTML = `
     ${renderSolverHeader({
-      subjectColor: croatianSubjectColor,
+      subject: "Hrvatski jezik",
+      exam,
       backHref: croatianSubjectUrl(),
       backLabel: "← Odaberi drugi ispit",
       paperUrl: exam.paperUrl,
       archiveUrl: exam.archiveUrl,
-      eyebrow: "Hrvatski jezik",
-      title: `${exam.year}. · ${formatTerm(exam.term)} · ${levelText(exam)}`,
-      iconName: "book-open-text",
       summaryHtml: `
         ${simulation.renderTimer()}
         <strong id="answer-progress"></strong>
         <span id="score-summary"></span>
+      `,
+      navigationHtml: `
+        <nav
+          class="task-navigation solver-header__task-navigation"
+          data-task-type-navigation
+          aria-label="Vrste zadataka u ispitnom zaglavlju"
+        ></nav>
       `,
     })}
 
@@ -295,7 +296,11 @@ function renderSolver(exam, taskTypeId) {
 
     <footer class="solver-sticky-footer">
       <div class="solver-sticky-footer__inner">
-        <nav class="task-navigation" id="task-type-navigation" aria-label="Vrste zadataka u ispitu"></nav>
+        <nav
+          class="task-navigation"
+          data-task-type-navigation
+          aria-label="Vrste zadataka u ispitu"
+        ></nav>
         <div class="solver-sticky-footer__controls">
           <div class="solver-sticky-footer__status">
             ${icon("list-checks", "solver-sticky-footer__status-icon")}
@@ -347,6 +352,9 @@ function renderSolver(exam, taskTypeId) {
   document.querySelector("#close-exam-results").addEventListener("click", closeResultsDialog);
   document.querySelector(".exam-results-dialog__backdrop").addEventListener("click", closeResultsDialog);
   document.addEventListener("keydown", closeResultsDialogOnEscape);
+  document.addEventListener("click", closeCompletionPopoverOnDocumentClick);
+  window.addEventListener("resize", closeCompletionPopover);
+  window.addEventListener("scroll", closeCompletionPopover, { passive: true });
 
   renderTaskTypeNavigation();
   renderSolverSummary();
@@ -355,7 +363,7 @@ function renderSolver(exam, taskTypeId) {
 }
 
 function renderTaskTypeNavigation() {
-  document.querySelector("#task-type-navigation").innerHTML = tasks()
+  const navigationHtml = tasks()
     .map((task) => {
       const isActive = task.id === activeTaskTypeId;
       return `
@@ -371,6 +379,10 @@ function renderTaskTypeNavigation() {
       `;
     })
     .join("");
+
+  document.querySelectorAll("[data-task-type-navigation]").forEach((navigation) => {
+    navigation.innerHTML = navigationHtml;
+  });
 
   document.querySelectorAll("[data-task-type]").forEach((link) => {
     link.addEventListener("click", (event) => {
@@ -413,6 +425,7 @@ function renderSolverSummary() {
 function renderTaskTypeContent() {
   const task = taskForId(activeTaskTypeId);
   const questions = task.questions || [];
+  const hasInteractiveCompletion = hasInteractiveCompletionBlanks(task);
 
   document.querySelector("#section-content").innerHTML = `
     <div class="solver-question-layout">
@@ -435,16 +448,161 @@ function renderTaskTypeContent() {
       </div>
       <small>${questions.length} pitanja</small>
     </div>
-    <p class="practice-notice">${escapeHtml(task.description)}</p>
     <div class="task-source physics-source-list">
-      ${renderContextImages(task.sourceImages, "Tekst s prazninama i ponuđeni odgovori")}
-      ${questions.map(renderSourceQuestion).join("")}
+      ${renderTaskContext(task, hasInteractiveCompletion)}
+      ${hasInteractiveCompletion ? "" : questions.map(renderSourceQuestion).join("")}
     </div>
   `;
 
   bindResponseListeners();
+  bindCompletionHotspots();
   renderQuickSelect();
   bindQuickSelectTracking();
+}
+
+function renderTaskContext(task, hasInteractiveCompletion) {
+  if (hasInteractiveCompletion) return renderCompletionContext(task);
+  return renderContextImages(task.sourceImages, "Tekst s prazninama i ponuđeni odgovori");
+}
+
+function hasInteractiveCompletionBlanks(task) {
+  const questions = task?.questions || [];
+  const images = completionSourceImages(task);
+  return (
+    task?.id === "nadopunjavanje" &&
+    questions.length > 0 &&
+    questions.every((question) =>
+      validCompletionBlank(question.blank, images?.[question.blank?.sourceImageIndex]),
+    )
+  );
+}
+
+function completionSourceImages(task) {
+  return task?.textImages?.length ? task.textImages : task?.sourceImages || [];
+}
+
+function validCompletionBlank(blank, source) {
+  const crop = source?.crop;
+  const values = [
+    blank?.sourceImageIndex,
+    blank?.x,
+    blank?.y,
+    blank?.width,
+    blank?.height,
+    crop?.width,
+    crop?.height,
+  ].map(Number);
+
+  return Boolean(
+    source?.url &&
+      values.every((value) => Number.isFinite(value)) &&
+      Number(blank?.width) > 0 &&
+      Number(blank?.height) > 0 &&
+      Number(crop?.width) > 0 &&
+      Number(crop?.height) > 0 &&
+      Number(blank?.x) >= 0 &&
+      Number(blank?.y) >= 0 &&
+      Number(blank?.x) < Number(crop?.width) &&
+      Number(blank?.y) < Number(crop?.height),
+  );
+}
+
+function renderCompletionContext(task) {
+  const images = completionSourceImages(task);
+  if (!images.length) return "";
+
+  return `
+    <section class="croatian-source-context croatian-completion-context" aria-label="Tekst s prazninama">
+      ${images
+        .map((image, index) =>
+          renderCroppedImage(
+            image,
+            `Tekst s prazninama i ponuđeni odgovori, službeni prikaz ${index + 1}.`,
+            {
+              cropClass: "croatian-completion-crop",
+              overlayHtml: renderCompletionHotspots(task, index),
+            },
+          ),
+        )
+        .join("")}
+    </section>
+  `;
+}
+
+function renderCompletionHotspots(task, sourceImageIndex) {
+  const images = completionSourceImages(task);
+  return (task.questions || [])
+    .filter((question) => question.blank?.sourceImageIndex === sourceImageIndex)
+    .map((question) => renderCompletionBlankButton(question, images[sourceImageIndex]))
+    .join("");
+}
+
+function renderCompletionBlankButton(question, source) {
+  const number = String(question.number);
+  const answer = responses[number] || "";
+  const stateClass = completionBlankStateClass(number, answer);
+
+  return `
+    <button
+      class="croatian-completion-blank${stateClass}"
+      id="pitanje-${escapeHtml(number)}"
+      type="button"
+      data-question-number="${escapeHtml(number)}"
+      data-completion-question="${escapeHtml(number)}"
+      aria-haspopup="dialog"
+      aria-expanded="false"
+      aria-label="${escapeHtml(completionBlankAriaLabel(number, answer))}"
+      style="${completionBlankStyle(question.blank, source)}"
+      ${simulation.inputDisabledAttribute()}
+    >
+      ${renderCompletionBlankContent(number, answer)}
+    </button>
+  `;
+}
+
+function completionBlankStateClass(question, answer) {
+  const answeredClass = answer ? " croatian-completion-blank--answered" : "";
+  if (!checked) return answeredClass;
+  return `${answeredClass}${
+    isCorrectAnswer(question, answer)
+      ? " croatian-completion-blank--correct"
+      : " croatian-completion-blank--wrong"
+  }`;
+}
+
+function completionBlankStyle(blank, source) {
+  const crop = source.crop;
+  const paddingX = 3;
+  const fieldHeight = 24;
+  const left = Math.max(0, Number(blank.x) - paddingX);
+  const top = Math.max(0, Number(blank.y) + Number(blank.height) - fieldHeight - 1);
+  const width = Math.min(crop.width - left, Number(blank.width) + paddingX * 2);
+  const height = Math.min(crop.height - top, fieldHeight);
+
+  return [
+    `left: ${(left / crop.width) * 100}%`,
+    `top: ${(top / crop.height) * 100}%`,
+    `width: ${(width / crop.width) * 100}%`,
+    `height: ${(height / crop.height) * 100}%`,
+  ].join("; ");
+}
+
+function renderCompletionBlankContent(question, answer) {
+  const text = completionBlankDisplayText(question, answer);
+  return `
+    <span>${escapeHtml(text)}</span>
+    <span class="croatian-completion-blank__chevron" aria-hidden="true"></span>
+  `;
+}
+
+function completionBlankDisplayText(question, answer) {
+  if (!answer) return "";
+  return questionByNumber.get(String(question))?.options?.[answer] || answer;
+}
+
+function completionBlankAriaLabel(question, answer) {
+  if (answer) return `Praznina ${question}, odabrano ${answer}. Promijeni odgovor.`;
+  return `Praznina ${question}, odaberi odgovor.`;
 }
 
 function renderSourceQuestion(question) {
@@ -487,7 +645,7 @@ function renderContextImages(images = [], title) {
   `;
 }
 
-function renderCroppedImage(source, alt) {
+function renderCroppedImage(source, alt, options = {}) {
   const crop = source?.crop;
   const dimensions = [
     source?.width,
@@ -503,10 +661,11 @@ function renderCroppedImage(source, alt) {
   const width = (source.width / crop.width) * 100;
   const offsetX = (-crop.x / source.width) * 100;
   const offsetY = (-crop.y / source.height) * 100;
+  const cropClass = options.cropClass ? ` ${options.cropClass}` : "";
 
   return `
     <figure class="physics-source-figure">
-      <div class="physics-source-crop" style="aspect-ratio: ${crop.width} / ${crop.height}">
+      <div class="physics-source-crop${cropClass}" style="aspect-ratio: ${crop.width} / ${crop.height}">
         <img
           src="${escapeHtml(source.url)}"
           alt="${escapeHtml(alt)}"
@@ -516,6 +675,7 @@ function renderCroppedImage(source, alt) {
           decoding="async"
           style="width: ${width}%; transform: translate(${offsetX}%, ${offsetY}%);"
         >
+        ${options.overlayHtml || ""}
       </div>
     </figure>
   `;
@@ -525,6 +685,117 @@ function bindResponseListeners() {
   document.querySelectorAll('input[type="radio"][data-question]').forEach((input) => {
     input.addEventListener("change", () => updateResponse(input.dataset.question, input.value));
   });
+}
+
+function bindCompletionHotspots() {
+  document.querySelectorAll("[data-completion-question]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openCompletionPopover(button.dataset.completionQuestion, button);
+    });
+  });
+}
+
+function completionOptionsForQuestion(question) {
+  const sourceOptions = question?.options || {};
+  return completionOptionLetters.map((option) => ({
+    option,
+    text: sourceOptions[option] || "",
+  }));
+}
+
+function openCompletionPopover(questionNumber, anchor) {
+  if (simulation.finished) return;
+
+  const question = questionByNumber.get(String(questionNumber));
+  if (!question) return;
+
+  closeCompletionPopover();
+  anchor.setAttribute("aria-expanded", "true");
+  const popover = document.createElement("div");
+  popover.className = "croatian-completion-popover";
+  popover.id = "croatian-completion-popover";
+  popover.setAttribute("role", "dialog");
+  popover.setAttribute("aria-label", `Odgovori za prazninu ${questionNumber}`);
+  popover.innerHTML = renderCompletionPopover(questionNumber, question);
+  document.body.append(popover);
+  placeCompletionPopover(popover, anchor);
+
+  popover.querySelector("[data-completion-popover-close]")?.addEventListener("click", () => {
+    closeCompletionPopover();
+    anchor.focus();
+  });
+
+  popover.querySelectorAll("[data-completion-option]").forEach((button) => {
+    button.addEventListener("click", () => {
+      updateResponse(questionNumber, button.dataset.completionOption);
+      anchor.focus();
+    });
+  });
+
+  const selected = popover.querySelector(".croatian-completion-popover__option--selected");
+  (selected || popover.querySelector("[data-completion-option]"))?.focus();
+}
+
+function renderCompletionPopover(questionNumber, question) {
+  const answer = responses[questionNumber] || "";
+
+  return `
+    <div class="croatian-completion-popover__heading">
+      <strong>${escapeHtml(questionNumber)}</strong>
+      <button type="button" data-completion-popover-close aria-label="Zatvori odabir">&times;</button>
+    </div>
+    <div class="croatian-completion-popover__options">
+      ${completionOptionsForQuestion(question)
+        .map(({ option, text }) => {
+          const selectedClass =
+            option === answer ? " croatian-completion-popover__option--selected" : "";
+          return `
+            <button
+              class="croatian-completion-popover__option${selectedClass}"
+              type="button"
+              data-completion-option="${option}"
+            >
+              <strong>${option}</strong>
+              <span>${escapeHtml(text || `Odgovor ${option}`)}</span>
+            </button>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function placeCompletionPopover(popover, anchor) {
+  const anchorRect = anchor.getBoundingClientRect();
+  const gap = 8;
+  const viewportPadding = 12;
+  let left = Math.max(viewportPadding, anchorRect.left);
+  let top = anchorRect.bottom + gap;
+
+  if (left + popover.offsetWidth > window.innerWidth - viewportPadding) {
+    left = window.innerWidth - popover.offsetWidth - viewportPadding;
+  }
+  if (top + popover.offsetHeight > window.innerHeight - viewportPadding) {
+    top = anchorRect.top - popover.offsetHeight - gap;
+  }
+
+  popover.style.left = `${Math.max(viewportPadding, left)}px`;
+  popover.style.top = `${Math.max(viewportPadding, top)}px`;
+}
+
+function closeCompletionPopover() {
+  document.querySelector("#croatian-completion-popover")?.remove();
+  document.querySelectorAll("[data-completion-question][aria-expanded='true']").forEach((button) => {
+    button.setAttribute("aria-expanded", "false");
+  });
+}
+
+function closeCompletionPopoverOnDocumentClick(event) {
+  const popover = document.querySelector("#croatian-completion-popover");
+  if (!popover) return;
+  if (popover.contains(event.target) || event.target.closest("[data-completion-question]")) return;
+  closeCompletionPopover();
 }
 
 function quickSelectGroupNumber(question) {
@@ -708,6 +979,7 @@ function updateResponse(question, answer) {
   if (simulation.finished) return;
 
   const wasChecked = checked;
+  closeCompletionPopover();
   checked = false;
   const normalizedAnswer = String(answer || "").trim();
   if (normalizedAnswer) responses[question] = normalizedAnswer;
@@ -717,6 +989,27 @@ function updateResponse(question, answer) {
   renderSolverSummary();
   renderQuickSelect();
   if (wasChecked) renderTaskTypeContent();
+  else syncRenderedResponse(question);
+}
+
+function syncRenderedResponse(question) {
+  const answer = responses[question] || "";
+
+  document.querySelectorAll('input[type="radio"][data-question]').forEach((input) => {
+    if (input.dataset.question === question) input.checked = input.value === answer;
+  });
+
+  document.querySelectorAll("[data-completion-question]").forEach((button) => {
+    const number = button.dataset.completionQuestion;
+    const buttonAnswer = responses[number] || "";
+    button.innerHTML = renderCompletionBlankContent(number, buttonAnswer);
+    button.classList.toggle("croatian-completion-blank--answered", Boolean(buttonAnswer));
+    button.classList.remove(
+      "croatian-completion-blank--correct",
+      "croatian-completion-blank--wrong",
+    );
+    button.setAttribute("aria-label", completionBlankAriaLabel(number, buttonAnswer));
+  });
 }
 
 function checkAnswers() {
@@ -808,7 +1101,9 @@ function closeResultsDialog() {
 }
 
 function closeResultsDialogOnEscape(event) {
-  if (event.key === "Escape") closeResultsDialog();
+  if (event.key !== "Escape") return;
+  closeCompletionPopover();
+  closeResultsDialog();
 }
 
 const id = selectedExamId();
