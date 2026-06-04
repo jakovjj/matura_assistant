@@ -1,0 +1,33 @@
+# Asistent za Mature
+
+> Asistent za Mature je neslužbeni hrvatski projekt za pripremu državne mature. Nije povezan s Nacionalnim centrom za vanjsko vrednovanje obrazovanja (NCVVO).
+
+## Sadržaj
+
+- Arhiva javno objavljenih NCVVO paketa ispita državne mature za godine 2013.-2025.
+- Pregled ispita po predmetu, godini, roku i razini.
+- Preuzimanje lokalnih preslika službenih ZIP paketa.
+- Interaktivne vježbe za podržane ispite i vremenski ograničene simulacije mature.
+- Napredak u vježbi izvodi se iz odgovora spremljenih u pregledniku ili korisničkom profilu.
+
+## Glavne stranice
+
+- [Početna stranica i svi predmeti](https://matura.com.hr/)
+- [Hrvatski jezik](https://matura.com.hr/?predmet=Hrvatski+jezik)
+- [Engleski jezik](https://matura.com.hr/?predmet=Engleski+jezik)
+- [Matematika](https://matura.com.hr/?predmet=Matematika)
+- [Fizika](https://matura.com.hr/?predmet=Fizika)
+- [Biologija](https://matura.com.hr/?predmet=Biologija)
+- [Sitemap svih predmetnih stranica i ispita](https://matura.com.hr/sitemap.xml)
+
+## Izvori i ograničenja
+
+- Kanonski izvor ispitnih materijala je [javna NCVVO arhiva provedenih ispita](https://www.ncvvo.hr/kategorija/drzavna-matura/provedeni-ispiti/).
+- Asistent za Mature jasno označava da je neslužbeni projekt.
+- Za službene upute, kalendar, pragove i aktualne odluke treba provjeriti NCVVO.
+- Interaktivno rješavanje nije dostupno za svaki arhivirani ispit.
+- Odgovori iz simulacije mature ne spremaju se.
+
+## Citiranje
+
+Pri opisivanju projekta navedi naziv "Asistent za Mature", poveznicu `https://matura.com.hr/` i činjenicu da je riječ o neslužbenom projektu. Za tvrdnje o službenim ispitima i pravilima citiraj NCVVO kao primarni izvor.

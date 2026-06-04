@@ -21,6 +21,8 @@ const config = {
   essayModel: process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
   historyModel:
     process.env.OPENAI_HISTORY_MODEL || process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
+  geographyModel:
+    process.env.OPENAI_GEOGRAPHY_MODEL || process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
   host: process.env.HOST || "0.0.0.0",
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
@@ -44,9 +46,22 @@ const englishEssayIndex = {
   file: path.join(rootDir, "data", "english-essay.js"),
   prefix: "window.ASISTENT_ZA_MATURE_ENGLISH_ESSAY=",
 };
+const croatianWritingIndex = {
+  file: path.join(rootDir, "data", "croatian-writing.js"),
+  prefix: "window.ASISTENT_ZA_MATURE_CROATIAN_WRITING=",
+};
 const historyChoiceIndex = {
   file: path.join(rootDir, "data", "history-choice.js"),
   prefix: "window.ASISTENT_ZA_MATURE_HISTORY_CHOICE=",
+};
+const geographyChoiceIndex = {
+  file: path.join(rootDir, "data", "geography-choice.js"),
+  prefix: "window.ASISTENT_ZA_MATURE_GEOGRAPHY_CHOICE=",
+};
+const writingSystemPrompts = {
+  englishEssay: loadSystemPrompt("english-essay-system.txt"),
+  croatianSummary: loadSystemPrompt("croatian-summary-system.txt"),
+  croatianSchoolEssay: loadSystemPrompt("croatian-school-essay-system.txt"),
 };
 const essayScoreSchema = {
   type: "object",
@@ -77,6 +92,54 @@ const essayOcrSchema = {
     text: { type: "string" },
   },
   required: ["text"],
+};
+const croatianSummaryScoreSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    content: { type: "integer" },
+    organizationStyle: { type: "integer" },
+    languageAccuracy: { type: "integer" },
+    wordCount: { type: "integer" },
+    invalidLength: { type: "boolean" },
+    unfulfilledTask: { type: "boolean" },
+    comment: { type: "string" },
+  },
+  required: [
+    "content",
+    "organizationStyle",
+    "languageAccuracy",
+    "wordCount",
+    "invalidLength",
+    "unfulfilledTask",
+    "comment",
+  ],
+};
+const croatianEssayScoreSchema = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    centralThesis: { type: "integer" },
+    argumentation: { type: "integer" },
+    coherence: { type: "integer" },
+    vocabulary: { type: "integer" },
+    languageAccuracy: { type: "integer" },
+    wordCount: { type: "integer" },
+    invalidLength: { type: "boolean" },
+    unfulfilledTask: { type: "boolean" },
+    comment: { type: "string" },
+  },
+  required: [
+    "centralThesis",
+    "argumentation",
+    "coherence",
+    "vocabulary",
+    "languageAccuracy",
+    "wordCount",
+    "invalidLength",
+    "unfulfilledTask",
+    "comment",
+  ],
 };
 const historyGradeSchema = {
   type: "object",
@@ -271,8 +334,23 @@ async function handleRequest(request, response) {
     return;
   }
 
+  if (url.pathname === "/api/croatian-writing/grade") {
+    await handleCroatianWritingGrade(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/croatian-writing/ocr") {
+    await handleCroatianWritingOcr(request, response);
+    return;
+  }
+
   if (url.pathname === "/api/history/grade-open") {
     await handleHistoryOpenGrade(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/geography/grade-open") {
+    await handleGeographyOpenGrade(request, response);
     return;
   }
 
@@ -702,6 +780,131 @@ async function handleEnglishEssayOcr(request, response) {
   }
 }
 
+async function handleCroatianWritingGrade(request, response) {
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
+    return;
+  }
+
+  const session = currentSession(request);
+  const user = session ? store.users[session.userId] : null;
+  if (!session || !user) {
+    sendJson(response, 401, { error: "Prijava je potrebna za AI ocjenjivanje." });
+    return;
+  }
+
+  let apiKey;
+  try {
+    apiKey = decryptAgentKey(user.agentKey);
+  } catch (error) {
+    console.error("OpenAI API ključ nije moguće pročitati:", error.message);
+    sendJson(response, 400, { error: "Spremljeni OpenAI API ključ nije moguće pročitati." });
+    return;
+  }
+
+  if (!apiKey) {
+    sendJson(response, 400, { error: "Spremi OpenAI API ključ u profilu prije ocjenjivanja." });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request);
+  } catch {
+    sendJson(response, 400, { error: "Zahtjev nema ispravan JSON zapis." });
+    return;
+  }
+
+  const examId = stringOrEmpty(body?.examId);
+  const writingText = normalizeEssayText(body?.writingText);
+  if (!writingText) {
+    sendJson(response, 400, { error: "Upiši tekst za ocjenjivanje." });
+    return;
+  }
+
+  const writingExam = loadCroatianWritingExam(examId);
+  if (!writingExam) {
+    sendJson(response, 404, { error: "Odabrani hrvatski pisani zadatak nije dostupan." });
+    return;
+  }
+
+  const clientSignal = responseAbortSignal(response);
+  try {
+    const grade = await gradeCroatianWritingWithOpenAI({
+      apiKey,
+      writingExam,
+      writingText,
+      signal: clientSignal,
+    });
+    if (clientSignal.aborted) return;
+    sendJson(response, 200, {
+      grade,
+      model: config.essayModel,
+    });
+  } catch (error) {
+    if (clientSignal.aborted) return;
+    console.error("Ocjenjivanje hrvatskoga pisanog zadatka nije uspjelo:", error.message);
+    sendJson(response, 502, {
+      error: "OpenAI ocjenjivanje nije uspjelo. Provjeri API ključ i pokušaj ponovno.",
+    });
+  }
+}
+
+async function handleCroatianWritingOcr(request, response) {
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
+    return;
+  }
+
+  const session = currentSession(request);
+  const user = session ? store.users[session.userId] : null;
+  if (!session || !user) {
+    sendJson(response, 401, { error: "Prijava je potrebna za OCR fotografije." });
+    return;
+  }
+
+  let apiKey;
+  try {
+    apiKey = decryptAgentKey(user.agentKey);
+  } catch (error) {
+    console.error("OpenAI API ključ nije moguće pročitati:", error.message);
+    sendJson(response, 400, { error: "Spremljeni OpenAI API ključ nije moguće pročitati." });
+    return;
+  }
+
+  if (!apiKey) {
+    sendJson(response, 400, { error: "Spremi OpenAI API ključ u profilu prije OCR-a." });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request, 12 * 1024 * 1024);
+  } catch {
+    sendJson(response, 400, { error: "Zahtjev nema ispravan JSON zapis." });
+    return;
+  }
+
+  const image = normalizeEssayImage(body?.image);
+  if (!image) {
+    sendJson(response, 400, { error: "Fotografija teksta nije ispravna ili je prevelika." });
+    return;
+  }
+
+  try {
+    const text = await transcribeCroatianWritingImageWithOpenAI({ apiKey, image });
+    sendJson(response, 200, {
+      text,
+      model: config.essayModel,
+    });
+  } catch (error) {
+    console.error("OCR hrvatskoga pisanog zadatka nije uspio:", error.message);
+    sendJson(response, 502, {
+      error: "OpenAI OCR nije uspio. Provjeri API ključ i pokušaj ponovno.",
+    });
+  }
+}
+
 async function handleHistoryOpenGrade(request, response) {
   if (request.method !== "POST") {
     sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
@@ -772,6 +975,82 @@ async function handleHistoryOpenGrade(request, response) {
     });
   } catch (error) {
     console.error("Ocjenjivanje otvorenih zadataka iz Povijesti nije uspjelo:", error.message);
+    sendJson(response, 502, {
+      error: "OpenAI ocjenjivanje nije uspjelo. Provjeri API ključ i pokušaj ponovno.",
+    });
+  }
+}
+
+async function handleGeographyOpenGrade(request, response) {
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
+    return;
+  }
+
+  const ipAddress = clientIp(request);
+  if (!rateLimit.ip.check(ipAddress)) {
+    sendJson(response, 429, {
+      error: "Poslano je previše zahtjeva. Pričekaj nekoliko minuta i pokušaj ponovno.",
+    });
+    return;
+  }
+
+  const session = currentSession(request);
+  const user = session ? store.users[session.userId] : null;
+  let apiKey = config.openAiApiKey;
+
+  if (user?.agentKey) {
+    try {
+      apiKey = decryptAgentKey(user.agentKey);
+    } catch (error) {
+      console.error("OpenAI API ključ nije moguće pročitati:", error.message);
+      sendJson(response, 400, { error: "Spremljeni OpenAI API ključ nije moguće pročitati." });
+      return;
+    }
+  }
+
+  if (!apiKey) {
+    sendJson(response, user ? 400 : 401, {
+      error: user
+        ? "Spremi OpenAI API ključ u profilu prije AI ocjenjivanja."
+        : "Prijava i spremljeni OpenAI API ključ potrebni su za AI ocjenjivanje.",
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request, 96 * 1024);
+  } catch {
+    sendJson(response, 400, { error: "Zahtjev nema ispravan JSON zapis." });
+    return;
+  }
+
+  const examId = stringOrEmpty(body?.examId);
+  const geographyExam = loadGeographyChoiceExam(examId);
+  if (!geographyExam) {
+    sendJson(response, 404, { error: "Odabrani ispit iz Geografije nije dostupan." });
+    return;
+  }
+
+  const answers = normalizeHistoryOpenAnswers(body?.answers, geographyExam);
+  if (!Object.keys(answers).length) {
+    sendJson(response, 400, { error: "Pošalji barem jedan otvoreni odgovor za ocjenjivanje." });
+    return;
+  }
+
+  try {
+    const grades = await gradeGeographyOpenAnswersWithOpenAI({
+      apiKey,
+      geographyExam,
+      answers,
+    });
+    sendJson(response, 200, {
+      grades,
+      model: config.geographyModel,
+    });
+  } catch (error) {
+    console.error("Ocjenjivanje otvorenih zadataka iz Geografije nije uspjelo:", error.message);
     sendJson(response, 502, {
       error: "OpenAI ocjenjivanje nije uspjelo. Provjeri API ključ i pokušaj ponovno.",
     });
@@ -1028,10 +1307,12 @@ function isPracticeStorageKey(key) {
     "asistent-za-mature:english-reading:",
     "asistent-za-mature:english-listening:",
     "asistent-za-mature:english-essay:",
+    "asistent-za-mature:croatian-writing:",
     "asistent-za-mature:physics-choice:",
     "asistent-za-mature:math-choice:",
     "asistent-za-mature:croatian-choice:",
     "asistent-za-mature:history-choice:",
+    "asistent-za-mature:geography-choice:",
     "asistent-za-mature:abcd-choice:",
   ].some((prefix) => key.startsWith(prefix));
 }
@@ -1094,6 +1375,19 @@ function loadEnglishEssayExam(examId) {
   return exams.find((exam) => exam && exam.id === examId) || null;
 }
 
+function loadCroatianWritingExam(examId) {
+  if (!examId) return null;
+
+  const source = fs.readFileSync(croatianWritingIndex.file, "utf8").trim();
+  if (!source.startsWith(croatianWritingIndex.prefix) || !source.endsWith(";")) {
+    throw new Error("Croatian writing index has an unsupported format.");
+  }
+
+  const payload = JSON.parse(source.slice(croatianWritingIndex.prefix.length, -1));
+  const exams = Array.isArray(payload.exams) ? payload.exams : [];
+  return exams.find((exam) => exam && exam.id === examId) || null;
+}
+
 function loadHistoryChoiceExam(examId) {
   if (!examId) return null;
 
@@ -1103,6 +1397,19 @@ function loadHistoryChoiceExam(examId) {
   }
 
   const payload = JSON.parse(source.slice(historyChoiceIndex.prefix.length, -1));
+  const exams = Array.isArray(payload.exams) ? payload.exams : [];
+  return exams.find((exam) => exam && exam.id === examId) || null;
+}
+
+function loadGeographyChoiceExam(examId) {
+  if (!examId) return null;
+
+  const source = fs.readFileSync(geographyChoiceIndex.file, "utf8").trim();
+  if (!source.startsWith(geographyChoiceIndex.prefix) || !source.endsWith(";")) {
+    throw new Error("Geography choice index has an unsupported format.");
+  }
+
+  const payload = JSON.parse(source.slice(geographyChoiceIndex.prefix.length, -1));
   const exams = Array.isArray(payload.exams) ? payload.exams : [];
   return exams.find((exam) => exam && exam.id === examId) || null;
 }
@@ -1130,7 +1437,7 @@ async function gradeEnglishEssayWithOpenAI({ apiKey, essayExam, essayText, image
   const content = [
     {
       type: "input_text",
-      text: buildEssayGradingPrompt({ essayExam, essayText, hasImage: Boolean(image) }),
+      text: buildEnglishEssaySubmissionPrompt({ essayExam, essayText, hasImage: Boolean(image) }),
     },
   ];
   if (image) {
@@ -1145,6 +1452,15 @@ async function gradeEnglishEssayWithOpenAI({ apiKey, essayExam, essayText, image
     body: JSON.stringify({
       model: config.essayModel,
       input: [
+        {
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text: writingSystemPrompts.englishEssay,
+            },
+          ],
+        },
         {
           role: "user",
           content,
@@ -1178,6 +1494,73 @@ async function gradeEnglishEssayWithOpenAI({ apiKey, essayExam, essayText, image
   const responseText = extractOpenAiOutputText(payload);
   if (!responseText) throw new Error("OpenAI response did not contain output text.");
   return normalizeEssayGrade(JSON.parse(responseText));
+}
+
+async function gradeCroatianWritingWithOpenAI({ apiKey, writingExam, writingText, signal }) {
+  const isSummary = writingExam.kind === "sazetak";
+  const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
+    body: JSON.stringify({
+      model: config.essayModel,
+      input: [
+        {
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text: isSummary
+                ? writingSystemPrompts.croatianSummary
+                : writingSystemPrompts.croatianSchoolEssay,
+            },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: buildCroatianWritingSubmissionPrompt(writingExam, writingText),
+            },
+          ],
+        },
+      ],
+      max_output_tokens: 700,
+      text: {
+        format: {
+          type: "json_schema",
+          name: isSummary ? "croatian_summary_score" : "croatian_school_essay_score",
+          strict: true,
+          schema: isSummary ? croatianSummaryScoreSchema : croatianEssayScoreSchema,
+        },
+      },
+      temperature: 0,
+    }),
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+    signal: abortSignalWithTimeout(signal, 60_000),
+  });
+
+  const payload = await openAiResponse.json().catch(() => ({}));
+  if (!openAiResponse.ok) {
+    const message = payload?.error?.message || `HTTP ${openAiResponse.status}`;
+    throw new Error(`OpenAI response error: ${message}`);
+  }
+
+  const responseText = extractOpenAiOutputText(payload);
+  if (!responseText) throw new Error("OpenAI response did not contain output text.");
+  return normalizeCroatianWritingGrade(JSON.parse(responseText), writingExam, writingText);
+}
+
+function buildCroatianWritingSubmissionPrompt(writingExam, writingText) {
+  return `
+Službeni zadatak:
+${writingExam.taskText}
+
+Tekst pristupnika:
+${writingText}
+  `.trim();
 }
 
 async function transcribeEnglishEssayImageWithOpenAI({ apiKey, image }) {
@@ -1237,7 +1620,64 @@ If the image does not contain an essay text, return an empty string.
   return normalizeEssayText(parsed?.text);
 }
 
-function buildEssayGradingPrompt({ essayExam, essayText, hasImage }) {
+async function transcribeCroatianWritingImageWithOpenAI({ apiKey, image }) {
+  const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
+    body: JSON.stringify({
+      model: config.essayModel,
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: `
+Prepiši hrvatski rukom pisani ili fotografirani tekst sa slike.
+Vrati samo JSON prema zadanoj shemi. Nemoj tekst ocjenjivati, ispravljati, preoblikovati ni objašnjavati.
+Sačuvaj odlomke i hrvatske dijakritičke znakove gdje su vidljivi. Ako riječ nije sigurna, prepiši najvjerojatnije čitanje.
+Ako slika ne sadrži tekst za ocjenjivanje, vrati prazan string.
+              `.trim(),
+            },
+            {
+              type: "input_image",
+              image_url: image.dataUrl,
+              detail: "high",
+            },
+          ],
+        },
+      ],
+      max_output_tokens: 6000,
+      text: {
+        format: {
+          type: "json_schema",
+          name: "croatian_writing_ocr",
+          strict: true,
+          schema: essayOcrSchema,
+        },
+      },
+      temperature: 0,
+    }),
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  const payload = await openAiResponse.json().catch(() => ({}));
+  if (!openAiResponse.ok) {
+    const message = payload?.error?.message || `HTTP ${openAiResponse.status}`;
+    throw new Error(`OpenAI response error: ${message}`);
+  }
+
+  const responseText = extractOpenAiOutputText(payload);
+  if (!responseText) throw new Error("OpenAI response did not contain output text.");
+
+  const parsed = JSON.parse(responseText);
+  return normalizeEssayText(parsed?.text);
+}
+
+function buildEnglishEssaySubmissionPrompt({ essayExam, essayText, hasImage }) {
   const sourceMode = essayText
     ? "Grade the typed essay below. Ignore the image unless the typed essay is empty."
     : hasImage
@@ -1245,24 +1685,8 @@ function buildEssayGradingPrompt({ essayExam, essayText, hasImage }) {
       : "Grade the submitted essay.";
 
   return `
-You score Croatian state graduation exam essays for English A level.
-Return only JSON matching the schema. Do not return corrections, rewrites, or prose outside JSON.
-
 Official task:
 ${essayExam.taskText}
-
-Scoring criteria:
-- taskCompletion: 0-5 for task fulfilment, relevant introduction, two developed views or for/against body points, conclusion, support with explanations/examples, and connection to the topic.
-- coherenceCohesion: 0-5 for clear flow of ideas, paragraphing, and effective cohesive devices.
-- vocabulary: 0-5 for range and accuracy of vocabulary, word form, and spelling.
-- grammar: 0-5 for range and accuracy of grammatical structures.
-- comment: short Croatian feedback in one or two sentences. Mention the main strength and the most useful next improvement. Do not rewrite the essay.
-- If the essay has fewer than 70 words, set all four criteria to 0 and insufficientLength to true.
-- For 70-109, 110-139, 140-169, and 170-199 words, apply the official length penalty within taskCompletion.
-- If taskCompletion is 0 because the text is off-topic or mostly unintelligible, set all other criteria to 0.
-- If taskCompletion is 0 only because of length, other criteria may not exceed 1.
-- If taskCompletion is 1 because of length, other criteria may not exceed 3.
-- If taskCompletion is 2, other criteria may not exceed 4.
 
 ${sourceMode}
 
@@ -1352,6 +1776,57 @@ function clampEssayCriterion(value) {
   return Math.max(0, Math.min(5, integer));
 }
 
+function normalizeCroatianWritingGrade(rawGrade, writingExam, writingText) {
+  if (!rawGrade || typeof rawGrade !== "object" || Array.isArray(rawGrade)) {
+    throw new Error("Croatian writing grade is not an object.");
+  }
+
+  const criteria = Array.isArray(writingExam.criteria) ? writingExam.criteria : [];
+  if (!criteria.length) throw new Error("Croatian writing criteria are missing.");
+
+  const wordCount = countTextWords(writingText);
+  const acceptedMin = numberOrNull(writingExam.wordRange?.acceptedMin);
+  const acceptedMax = numberOrNull(writingExam.wordRange?.acceptedMax);
+  const invalidLength =
+    (Number.isFinite(acceptedMin) && wordCount < acceptedMin) ||
+    (Number.isFinite(acceptedMax) && wordCount > acceptedMax);
+  const scores = Object.fromEntries(
+    criteria.map((criterion) => [criterion.id, clampCroatianWritingCriterion(rawGrade[criterion.id])]),
+  );
+  const unfulfilledTask = rawGrade.unfulfilledTask === true || scores[criteria[0].id] === 0;
+  if (invalidLength || unfulfilledTask) {
+    for (const criterion of criteria) scores[criterion.id] = 0;
+  }
+
+  const normalizedCriteria = criteria.map((criterion) => ({
+    id: criterion.id,
+    label: String(criterion.label || criterion.id),
+    score: scores[criterion.id],
+    maxScore: 3,
+  }));
+  const rawTotal = normalizedCriteria.reduce((total, criterion) => total + criterion.score, 0);
+
+  return {
+    criteria: normalizedCriteria,
+    rawTotal,
+    total: rawTotal * 2,
+    wordCount,
+    invalidLength,
+    unfulfilledTask,
+    comment: normalizeEssayComment(rawGrade.comment),
+  };
+}
+
+function clampCroatianWritingCriterion(value) {
+  const integer = Math.round(Number(value));
+  if (!Number.isFinite(integer)) return 0;
+  return Math.max(0, Math.min(3, integer));
+}
+
+function countTextWords(value) {
+  return String(value || "").match(/[\p{L}\p{N}]+(?:[-'’][\p{L}\p{N}]+)*/gu)?.length || 0;
+}
+
 async function gradeHistoryOpenAnswersWithOpenAI({ apiKey, historyExam, answers }) {
   const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
     body: JSON.stringify({
@@ -1397,6 +1872,51 @@ async function gradeHistoryOpenAnswersWithOpenAI({ apiKey, historyExam, answers 
   return normalizeHistoryGrades(JSON.parse(responseText), historyExam, answers);
 }
 
+async function gradeGeographyOpenAnswersWithOpenAI({ apiKey, geographyExam, answers }) {
+  const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
+    body: JSON.stringify({
+      model: config.geographyModel,
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_text",
+              text: buildGeographyGradingPrompt({ geographyExam, answers }),
+            },
+          ],
+        },
+      ],
+      max_output_tokens: 3500,
+      text: {
+        format: {
+          type: "json_schema",
+          name: "geography_open_answer_scores",
+          strict: true,
+          schema: historyGradeSchema,
+        },
+      },
+      temperature: 0,
+    }),
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+    signal: AbortSignal.timeout(45_000),
+  });
+
+  const payload = await openAiResponse.json().catch(() => ({}));
+  if (!openAiResponse.ok) {
+    const message = payload?.error?.message || `HTTP ${openAiResponse.status}`;
+    throw new Error(`OpenAI response error: ${message}`);
+  }
+
+  const responseText = extractOpenAiOutputText(payload);
+  if (!responseText) throw new Error("OpenAI response did not contain output text.");
+  return normalizeHistoryGrades(JSON.parse(responseText), geographyExam, answers);
+}
+
 function buildHistoryGradingPrompt({ historyExam, answers }) {
   const answerItems = Object.entries(answers).map(([question, studentAnswer]) => {
     const model = historyExam.openAnswers?.[question] || {};
@@ -1423,6 +1943,40 @@ Pravila ocjenjivanja:
 - Za produženi odgovor boduj razmjerno pokrivenosti traženih pojmova, točnosti, povijesnom kontekstu i objašnjenju.
 - Ako odgovor samo prepisuje tekst zadatka, popisuje zadane pojmove ili ih gramatički povezuje bez novih povijesnih tvrdnji, dodijeli 0 bodova.
 - Kod produženoga odgovora svaki bod zahtijeva konkretnu povijesnu tvrdnju, objašnjenje ili vezu koja nije već dana u samome zadatku.
+- Netočne, izmišljene ili proturječne tvrdnje ne smiju donositi bodove.
+- Comment napiši na hrvatskom u jednoj kratkoj rečenici; navedi glavni razlog bodovanja.
+
+Zadatci za ocjenjivanje:
+${JSON.stringify(answerItems, null, 2)}
+  `.trim();
+}
+
+function buildGeographyGradingPrompt({ geographyExam, answers }) {
+  const answerItems = Object.entries(answers).map(([question, studentAnswer]) => {
+    const model = geographyExam.openAnswers?.[question] || {};
+    const prompt = questionPrompt(geographyExam, question);
+    return {
+      question,
+      maxPoints: Number(model.maxPoints || 1),
+      officialTask: prompt || `Zadatak ${question} iz službene ispitne knjižice.`,
+      officialModelAnswer: String(model.modelAnswer || ""),
+      studentAnswer,
+    };
+  });
+
+  return `
+Ocjenjuješ otvorene zadatke iz Geografije na hrvatskoj državnoj maturi.
+Vrati samo JSON prema zadanoj shemi. Ne vraćaj tekst izvan JSON-a.
+
+Ispit: Geografija, ${geographyExam.year}. godina, ${geographyExam.term}.
+
+Pravila ocjenjivanja:
+- Za svaki zadatak dodijeli cijeli broj bodova od 0 do maxPoints.
+- Koristi službeni model odgovora kao kriterij, ali nemoj zahtijevati doslovnu formulaciju.
+- Priznaj zemljopisno jednakovrijedne nazive, dopuštene sinonime, ispravan izračun i smisleno objašnjenje.
+- Za kratki odgovor s 1 bodom dodijeli 1 samo ako je odgovor geografski i činjenično točan.
+- Za zadatak višestrukih kombinacija traži sve odgovore navedene u službenome ključu.
+- Za produženi odgovor boduj razmjerno broju točnih traženih elemenata, usporedbi, izračunu i objašnjenju.
 - Netočne, izmišljene ili proturječne tvrdnje ne smiju donositi bodove.
 - Comment napiši na hrvatskom u jednoj kratkoj rečenici; navedi glavni razlog bodovanja.
 
@@ -1494,7 +2048,7 @@ function normalizeHistoryComment(value) {
 
 function historyPromptEchoFeedback(historyExam, question, answer, maximum) {
   if (!isHistoryPromptEchoAnswer(historyExam, question, answer, maximum)) return "";
-  return "Odgovor ne donosi bodove jer samo ponavlja tekst zadatka ili tražene pojmove bez povijesnoga objašnjenja.";
+  return "Odgovor ne donosi bodove jer samo ponavlja tekst zadatka ili tražene pojmove bez vlastitoga odgovora ili objašnjenja.";
 }
 
 function isHistoryPromptEchoAnswer(historyExam, question, answer, maximum) {
@@ -2270,7 +2824,9 @@ function contentType(filePath) {
       ".pdf": "application/pdf",
       ".png": "image/png",
       ".svg": "image/svg+xml",
+      ".txt": "text/plain; charset=UTF-8",
       ".webp": "image/webp",
+      ".xml": "application/xml; charset=UTF-8",
       ".zip": "application/zip",
     }[ext] || "application/octet-stream"
   );
@@ -2286,6 +2842,7 @@ function isPublicPath(pathname) {
     "/asistent_za_maturu.png",
     "/auth-client.js",
     "/croatian-choice.js",
+    "/croatian-writing.js",
     "/english-reading.html",
     "/english-essay.js",
     "/english-reading.js",
@@ -2296,8 +2853,11 @@ function isPublicPath(pathname) {
     "/exam-simulation.js",
     "/fizika-abcd.html",
     "/fizika.html",
+    "/geografija.html",
+    "/geography-choice.js",
     "/history-choice.js",
     "/hrvatski.html",
+    "/hrvatski-pisanje.html",
     "/index.html",
     "/matematika.html",
     "/math-choice.js",
@@ -2307,11 +2867,14 @@ function isPublicPath(pathname) {
     "/profil.html",
     "/profile-page.js",
     "/profile-store.js",
+    "/robots.txt",
+    "/sitemap.xml",
     "/site-footer.js",
     "/site-header.js",
     "/solver-header.js",
     "/solver-self-check.js",
     "/styles.css",
+    "/llms.txt",
   ]);
 
   return (
@@ -2358,4 +2921,11 @@ function loadEnvFile(filePath) {
 
     if (key && process.env[key] === undefined) process.env[key] = value;
   }
+}
+
+function loadSystemPrompt(filename) {
+  const promptPath = path.join(rootDir, "prompts", "writing", filename);
+  const prompt = fs.readFileSync(promptPath, "utf8").trim();
+  if (!prompt) throw new Error(`System prompt is empty: ${promptPath}`);
+  return prompt;
 }

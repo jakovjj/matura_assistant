@@ -6,10 +6,12 @@
     "asistent-za-mature:english-reading:",
     "asistent-za-mature:english-listening:",
     "asistent-za-mature:english-essay:",
+    "asistent-za-mature:croatian-writing:",
     "asistent-za-mature:physics-choice:",
     "asistent-za-mature:math-choice:",
     "asistent-za-mature:croatian-choice:",
     "asistent-za-mature:history-choice:",
+    "asistent-za-mature:geography-choice:",
     "asistent-za-mature:abcd-choice:",
   ];
   const canonicalOrigin = "https://matura.com.hr";

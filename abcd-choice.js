@@ -1,4 +1,5 @@
 const data = window.ASISTENT_ZA_MATURE_ABCD_CHOICE;
+const geographyData = window.ASISTENT_ZA_MATURE_GEOGRAPHY_CHOICE;
 
 if (!data || !Array.isArray(data.exams)) {
   throw new Error("Nedostaje generirani indeks ABCD zadataka.");
@@ -133,6 +134,12 @@ const exams = data.exams.map((exam) => {
   };
 });
 const examsById = buildExamMap(exams);
+const geographyExamsById = buildExamMap(
+  (geographyData?.exams || []).map((exam) => ({
+    ...exam,
+    term: normalizeTerm(exam.term),
+  })),
+);
 
 function questionIds(exam = solverExam) {
   return exam?.questions || [];
@@ -152,6 +159,12 @@ function historyChoiceUrl(exam) {
   const params = new URLSearchParams({ exam: exam.id });
   if (simulation.active) params.set("nacin", "simulacija");
   return `./povijest.html?${params.toString()}`;
+}
+
+function geographyChoiceUrl(exam) {
+  const params = new URLSearchParams({ exam: exam.id });
+  if (simulation.active) params.set("nacin", "simulacija");
+  return `./geografija.html?${params.toString()}`;
 }
 
 function subjectUrl(exam = solverExam) {
@@ -583,6 +596,12 @@ function startAbcdPage() {
   }
 
   const exam = examsById.get(id);
+  const geographyExam = geographyExamsById.get(id);
+  if (geographyExam) {
+    window.location.replace(geographyChoiceUrl(geographyExam));
+    return;
+  }
+
   if (exam?.subject === "Povijest") {
     window.location.replace(historyChoiceUrl(exam));
     return;

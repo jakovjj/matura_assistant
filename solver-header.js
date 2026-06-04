@@ -74,6 +74,10 @@
     "engleski jezik|slušanje": "music-2",
     "engleski jezik|slusanje": "music-2",
     "engleski jezik|esej": "book-open-text",
+    "hrvatski|sažetak": "book-open-text",
+    "hrvatski|sazetak": "book-open-text",
+    "hrvatski|školski esej": "book-open-text",
+    "hrvatski|skolski esej": "book-open-text",
   };
 
   function escapeHtml(value) {

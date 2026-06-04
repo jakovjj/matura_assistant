@@ -298,6 +298,13 @@ def pdf_bbox_words(contents: bytes) -> list[PdfWord]:
     ]
 
 
+def legacy_question_marker(line: PdfLine, number: str) -> bool:
+    if line.first_word != number or line.text == line.first_word:
+        return False
+    remainder = line.text[len(line.first_word) :].strip()
+    return bool(remainder) and (remainder[0].isupper() or remainder[0] in "([")
+
+
 def find_question_crops(contents: bytes, question_numbers: list[str]) -> dict[str, QuestionCrop]:
     pages = pdf_bbox_pages(contents)
     markers: list[QuestionMarker] = []
@@ -317,7 +324,7 @@ def find_question_crops(contents: bytes, question_numbers: list[str]) -> dict[st
 
             number = question_numbers[expected_index]
             has_question_number = line.first_word == f"{number}."
-            has_legacy_question_number = line.first_word == number and line.text != line.first_word
+            has_legacy_question_number = legacy_question_marker(line, number)
             if line.x_min < 150 and (has_question_number or has_legacy_question_number):
                 markers.append(QuestionMarker(number=number, page=page, y_min=line.y_min, x_min=line.x_min))
                 expected_index += 1

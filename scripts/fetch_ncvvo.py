@@ -19,6 +19,8 @@ from typing import Any
 from urllib.parse import quote, unquote, urljoin, urlparse
 from urllib.request import Request, urlopen
 
+from build_sitemap import sitemap_urls, write_sitemap
+
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "data" / "exams.js"
@@ -346,6 +348,8 @@ def main() -> None:
     payload = json.dumps(index, ensure_ascii=False, separators=(",", ":"))
     OUTPUT.write_text(f"window.ASISTENT_ZA_MATURE_DATA={payload};\n", encoding="utf-8")
     print(f"Wrote {len(index['exams'])} exams to {OUTPUT.relative_to(ROOT)}")
+    write_sitemap(sitemap_urls(index))
+    print("Updated sitemap.xml")
 
 
 if __name__ == "__main__":

@@ -2,10 +2,12 @@ const archiveData = window.ASISTENT_ZA_MATURE_DATA;
 const englishReadingData = window.ASISTENT_ZA_MATURE_ENGLISH_READING;
 const englishListeningData = window.ASISTENT_ZA_MATURE_ENGLISH_LISTENING;
 const englishEssayData = window.ASISTENT_ZA_MATURE_ENGLISH_ESSAY;
+const croatianWritingData = window.ASISTENT_ZA_MATURE_CROATIAN_WRITING;
 const physicsChoiceData = window.ASISTENT_ZA_MATURE_PHYSICS_CHOICE;
 const mathChoiceData = window.ASISTENT_ZA_MATURE_MATH_CHOICE;
 const croatianChoiceData = window.ASISTENT_ZA_MATURE_CROATIAN_CHOICE;
 const historyChoiceData = window.ASISTENT_ZA_MATURE_HISTORY_CHOICE;
+const geographyChoiceData = window.ASISTENT_ZA_MATURE_GEOGRAPHY_CHOICE;
 const abcdChoiceData = window.ASISTENT_ZA_MATURE_ABCD_CHOICE;
 
 if (!archiveData || !Array.isArray(archiveData.exams)) {
@@ -189,8 +191,15 @@ const termOrder = {
   "jesenski rok": 1,
 };
 
+const siteOrigin = "https://matura.com.hr";
+const siteName = "Asistent za Mature";
+const homeSeoTitle = "Državna matura: prethodni ispiti i vježba | Asistent za Mature";
+const homeSeoDescription =
+  "Vježbaj državnu maturu na prethodnim ispitima i preuzmi NCVVO pakete za 2013.-2025. Prati napredak ili pokreni vremenski ograničenu simulaciju.";
+
 const appRoot = document.querySelector("#app-root");
 const homeHeading = document.querySelector("[data-home-heading]");
+const homeInformation = document.querySelector("[data-home-information]");
 
 if (!appRoot) {
   throw new Error("Nedostaje korijenski element aplikacije.");
@@ -273,6 +282,10 @@ function englishEssayIdForTerm(exam, term) {
   return `engleski-${exam.level.toLocaleLowerCase("hr")}-${exam.year}-${slugPart(term)}`;
 }
 
+function croatianWritingIdForTerm(exam, term) {
+  return `hrvatski-${exam.year}-${slugPart(term)}-${exam.kind}`;
+}
+
 function physicsChoiceIdForTerm(exam, term) {
   return `fizika-${exam.year}-${slugPart(term)}`;
 }
@@ -289,6 +302,10 @@ function croatianChoiceIdForTerm(exam, term) {
 
 function historyChoiceIdForTerm(exam, term) {
   return `povijest-${exam.year}-${slugPart(term)}`;
+}
+
+function geographyChoiceIdForTerm(exam, term) {
+  return `geografija-${exam.year}-${slugPart(term)}`;
 }
 
 function abcdChoiceIdForTerm(exam, term) {
@@ -327,6 +344,17 @@ function englishEssayStorageKeys(essayExam) {
   ];
 
   return [...new Set(ids)].map((id) => `asistent-za-mature:english-essay:${id}`);
+}
+
+function croatianWritingStorageKeys(writingExam) {
+  const ids = [
+    writingExam.id,
+    ...(legacyTermAliases[writingExam.term] || []).map((term) =>
+      croatianWritingIdForTerm(writingExam, term),
+    ),
+  ];
+
+  return [...new Set(ids)].map((id) => `asistent-za-mature:croatian-writing:${id}`);
 }
 
 function physicsChoiceStorageKeys(choiceExam) {
@@ -381,6 +409,17 @@ function historyChoiceStorageKeys(choiceExam) {
   return [...new Set(ids)].map((id) => `asistent-za-mature:history-choice:${id}`);
 }
 
+function geographyChoiceStorageKeys(choiceExam) {
+  const ids = [
+    choiceExam.id,
+    ...(legacyTermAliases[choiceExam.term] || []).map((term) =>
+      geographyChoiceIdForTerm(choiceExam, term),
+    ),
+  ];
+
+  return [...new Set(ids)].map((id) => `asistent-za-mature:geography-choice:${id}`);
+}
+
 function abcdChoiceStorageKeys(choiceExam) {
   const ids = [
     choiceExam.id,
@@ -430,6 +469,17 @@ const englishEssayExams = (englishEssayData?.exams || []).map((exam) => {
 const englishEssayByArchiveUrl = new Map(
   englishEssayExams.map((exam) => [exam.archiveUrl, exam]),
 );
+const croatianWritingExams = (croatianWritingData?.exams || []).map((exam) => {
+  const term = normalizeTerm(exam.term);
+  return {
+    ...exam,
+    term,
+    id: croatianWritingIdForTerm(exam, term),
+  };
+});
+const croatianWritingByArchivePart = new Map(
+  croatianWritingExams.map((exam) => [`${exam.archiveUrl}|${exam.kind}`, exam]),
+);
 const physicsChoiceExams = (physicsChoiceData?.exams || []).map((exam) => {
   const term = normalizeTerm(exam.term);
   return {
@@ -474,6 +524,17 @@ const historyChoiceExams = (historyChoiceData?.exams || []).map((exam) => {
 const historyChoiceByArchiveUrl = new Map(
   historyChoiceExams.map((exam) => [exam.archiveUrl, exam]),
 );
+const geographyChoiceExams = (geographyChoiceData?.exams || []).map((exam) => {
+  const term = normalizeTerm(exam.term);
+  return {
+    ...exam,
+    term,
+    id: geographyChoiceIdForTerm(exam, term),
+  };
+});
+const geographyChoiceByArchiveUrl = new Map(
+  geographyChoiceExams.map((exam) => [exam.archiveUrl, exam]),
+);
 const abcdChoiceExams = (abcdChoiceData?.exams || []).map((exam) => {
   const term = normalizeTerm(exam.term);
   return {
@@ -500,6 +561,7 @@ const englishPracticeParts = [
     id: "esej",
     label: "Esej",
     description: "Pisani sastav iz ispita.",
+    usesAiChecking: true,
   },
 ];
 function englishPracticePartsForExam(exam) {
@@ -727,6 +789,247 @@ function examUrl(exam, practicePart = "") {
   return `./?${params.toString()}#predmeti`;
 }
 
+function sitePageUrl(params = {}) {
+  const url = new URL("/", siteOrigin);
+  url.search = new URLSearchParams(params).toString();
+  return url.toString();
+}
+
+function subjectCanonicalUrl(subject) {
+  return sitePageUrl({ predmet: subject });
+}
+
+function examCanonicalUrl(exam) {
+  return sitePageUrl({
+    predmet: exam.subject,
+    ispit: exam.id,
+  });
+}
+
+function setMetaContent(attribute, key, content) {
+  let meta = document.head.querySelector(`meta[${attribute}="${key}"]`);
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.setAttribute(attribute, key);
+    document.head.append(meta);
+  }
+  meta.setAttribute("content", content);
+}
+
+function websiteStructuredData() {
+  return {
+    "@type": "WebSite",
+    "@id": `${siteOrigin}/#website`,
+    url: `${siteOrigin}/`,
+    name: siteName,
+    description: "Neslužbena arhiva prethodnih ispita državne mature s interaktivnim vježbama.",
+    inLanguage: "hr-HR",
+    disambiguatingDescription: "Neslužbeni projekt koji nije povezan s NCVVO-om.",
+  };
+}
+
+function breadcrumbStructuredData(items) {
+  return {
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: item.url,
+    })),
+  };
+}
+
+function setStructuredData(pageData) {
+  let script = document.querySelector("#seo-structured-data");
+  if (!script) {
+    script = document.createElement("script");
+    script.id = "seo-structured-data";
+    script.type = "application/ld+json";
+    document.head.append(script);
+  }
+
+  script.textContent = JSON.stringify({
+    "@context": "https://schema.org",
+    "@graph": [websiteStructuredData(), pageData],
+  });
+}
+
+function setPageSeo({
+  canonicalUrl,
+  description,
+  robots = "index, follow, max-image-preview:large",
+  schema,
+  title,
+}) {
+  document.title = title;
+  setMetaContent("name", "description", description);
+  setMetaContent("name", "robots", robots);
+  setMetaContent("property", "og:title", title);
+  setMetaContent("property", "og:description", description);
+  setMetaContent("property", "og:url", canonicalUrl);
+  setMetaContent("name", "twitter:title", title);
+  setMetaContent("name", "twitter:description", description);
+
+  let canonical = document.head.querySelector('link[rel="canonical"]');
+  if (!canonical) {
+    canonical = document.createElement("link");
+    canonical.rel = "canonical";
+    document.head.append(canonical);
+  }
+  canonical.href = canonicalUrl;
+
+  setStructuredData(schema);
+}
+
+function setHomeSeo() {
+  const canonicalUrl = sitePageUrl();
+  setPageSeo({
+    canonicalUrl,
+    description: homeSeoDescription,
+    title: homeSeoTitle,
+    schema: {
+      "@type": ["CollectionPage", "LearningResource"],
+      "@id": `${canonicalUrl}#webpage`,
+      url: canonicalUrl,
+      name: "Državna matura: prethodni ispiti i vježba",
+      description: homeSeoDescription,
+      isPartOf: { "@id": `${siteOrigin}/#website` },
+      inLanguage: "hr-HR",
+      dateModified: archiveData.generatedAt,
+      educationalLevel: "Srednja škola",
+      educationalUse: ["vježba", "samoprocjena"],
+      learningResourceType: "Arhiva ispita državne mature",
+      isBasedOn: archiveData.officialArchiveUrl,
+      audience: {
+        "@type": "EducationalAudience",
+        educationalRole: "student",
+      },
+      mainEntity: {
+        "@type": "ItemList",
+        name: "Predmeti državne mature",
+        numberOfItems: allSubjects.length,
+        itemListElement: allSubjects.map((subject, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          name: subject,
+          url: subjectCanonicalUrl(subject),
+        })),
+      },
+    },
+  });
+}
+
+function setSubjectSeo(subject) {
+  const canonicalUrl = subjectCanonicalUrl(subject);
+  const title = `${subject} državna matura: ispiti i vježba | ${siteName}`;
+  const description = `${subject}: prethodni ispiti državne mature od 2013. do 2025., službeni NCVVO paketi za preuzimanje i dostupne interaktivne vježbe.`;
+  const subjectArchive = subjectExams(subject);
+
+  setPageSeo({
+    canonicalUrl,
+    description,
+    title,
+    schema: {
+      "@type": "CollectionPage",
+      "@id": `${canonicalUrl}#webpage`,
+      url: canonicalUrl,
+      name: `${subject} - prethodni ispiti državne mature`,
+      description,
+      isPartOf: { "@id": `${siteOrigin}/#website` },
+      inLanguage: "hr-HR",
+      dateModified: archiveData.generatedAt,
+      about: {
+        "@type": "Thing",
+        name: subject,
+      },
+      breadcrumb: breadcrumbStructuredData([
+        { name: "Asistent za Mature", url: sitePageUrl() },
+        { name: subject, url: canonicalUrl },
+      ]),
+      mainEntity: {
+        "@type": "ItemList",
+        name: `${subject} - arhiva ispita`,
+        numberOfItems: subjectArchive.length,
+        itemListElement: subjectArchive.map((exam, index) => ({
+          "@type": "ListItem",
+          position: index + 1,
+          name: `${exam.subject} ${exam.year}. - ${formatTerm(exam.term)}${
+            exam.level ? `, ${exam.level} razina` : ""
+          }`,
+          url: examCanonicalUrl(exam),
+        })),
+      },
+    },
+  });
+}
+
+function setExamSeo(exam) {
+  const canonicalUrl = examCanonicalUrl(exam);
+  const level = exam.level ? `, ${exam.level} razina` : "";
+  const examName = `${exam.subject} ${exam.year}. - ${formatTerm(exam.term)}${level}`;
+  const title = `${examName} | ${siteName}`;
+  const description = `${exam.subject} ${exam.year}., ${exam.term}${level}. Preuzmi službeni NCVVO paket i otvori dostupne interaktivne cjeline za vježbu ili simulaciju mature.`;
+
+  setPageSeo({
+    canonicalUrl,
+    description,
+    title,
+    schema: {
+      "@type": "WebPage",
+      "@id": `${canonicalUrl}#webpage`,
+      url: canonicalUrl,
+      name: examName,
+      description,
+      isPartOf: { "@id": `${siteOrigin}/#website` },
+      inLanguage: "hr-HR",
+      dateModified: archiveData.generatedAt,
+      breadcrumb: breadcrumbStructuredData([
+        { name: "Asistent za Mature", url: sitePageUrl() },
+        { name: exam.subject, url: subjectCanonicalUrl(exam.subject) },
+        { name: examName, url: canonicalUrl },
+      ]),
+      mainEntity: {
+        "@type": "LearningResource",
+        name: examName,
+        description,
+        inLanguage: "hr-HR",
+        educationalLevel: "Srednja škola",
+        educationalUse: ["vježba", "samoprocjena"],
+        learningResourceType: "Ispit državne mature",
+        about: {
+          "@type": "Thing",
+          name: exam.subject,
+        },
+        isBasedOn: exam.upstreamUrl || exam.sourceUrl || archiveData.officialArchiveUrl,
+        encoding: {
+          "@type": "MediaObject",
+          contentUrl: new URL(exam.url, `${siteOrigin}/`).toString(),
+          encodingFormat: "application/zip",
+        },
+      },
+    },
+  });
+}
+
+function setMissingSeo(title, description) {
+  setPageSeo({
+    canonicalUrl: sitePageUrl(),
+    description,
+    robots: "noindex, follow",
+    title: `${title} | ${siteName}`,
+    schema: {
+      "@type": "WebPage",
+      "@id": `${sitePageUrl()}#missing-page`,
+      url: sitePageUrl(),
+      name: title,
+      description,
+      isPartOf: { "@id": `${siteOrigin}/#website` },
+      inLanguage: "hr-HR",
+    },
+  });
+}
+
 function englishReadingUrl(readingExam, simulation = false) {
   const params = new URLSearchParams({ exam: readingExam.id });
   if (simulation) params.set("nacin", "simulacija");
@@ -743,6 +1046,12 @@ function englishEssayUrl(essayExam, simulation = false) {
   const params = new URLSearchParams({ exam: essayExam.id });
   if (simulation) params.set("nacin", "simulacija");
   return `./engleski-esej.html?${params.toString()}`;
+}
+
+function croatianWritingUrl(writingExam, simulation = false) {
+  const params = new URLSearchParams({ exam: writingExam.id });
+  if (simulation) params.set("nacin", "simulacija");
+  return `./hrvatski-pisanje.html?${params.toString()}`;
 }
 
 function physicsChoiceUrl(choiceExam, simulation = false) {
@@ -769,6 +1078,12 @@ function historyChoiceUrl(choiceExam, simulation = false) {
   return `./povijest.html?${params.toString()}`;
 }
 
+function geographyChoiceUrl(choiceExam, simulation = false) {
+  const params = new URLSearchParams({ exam: choiceExam.id });
+  if (simulation) params.set("nacin", "simulacija");
+  return `./geografija.html?${params.toString()}`;
+}
+
 function abcdChoiceUrl(choiceExam, simulation = false) {
   const params = new URLSearchParams({ exam: choiceExam.id });
   if (simulation) params.set("nacin", "simulacija");
@@ -787,6 +1102,10 @@ function essayExamForArchive(exam) {
   return englishEssayByArchiveUrl.get(exam.url) || null;
 }
 
+function croatianWritingExamForArchive(exam, kind) {
+  return croatianWritingByArchivePart.get(`${exam.url}|${kind}`) || null;
+}
+
 function physicsChoiceExamForArchive(exam) {
   return physicsChoiceByArchiveUrl.get(exam.url) || null;
 }
@@ -801,6 +1120,10 @@ function croatianChoiceExamForArchive(exam) {
 
 function historyChoiceExamForArchive(exam) {
   return historyChoiceByArchiveUrl.get(exam.url) || null;
+}
+
+function geographyChoiceExamForArchive(exam) {
+  return geographyChoiceByArchiveUrl.get(exam.url) || null;
 }
 
 function abcdChoiceExamForArchive(exam) {
@@ -900,18 +1223,30 @@ function croatianPracticeParts(exam) {
   if (exam.year >= 2023 && !exam.level) {
     return [
       corePart,
-      unavailablePart(exam, {
-        id: "sazetak",
-        label: "Sažetak",
-        description: "Pisani sažetak.",
-        durationMinutes: 80,
-      }),
-      unavailablePart(exam, {
-        id: "skolski-esej",
-        label: "Školski esej",
-        description: "Pisani dio ispita.",
-        durationMinutes: 160,
-      }),
+      linkedPart(
+        exam,
+        {
+          id: "sazetak",
+          label: "Sažetak",
+          description: "Pisani sažetak.",
+          durationMinutes: 80,
+          usesAiChecking: true,
+        },
+        croatianWritingExamForArchive(exam, "sazetak"),
+        croatianWritingUrl,
+      ),
+      linkedPart(
+        exam,
+        {
+          id: "skolski-esej",
+          label: "Školski esej",
+          description: "Pisani dio ispita.",
+          durationMinutes: 160,
+          usesAiChecking: true,
+        },
+        croatianWritingExamForArchive(exam, "skolski-esej"),
+        croatianWritingUrl,
+      ),
     ];
   }
 
@@ -987,6 +1322,7 @@ function interactiveParts(exam) {
           label: "Ispit",
           description: "Zadatci iz ispitne knjižice.",
           durationMinutes: singleExamDuration(exam),
+          requiresManualChecking: true,
         },
         choiceExam,
         physicsChoiceUrl,
@@ -1004,6 +1340,7 @@ function interactiveParts(exam) {
           label: "Ispit",
           description: "Zadatci višestrukoga izbora i otvoreni zadatci iz ispitne knjižice.",
           durationMinutes: singleExamDuration(exam),
+          requiresManualChecking: true,
         },
         choiceExam,
         mathChoiceUrl,
@@ -1021,9 +1358,28 @@ function interactiveParts(exam) {
           label: "Ispit",
           description: "Zadatci višestrukoga izbora i otvoreni zadatci iz ispitne knjižice.",
           durationMinutes: singleExamDuration(exam),
+          usesAiChecking: true,
         },
         choiceExam,
         historyChoiceUrl,
+      ),
+    ];
+  }
+
+  if (exam.subject === "Geografija") {
+    const choiceExam = geographyChoiceExamForArchive(exam);
+    return [
+      linkedPart(
+        exam,
+        {
+          id: "geografija",
+          label: "Ispit",
+          description: "Zadatci zatvorenoga tipa i otvoreni zadatci iz ispitne knjižice.",
+          durationMinutes: singleExamDuration(exam),
+          usesAiChecking: true,
+        },
+        choiceExam,
+        geographyChoiceUrl,
       ),
     ];
   }
@@ -1164,6 +1520,31 @@ function englishEssayProgress(exam) {
     id: essayExam.id,
     total: 1,
   };
+}
+
+function readCroatianWritingDraft(writingExam) {
+  try {
+    for (const key of croatianWritingStorageKeys(writingExam).reverse()) {
+      const stored = JSON.parse(localStorage.getItem(key) || "{}");
+      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+        return typeof stored.writingText === "string" ? stored.writingText : "";
+      }
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+function croatianWritingProgress(exam) {
+  return ["sazetak", "skolski-esej"]
+    .map((kind) => croatianWritingExamForArchive(exam, kind))
+    .filter(Boolean)
+    .map((writingExam) => ({
+      answered: readCroatianWritingDraft(writingExam).trim() ? 1 : 0,
+      id: writingExam.id,
+      total: 1,
+    }));
 }
 
 function readPhysicsResponses(choiceExam) {
@@ -1400,6 +1781,48 @@ function historyProgress(exam) {
   };
 }
 
+function geographyProgress(exam) {
+  const choiceExam = geographyChoiceExamForArchive(exam);
+  if (!choiceExam) return null;
+
+  const knownClosed = new Set((choiceExam.questions || []).map(String));
+  const knownOpen = new Set((choiceExam.openQuestions || []).map(String));
+  const stored = {};
+  try {
+    for (const key of geographyChoiceStorageKeys(choiceExam).reverse()) {
+      const value = JSON.parse(localStorage.getItem(key) || "{}");
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        Object.assign(stored, value);
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  const closedResponses =
+    stored.closedResponses && typeof stored.closedResponses === "object"
+      ? stored.closedResponses
+      : {};
+  const openResponses =
+    stored.openResponses && typeof stored.openResponses === "object"
+      ? stored.openResponses
+      : {};
+  const answeredClosed = Object.entries(closedResponses).filter(
+    ([question, answer]) =>
+      knownClosed.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+  const answeredOpen = Object.entries(openResponses).filter(
+    ([question, answer]) =>
+      knownOpen.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+
+  return {
+    answered: answeredClosed + answeredOpen,
+    id: choiceExam.id,
+    total: knownClosed.size + knownOpen.size,
+  };
+}
+
 function readAbcdChoiceResponses(choiceExam) {
   const storedResponses = {};
   try {
@@ -1420,7 +1843,11 @@ function abcdChoiceQuestionNumbers(choiceExam) {
 }
 
 function abcdChoiceProgress(exam) {
-  if (exam.subject === "Matematika" || exam.subject === "Povijest") return null;
+  if (
+    exam.subject === "Matematika"
+    || exam.subject === "Povijest"
+    || exam.subject === "Geografija"
+  ) return null;
 
   const choiceExam = abcdChoiceExamForArchive(exam);
   if (!choiceExam) return null;
@@ -1444,10 +1871,12 @@ function examProgress(exam) {
     englishProgress(exam),
     englishListeningProgress(exam),
     englishEssayProgress(exam),
+    ...croatianWritingProgress(exam),
     physicsProgress(exam),
     mathProgress(exam),
     croatianProgress(exam),
     historyProgress(exam),
+    geographyProgress(exam),
     abcdChoiceProgress(exam),
   ].filter(Boolean);
   const answered = progressItems.reduce((sum, item) => sum + item.answered, 0);
@@ -1533,10 +1962,13 @@ function interactiveExamIds(exam) {
       readingExamForArchive(exam)?.id,
       listeningExamForArchive(exam)?.id,
       essayExamForArchive(exam)?.id,
+      croatianWritingExamForArchive(exam, "sazetak")?.id,
+      croatianWritingExamForArchive(exam, "skolski-esej")?.id,
       physicsChoiceExamForArchive(exam)?.id,
       mathChoiceExamForArchive(exam)?.id,
       croatianChoiceExamForArchive(exam)?.id,
       historyChoiceExamForArchive(exam)?.id,
+      geographyChoiceExamForArchive(exam)?.id,
       abcdChoiceExamForArchive(exam)?.id,
     ].filter(Boolean),
   );
@@ -1700,11 +2132,15 @@ function syncHomeHeadingVisibility(currentRoute) {
   if (homeHeading) {
     homeHeading.hidden = !isHomeRoute;
   }
+
+  if (homeInformation) {
+    homeInformation.hidden = !isHomeRoute;
+  }
 }
 
 function renderHome() {
   cleanupYearNavigation();
-  document.title = "Asistent za Mature - interaktivni ispiti za vježbu";
+  setHomeSeo();
 
   appRoot.innerHTML = `
     <div class="home-workspace">
@@ -1809,7 +2245,7 @@ function renderSubjectCard(subject) {
 
 function renderSubjectPage(subject) {
   cleanupYearNavigation();
-  document.title = `${subject} - Asistent za Mature`;
+  setSubjectSeo(subject);
   const colorStyle = ` style="--subject-color: ${subjectColor(subject)}"`;
 
   appRoot.innerHTML = `
@@ -2111,7 +2547,7 @@ function renderSubjectExamRow(exam, hasLevels, simulationAttempts) {
 
 function renderExamPractice(exam, selectedPartId = "") {
   cleanupYearNavigation();
-  document.title = `${exam.subject} ${exam.year}. - Asistent za Mature`;
+  setExamSeo(exam);
 
   appRoot.innerHTML = `
     <div class="practice-detail" style="--subject-color: ${subjectColor(exam.subject)}">
@@ -2256,7 +2692,7 @@ function renderSimulationNote() {
 
 function renderMissing(title, message) {
   cleanupYearNavigation();
-  document.title = "Asistent za Mature";
+  setMissingSeo(title, message);
   appRoot.innerHTML = `
     <div class="empty-state">
       <h2>${escapeHtml(title)}</h2>

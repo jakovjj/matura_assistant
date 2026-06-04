@@ -34,6 +34,7 @@ EXCLUDED_SUBJECTS = {
     "Engleski jezik",
     "Fizika",
     "Francuski jezik",
+    "Geografija",
     "Glazbena umjetnost",
     "Hrvatski jezik",
     "Matematika",
