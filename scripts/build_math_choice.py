@@ -477,6 +477,16 @@ def question_block_lines(
     return lines
 
 
+def next_marker_after(marker: QuestionMarker, ordered_markers: list[QuestionMarker]) -> QuestionMarker | None:
+    for candidate in ordered_markers:
+        if candidate.page.number < marker.page.number:
+            continue
+        if candidate.page.number == marker.page.number and candidate.y_min <= marker.y_min + 0.5:
+            continue
+        return candidate
+    return None
+
+
 def marker_column_bounds(page: PdfPage, page_markers: list[QuestionMarker], marker: QuestionMarker) -> tuple[float, float, int]:
     centers: list[list[float]] = []
     for x_min in sorted(item.x_min for item in page_markers):
@@ -744,6 +754,18 @@ def find_open_question_crops(
         for parent_number in multipart_parent_numbers
         if any(marker.number.startswith(f"{parent_number}.") for marker in markers)
     }
+    crop_boundary_markers = sorted(
+        [
+            *markers,
+            *(
+                parent_marker
+                for parent_number, parent_marker in parent_markers.items()
+                if parent_number in first_child_markers
+                and all(marker.number != parent_number for marker in markers)
+            ),
+        ],
+        key=lambda marker: (marker.page.number, marker.y_min, question_sort_key(marker.number)),
+    )
     for parent_number, parent_marker in parent_markers.items():
         first_child = first_child_markers.get(parent_number)
         if not first_child:
@@ -763,8 +785,8 @@ def find_open_question_crops(
             y_max=y_max,
         )
 
-    for index, marker in enumerate(markers):
-        next_marker = markers[index + 1] if index + 1 < len(markers) else None
+    for marker in markers:
+        next_marker = next_marker_after(marker, crop_boundary_markers)
         y_min = max(0, marker.y_min - SOURCE_CROP_VERTICAL_PADDING)
         relevant_lines = [
             line

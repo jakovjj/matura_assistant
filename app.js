@@ -35,7 +35,6 @@ const temporarilyUnavailableSubjects = new Set([
   "Mađarski jezik",
   "Mađarski jezik i književnost",
   "Njemački jezik",
-  "Politika i gospodarstvo",
   "Psihologija",
   "Sociologija",
   "Srpski jezik",
@@ -283,7 +282,8 @@ function englishEssayIdForTerm(exam, term) {
 }
 
 function croatianWritingIdForTerm(exam, term) {
-  return `hrvatski-${exam.year}-${slugPart(term)}-${exam.kind}`;
+  const level = exam.level ? `-${exam.level.toLocaleLowerCase("hr")}` : "";
+  return `hrvatski${level}-${exam.year}-${slugPart(term)}-${exam.kind}`;
 }
 
 function physicsChoiceIdForTerm(exam, term) {
@@ -1191,6 +1191,7 @@ function linkedPart(exam, part, practiceExam, urlBuilder) {
     ...part,
     available: true,
     durationMinutes: practiceExam.durationMinutes ?? part.durationMinutes ?? null,
+    examId: practiceExam.id,
     href: urlBuilder(practiceExam),
     simulationHref: urlBuilder(practiceExam, true),
   };
@@ -1250,14 +1251,22 @@ function croatianPracticeParts(exam) {
     ];
   }
 
+  const essayPart = {
+    id: "skolski-esej",
+    label: "Školski esej",
+    description: "Pisani dio ispita.",
+    durationMinutes: 160,
+    usesAiChecking: true,
+  };
+
   return [
     corePart,
-    unavailablePart(exam, {
-      id: "skolski-esej",
-      label: "Školski esej",
-      description: "Pisani dio ispita.",
-      durationMinutes: 160,
-    }),
+    linkedPart(
+      exam,
+      essayPart,
+      croatianWritingExamForArchive(exam, "skolski-esej"),
+      croatianWritingUrl,
+    ),
   ];
 }
 
@@ -1956,24 +1965,6 @@ async function loadServerSimulationAttempts() {
   }
 }
 
-function interactiveExamIds(exam) {
-  return new Set(
-    [
-      readingExamForArchive(exam)?.id,
-      listeningExamForArchive(exam)?.id,
-      essayExamForArchive(exam)?.id,
-      croatianWritingExamForArchive(exam, "sazetak")?.id,
-      croatianWritingExamForArchive(exam, "skolski-esej")?.id,
-      physicsChoiceExamForArchive(exam)?.id,
-      mathChoiceExamForArchive(exam)?.id,
-      croatianChoiceExamForArchive(exam)?.id,
-      historyChoiceExamForArchive(exam)?.id,
-      geographyChoiceExamForArchive(exam)?.id,
-      abcdChoiceExamForArchive(exam)?.id,
-    ].filter(Boolean),
-  );
-}
-
 function simulationAttemptPercentage(attempt) {
   if (!attempt || attempt.checkingSupported === false) return null;
 
@@ -1987,9 +1978,8 @@ function simulationAttemptPercentage(attempt) {
   return Math.round((score / maxScore) * 100);
 }
 
-function simulationAttemptMatchesExam(attempt, exam, examIds) {
+function simulationAttemptMatchesArchiveExam(attempt, exam) {
   if (!attempt || typeof attempt !== "object") return false;
-  if (examIds.has(attempt.examId)) return true;
 
   const attemptYear = numberOrNull(attempt.year);
   const attemptLevel = String(attempt.level || "");
@@ -2002,12 +1992,31 @@ function simulationAttemptMatchesExam(attempt, exam, examIds) {
   );
 }
 
-function bestSimulationPercentage(exam, attempts) {
-  const examIds = interactiveExamIds(exam);
+function normalizedSimulationPartLabel(value) {
+  return String(value || "")
+    .trim()
+    .toLocaleLowerCase("hr-HR");
+}
+
+function simulationAttemptMatchesPart(attempt, exam, part) {
+  if (!attempt || typeof attempt !== "object") return false;
+  if (part.examId && attempt.examId === part.examId) return true;
+
+  const attemptPart = normalizedSimulationPartLabel(attempt.part);
+  const partLabel = normalizedSimulationPartLabel(part.label);
+  return (
+    attemptPart
+    && partLabel
+    && attemptPart === partLabel
+    && simulationAttemptMatchesArchiveExam(attempt, exam)
+  );
+}
+
+function bestSimulationPercentageForPart(exam, part, attempts) {
   let best = null;
 
   for (const attempt of attempts) {
-    if (!simulationAttemptMatchesExam(attempt, exam, examIds)) continue;
+    if (!simulationAttemptMatchesPart(attempt, exam, part)) continue;
 
     const percentage = simulationAttemptPercentage(attempt);
     if (percentage === null) continue;
@@ -2015,6 +2024,17 @@ function bestSimulationPercentage(exam, attempts) {
   }
 
   return best === null ? null : Math.max(0, Math.min(100, Math.round(best)));
+}
+
+function bestSimulationPercentages(exam, attempts) {
+  return interactiveParts(exam).map((part) => {
+    const percentage = bestSimulationPercentageForPart(exam, part, attempts);
+    return {
+      hasResult: percentage !== null,
+      label: part.label,
+      percentage: percentage ?? 0,
+    };
+  });
 }
 
 function percentageTone(percentage) {
@@ -2025,17 +2045,35 @@ function percentageTone(percentage) {
   return "poor";
 }
 
-function renderBestSimulationPercentage(percentage) {
-  if (percentage === null) {
-    return `<span class="subject-best-score subject-best-score--empty" aria-label="Nema rezultata">/</span>`;
-  }
+function renderBestSimulationPercentageCircle(result) {
+  const percentage = Math.max(0, Math.min(100, Math.round(numberOrNull(result.percentage) ?? 0)));
+  const tone = result.hasResult ? percentageTone(percentage) : "empty";
+  return `<span class="subject-best-score subject-best-score--${tone}" title="${escapeHtml(
+    result.label,
+  )}: ${percentage}%">${escapeHtml(`${percentage}%`)}</span>`;
+}
 
-  const tone = percentageTone(percentage);
-  return `
-    <span class="subject-best-score subject-best-score--${tone}">
-      ${escapeHtml(`${percentage}%`)}
-    </span>
-  `;
+function renderBestSimulationPercentages(results) {
+  const safeResults = results.length
+    ? results
+    : [{ label: "Ispit", percentage: 0 }];
+  const label = safeResults
+    .map((result) => {
+      const percentage = Math.max(0, Math.min(100, Math.round(numberOrNull(result.percentage) ?? 0)));
+      return `${result.label}: ${percentage}%`;
+    })
+    .join(", ");
+
+  const content = safeResults
+    .map(
+      (result, index) =>
+        `${index ? '<span class="subject-best-scores__separator" aria-hidden="true">/</span>' : ""}${renderBestSimulationPercentageCircle(result)}`,
+    )
+    .join("");
+
+  return `<span class="subject-best-scores" aria-label="${escapeHtml(
+    `Najbolji rezultati - ${label}`,
+  )}">${content}</span>`;
 }
 
 function progressMeter(percent, label) {
@@ -2506,7 +2544,7 @@ function renderPracticeYearBlock(year, yearExams, simulationAttempts) {
 
 function renderSubjectExamRow(exam, hasLevels, simulationAttempts) {
   const progress = examProgress(exam);
-  const bestPercentage = bestSimulationPercentage(exam, simulationAttempts);
+  const bestPercentages = bestSimulationPercentages(exam, simulationAttempts);
 
   return `
     <tr>
@@ -2523,7 +2561,7 @@ function renderSubjectExamRow(exam, hasLevels, simulationAttempts) {
         </div>
       </td>
       <td class="subject-exam-table__best-cell">
-        ${renderBestSimulationPercentage(bestPercentage)}
+        ${renderBestSimulationPercentages(bestPercentages)}
       </td>
       <td>
         <div class="exam-actions">

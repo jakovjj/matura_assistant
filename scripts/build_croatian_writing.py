@@ -42,9 +42,41 @@ class WritingPart:
     max_score: int
     word_range: dict[str, int | None]
     criteria: list[dict[str, Any]]
+    score_multiplier: int = 1
+    source_format: str = "new"
 
 
-WRITING_PARTS = (
+SCHOOL_ESSAY_CRITERIA = [
+    {"id": "centralThesis", "label": "Središnja tvrdnja", "maxScore": 3},
+    {"id": "argumentation", "label": "Argumentacija", "maxScore": 3},
+    {"id": "coherence", "label": "Povezanost teksta", "maxScore": 3},
+    {"id": "vocabulary", "label": "Upotreba rječnika", "maxScore": 3},
+    {
+        "id": "languageAccuracy",
+        "label": "Pravopisna i gramatička točnost",
+        "maxScore": 3,
+    },
+]
+
+OLD_SCHOOL_ESSAY_CRITERIA = [
+    {
+        "id": "contentArgumentation",
+        "label": "A: Sadržaj i argumentacija",
+        "maxScore": 20,
+    },
+    {
+        "id": "composition",
+        "label": "B: Struktura i povezanost",
+        "maxScore": 6,
+    },
+    {
+        "id": "languageStyle",
+        "label": "C: Jezik i stil",
+        "maxScore": 14,
+    },
+]
+
+NEW_WRITING_PARTS = (
     WritingPart(
         kind="sazetak",
         label="Sažetak",
@@ -56,6 +88,7 @@ WRITING_PARTS = (
             {"id": "organizationStyle", "label": "Organizacija teksta i stil", "maxScore": 3},
             {"id": "languageAccuracy", "label": "Jezična točnost", "maxScore": 3},
         ],
+        score_multiplier=2,
     ),
     WritingPart(
         kind="skolski-esej",
@@ -63,17 +96,8 @@ WRITING_PARTS = (
         duration_minutes=160,
         max_score=30,
         word_range={"min": 440, "max": None, "acceptedMin": 396, "acceptedMax": None},
-        criteria=[
-            {"id": "centralThesis", "label": "Središnja tvrdnja", "maxScore": 3},
-            {"id": "argumentation", "label": "Argumentacija", "maxScore": 3},
-            {"id": "coherence", "label": "Povezanost teksta", "maxScore": 3},
-            {"id": "vocabulary", "label": "Upotreba rječnika", "maxScore": 3},
-            {
-                "id": "languageAccuracy",
-                "label": "Pravopisna i gramatička točnost",
-                "maxScore": 3,
-            },
-        ],
+        criteria=SCHOOL_ESSAY_CRITERIA,
+        score_multiplier=2,
     ),
 )
 
@@ -96,7 +120,8 @@ def normalize_term(term: str) -> str:
 
 
 def writing_id(exam: dict[str, Any], part: WritingPart) -> str:
-    return f"hrvatski-{exam['year']}-{slugify(normalize_term(exam['term']))}-{part.kind}"
+    level = f"-{slugify(exam['level'])}" if exam.get("level") else ""
+    return f"hrvatski{level}-{exam['year']}-{slugify(normalize_term(exam['term']))}-{part.kind}"
 
 
 def local_archive_path(url: str) -> Path:
@@ -179,6 +204,47 @@ def find_essay_task(names: list[str]) -> str:
     return candidates[0]
 
 
+def find_old_essay_booklet(names: list[str]) -> str | None:
+    candidates = [
+        name
+        for name in names
+        if name.casefold().endswith(".pdf")
+        and re.search(r"\bik[-_ ]*2\b|ispitna knjizica 2", normalized_name(name))
+    ]
+    if not candidates:
+        return None
+    if len(candidates) != 1:
+        raise ValueError(f"Expected one old Croatian essay booklet, found {candidates}")
+    return candidates[0]
+
+
+def find_old_essay_task(names: list[str]) -> str | None:
+    direct_candidates = [
+        name
+        for name in names
+        if name.casefold().endswith(".pdf")
+        and re.search(r"esejski.?zadatak", normalized_name(name))
+    ]
+    if direct_candidates:
+        if len(direct_candidates) != 1:
+            raise ValueError(f"Expected one old Croatian essay task, found {direct_candidates}")
+        return direct_candidates[0]
+
+    essay_candidates = [
+        name
+        for name in names
+        if name.casefold().endswith(".pdf")
+        and re.search(r"\bhrv\s*[ab]\s*esej\b", normalized_name(name))
+        and not re.search(r"list|ik[-_ ]*2|koncept|klju|odgovor", normalized_name(name))
+    ]
+    if essay_candidates:
+        if len(essay_candidates) != 1:
+            raise ValueError(f"Expected one old Croatian essay fallback task, found {essay_candidates}")
+        return essay_candidates[0]
+
+    return find_old_essay_booklet(names)
+
+
 def summary_task_pages(contents: bytes) -> list[int]:
     page_count = pdf_page_count(contents)
     page_texts = {
@@ -209,12 +275,58 @@ def summary_task_pages(contents: bytes) -> list[int]:
     return list(range(start_page, end_page + 1))
 
 
+def old_essay_task_pages(contents: bytes) -> list[int]:
+    page_count = pdf_page_count(contents)
+    page_texts = {
+        page: pdf_text(contents, page, page)
+        for page in range(1, page_count + 1)
+    }
+    if page_count <= 3:
+        return list(range(1, page_count + 1))
+
+    start_page = next(
+        (
+            page
+            for page, text in page_texts.items()
+            if re.search(r"Pozorno pročitajte (?:sljedeć[ei]|naveden[ei])", text)
+            or "ZADATAK ZA PISANJE ŠKOLSKOGA ESEJA" in text
+        ),
+        None,
+    )
+    if start_page is None:
+        start_page = next(
+            (
+                page
+                for page, text in page_texts.items()
+                if re.search(r"\b(?:Prvi|Polazni) tekst\b", text)
+            ),
+            None,
+        )
+    if start_page is None:
+        raise ValueError("Could not locate the old Croatian essay task")
+
+    end_page = page_count
+    for page in range(start_page + 1, page_count + 1):
+        normalized = re.sub(r"\s+", " ", page_texts[page]).strip()
+        if (
+            "LISTOVI ZA PISANJE" in normalized
+            or "List za školski esej" in normalized
+            or "ca ni ra st a zn ra P" in normalized
+        ):
+            end_page = page - 1
+            break
+
+    return list(range(start_page, end_page + 1))
+
+
 def clean_task_text(text: str, part: WritingPart) -> str:
     if part.kind == "sazetak":
         start = text.find("Pročitajte polazni tekst.")
         end = text.find("LISTOVI ZA PISANJE", start)
-        if start < 0 or end < 0:
+        if start < 0:
             raise ValueError("Could not extract the Croatian summary task text")
+        if end < 0:
+            end = len(text)
         text = text[start:end]
 
     skipped_lines = {
@@ -297,19 +409,76 @@ def render_source_pages(paper_path: Path, identifier: str, pages: list[int]) -> 
     return source_images
 
 
+def old_essay_word_range(exam: dict[str, Any]) -> dict[str, int | None]:
+    level = exam.get("level")
+    if level == "A":
+        minimum = 400
+        maximum = 600 if exam["year"] <= 2015 else None
+    elif level == "B":
+        minimum = 350
+        maximum = 500 if exam["year"] <= 2015 else None
+    else:
+        raise ValueError(f"Old Croatian essay requires A/B level: {exam}")
+
+    return {
+        "min": minimum,
+        "max": maximum,
+        "acceptedMin": minimum,
+        "acceptedMax": maximum,
+    }
+
+
+def old_school_essay_part(exam: dict[str, Any]) -> WritingPart:
+    return WritingPart(
+        kind="skolski-esej",
+        label="Školski esej",
+        duration_minutes=160,
+        max_score=40,
+        word_range=old_essay_word_range(exam),
+        criteria=OLD_SCHOOL_ESSAY_CRITERIA,
+        source_format="old",
+    )
+
+
+def writing_parts_for_exam(exam: dict[str, Any]) -> tuple[WritingPart, ...]:
+    if exam["year"] >= 2023 and not exam.get("level"):
+        return NEW_WRITING_PARTS
+    if exam["year"] < 2023 and exam.get("level") in {"A", "B"}:
+        return (old_school_essay_part(exam),)
+    return ()
+
+
+def source_name_for_part(
+    names: list[str],
+    part: WritingPart,
+) -> str | None:
+    if part.kind == "sazetak":
+        return find_summary_paper(names)
+    if part.source_format == "old":
+        return find_old_essay_task(names)
+    return find_essay_task(names)
+
+
+def task_pages(contents: bytes, part: WritingPart) -> list[int]:
+    if part.kind == "sazetak":
+        return summary_task_pages(contents)
+    if part.source_format == "old":
+        return old_essay_task_pages(contents)
+    return list(range(1, pdf_page_count(contents) + 1))
+
+
 def build_part(
     exam: dict[str, Any],
     archive: zipfile.ZipFile,
     names: list[str],
     part: WritingPart,
-) -> dict[str, Any]:
-    source_name = find_summary_paper(names) if part.kind == "sazetak" else find_essay_task(names)
+) -> dict[str, Any] | None:
+    source_name = source_name_for_part(names, part)
+    if source_name is None:
+        return None
+
     contents = archive.read(source_name)
-    pages = (
-        summary_task_pages(contents)
-        if part.kind == "sazetak"
-        else list(range(1, pdf_page_count(contents) + 1))
-    )
+    pages = task_pages(contents, part)
     identifier = writing_id(exam, part)
     destination = ASSET_ROOT / identifier
     destination.mkdir(parents=True, exist_ok=True)
@@ -330,8 +499,9 @@ def build_part(
         "durationMinutes": part.duration_minutes,
         "wordRange": part.word_range,
         "maxScore": part.max_score,
+        "scoreMultiplier": part.score_multiplier,
         "criteria": part.criteria,
-        "taskText": clean_task_text(pdf_text(contents), part),
+        "taskText": clean_task_text(pdf_text(contents, pages[0], pages[-1]), part),
         "sourceImages": render_source_pages(paper_path, identifier, pages),
     }
 
@@ -340,20 +510,23 @@ def build_exam(exam: dict[str, Any]) -> list[dict[str, Any]]:
     archive_path = local_archive_path(exam["url"])
     with zipfile.ZipFile(archive_path) as archive:
         names = archive.namelist()
-        return [build_part(exam, archive, names, part) for part in WRITING_PARTS]
+        parts = []
+        for part in writing_parts_for_exam(exam):
+            built_part = build_part(exam, archive, names, part)
+            if built_part is not None:
+                parts.append(built_part)
+        return parts
 
 
 def main() -> None:
     archive_index = load_archive_index()
-    # The unified one-level format with a separate summary starts in 2023.
-    # Older A/B school essays use a different scoring rubric.
     croatian_exams = [
         exam
         for exam in archive_index["exams"]
-        if exam["subject"] == SUBJECT and exam["year"] >= 2023 and not exam.get("level")
+        if exam["subject"] == SUBJECT and writing_parts_for_exam(exam)
     ]
     croatian_exams.sort(
-        key=lambda item: (item["year"], normalize_term(item["term"])),
+        key=lambda item: (item["year"], normalize_term(item["term"]), item.get("level") or ""),
         reverse=True,
     )
 

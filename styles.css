@@ -1404,6 +1404,21 @@ h2 {
   text-align: center;
 }
 
+.subject-best-scores {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.subject-best-scores__separator {
+  color: #8a93a3;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .exam-progress {
   min-width: 0;
 }
@@ -1433,17 +1448,17 @@ h2 {
 
 .subject-best-score {
   display: inline-grid;
-  min-width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   place-items: center;
-  padding: 0 5px;
+  padding: 0;
   background: var(--white);
   border: 2px solid currentColor;
   border-radius: 999px;
   box-shadow:
     inset 0 0 0 2px rgba(255, 255, 255, 0.78),
     0 0 0 3px rgba(0, 29, 77, 0.05);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 800;
   line-height: 1;
 }
@@ -1469,14 +1484,8 @@ h2 {
 }
 
 .subject-best-score--empty {
-  display: inline;
-  min-width: 0;
-  height: auto;
-  padding: 0;
   color: #8a93a3;
-  background: transparent;
-  border: 0;
-  box-shadow: none;
+  background: #f8fafc;
   font-weight: 700;
 }
 
@@ -3133,7 +3142,8 @@ body.solver-page {
 }
 
 .task-button strong,
-.task-button small {
+.task-button small,
+.task-button__grading {
   display: inline;
 }
 
@@ -3145,6 +3155,13 @@ body.solver-page {
   color: var(--navy);
   font-size: inherit;
   font-weight: 700;
+}
+
+.task-button__grading {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 400;
 }
 
 .task-type-pager {

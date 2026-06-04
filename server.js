@@ -141,6 +141,35 @@ const croatianEssayScoreSchema = {
     "comment",
   ],
 };
+function croatianWritingScoreSchemaForExam(writingExam) {
+  const criteria = Array.isArray(writingExam?.criteria) ? writingExam.criteria : [];
+  const criterionProperties = Object.fromEntries(
+    criteria
+      .map((criterion) => String(criterion?.id || "").trim())
+      .filter(Boolean)
+      .map((id) => [id, { type: "integer" }]),
+  );
+  const criterionIds = Object.keys(criterionProperties);
+
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      ...criterionProperties,
+      wordCount: { type: "integer" },
+      invalidLength: { type: "boolean" },
+      unfulfilledTask: { type: "boolean" },
+      comment: { type: "string" },
+    },
+    required: [
+      ...criterionIds,
+      "wordCount",
+      "invalidLength",
+      "unfulfilledTask",
+      "comment",
+    ],
+  };
+}
 const historyGradeSchema = {
   type: "object",
   additionalProperties: false,
@@ -1498,6 +1527,9 @@ async function gradeEnglishEssayWithOpenAI({ apiKey, essayExam, essayText, image
 
 async function gradeCroatianWritingWithOpenAI({ apiKey, writingExam, writingText, signal }) {
   const isSummary = writingExam.kind === "sazetak";
+  const responseSchema = isSummary
+    ? croatianSummaryScoreSchema
+    : croatianWritingScoreSchemaForExam(writingExam);
   const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
     body: JSON.stringify({
       model: config.essayModel,
@@ -1529,7 +1561,7 @@ async function gradeCroatianWritingWithOpenAI({ apiKey, writingExam, writingText
           type: "json_schema",
           name: isSummary ? "croatian_summary_score" : "croatian_school_essay_score",
           strict: true,
-          schema: isSummary ? croatianSummaryScoreSchema : croatianEssayScoreSchema,
+          schema: responseSchema,
         },
       },
       temperature: 0,
@@ -1555,12 +1587,55 @@ async function gradeCroatianWritingWithOpenAI({ apiKey, writingExam, writingText
 
 function buildCroatianWritingSubmissionPrompt(writingExam, writingText) {
   return `
+Rubrika ocjenjivanja:
+${croatianWritingRubricInstructions(writingExam)}
+
 Službeni zadatak:
 ${writingExam.taskText}
 
 Tekst pristupnika:
 ${writingText}
   `.trim();
+}
+
+function croatianWritingRubricInstructions(writingExam) {
+  const criteria = Array.isArray(writingExam.criteria) ? writingExam.criteria : [];
+  const criterionLines = criteria.map((criterion) => {
+    const id = String(criterion?.id || "").trim();
+    const label = String(criterion?.label || id).trim();
+    const maxScore = numberOrNull(criterion?.maxScore) ?? 3;
+    const description = String(criterion?.description || "").trim();
+    return `- ${id}: ${label}, 0-${maxScore} bodova.${description ? ` ${description}` : ""}`;
+  });
+  const range = croatianWritingWordRangeInstructions(writingExam.wordRange);
+  const scoreMultiplier = numberOrNull(writingExam.scoreMultiplier) ?? 1;
+
+  return [
+    `Vrsta zadatka: ${writingExam.partLabel || "Pisani zadatak"}.`,
+    range,
+    `Maksimalan rezultat: ${numberOrNull(writingExam.maxScore) ?? "nije naveden"} bodova.`,
+    scoreMultiplier === 1
+      ? "Ukupni rezultat računa se kao zbroj bodova po sastavnicama."
+      : `Ukupni rezultat računa se kao zbroj bodova po sastavnicama pomnožen s ${scoreMultiplier}.`,
+    "Sastavnice:",
+    ...criterionLines,
+  ].join("\n");
+}
+
+function croatianWritingWordRangeInstructions(wordRange) {
+  const minimum = numberOrNull(wordRange?.min);
+  const maximum = numberOrNull(wordRange?.max);
+  const acceptedMin = numberOrNull(wordRange?.acceptedMin);
+  const acceptedMax = numberOrNull(wordRange?.acceptedMax);
+  const expected =
+    maximum === null
+      ? `očekuje se najmanje ${minimum ?? "nepoznato"} riječi`
+      : `očekuje se ${minimum ?? "nepoznato"}-${maximum} riječi`;
+  const accepted =
+    acceptedMax === null
+      ? `dopušteno za vrednovanje: najmanje ${acceptedMin ?? minimum ?? "nepoznato"} riječi`
+      : `dopušteno za vrednovanje: ${acceptedMin ?? minimum ?? "nepoznato"}-${acceptedMax} riječi`;
+  return `Raspon riječi: ${expected}; ${accepted}.`;
 }
 
 async function transcribeEnglishEssayImageWithOpenAI({ apiKey, image }) {
@@ -1791,7 +1866,10 @@ function normalizeCroatianWritingGrade(rawGrade, writingExam, writingText) {
     (Number.isFinite(acceptedMin) && wordCount < acceptedMin) ||
     (Number.isFinite(acceptedMax) && wordCount > acceptedMax);
   const scores = Object.fromEntries(
-    criteria.map((criterion) => [criterion.id, clampCroatianWritingCriterion(rawGrade[criterion.id])]),
+    criteria.map((criterion) => [
+      criterion.id,
+      clampCroatianWritingCriterion(rawGrade[criterion.id], criterion.maxScore),
+    ]),
   );
   const unfulfilledTask = rawGrade.unfulfilledTask === true || scores[criteria[0].id] === 0;
   if (invalidLength || unfulfilledTask) {
@@ -1802,14 +1880,17 @@ function normalizeCroatianWritingGrade(rawGrade, writingExam, writingText) {
     id: criterion.id,
     label: String(criterion.label || criterion.id),
     score: scores[criterion.id],
-    maxScore: 3,
+    maxScore: numberOrNull(criterion.maxScore) ?? 3,
   }));
   const rawTotal = normalizedCriteria.reduce((total, criterion) => total + criterion.score, 0);
+  const scoreMultiplier = numberOrNull(writingExam.scoreMultiplier) ?? 1;
+  const maximum = numberOrNull(writingExam.maxScore);
+  const total = rawTotal * scoreMultiplier;
 
   return {
     criteria: normalizedCriteria,
     rawTotal,
-    total: rawTotal * 2,
+    total: maximum === null ? total : Math.min(maximum, total),
     wordCount,
     invalidLength,
     unfulfilledTask,
@@ -1817,10 +1898,11 @@ function normalizeCroatianWritingGrade(rawGrade, writingExam, writingText) {
   };
 }
 
-function clampCroatianWritingCriterion(value) {
+function clampCroatianWritingCriterion(value, maximum = 3) {
   const integer = Math.round(Number(value));
+  const maxScore = numberOrNull(maximum) ?? 3;
   if (!Number.isFinite(integer)) return 0;
-  return Math.max(0, Math.min(3, integer));
+  return Math.max(0, Math.min(maxScore, integer));
 }
 
 function countTextWords(value) {

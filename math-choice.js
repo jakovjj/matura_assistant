@@ -484,6 +484,7 @@ function renderTaskTypeNavigation() {
   const choiceTotal = choiceQuestions().length;
   const openTotal = openQuestions().length;
   const openScored = openScoredCount();
+  const manualGradingNote = `<em class="task-button__grading">(Ručno ispravljanje)</em>`;
   const openNavigation = openTotal
     ? `<a
         class="task-button${activeTaskTypeId === taskTypes.open ? " task-button--active" : ""}"
@@ -493,6 +494,7 @@ function renderTaskTypeNavigation() {
       >
         <strong>Otvoreni zadatci</strong>
         <small>${openScored}/${openTotal}</small>
+        ${manualGradingNote}
       </a>`
     : "";
 

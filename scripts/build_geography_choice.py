@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
@@ -41,6 +42,7 @@ SOURCE_BLANK_TRIM_PADDING = 14
 SOURCE_LINE_ONLY_MIN_GAP = 72
 SOURCE_LINE_ONLY_PIXEL_THRESHOLD = 214
 SOURCE_BLANK_PIXEL_THRESHOLD = 236
+SOURCE_TRAILING_RULE_MIN_COUNT = 2
 
 TERM_ALIASES = {
     "prvi rok": "ljetni rok",
@@ -91,11 +93,23 @@ SIMPLE_ANSWER_PAIR_RE = re.compile(
     r"(?<![\w.])(?P<question>\d{1,3}(?:[\.,]\d{1,2})?)\s*[\.)]?\s+"
     r"(?P<answer>[A-Ea-e])(?=\s|$)"
 )
+TRAILING_DECIMAL_ANSWER_RE = re.compile(
+    r"(?P<question>\d{1,3}\.\d{1,2})\.\s+(?P<answer>[A-Ea-e])\s*$"
+)
 MATCHING_ASSIGNMENT_RE = re.compile(
     r"(?<!\d)(?P<item>\d{1,2})\s*[.\-:]?\s*(?P<answer>[A-Ea-e])(?=\s*[,;/]|\s*$)"
 )
 MODEL_ANSWER_HEADING_RE = re.compile(
     r"(?im)^\s*MODEL[^\n]*TO[ČC]N[^\n]*ODGOVORA:?\s*$"
+)
+TWO_COLUMN_CLOSED_ROW_RE = re.compile(
+    r"^\s*(?P<leftQuestion>\d{1,3}(?:\.\d{1,2})?)\.\s+"
+    r"(?P<leftAnswer>.*?)\s{2,}"
+    r"(?P<rightQuestion>\d{1,3}\.\d{1,2})\.\s+"
+    r"(?P<rightAnswer>[A-Ea-e])\s*$"
+)
+PDF_TRAILER_ID_RE = re.compile(
+    rb"/ID\s*\[\s*\((?:\\.|[^\\)])*\)\s*\((?:\\.|[^\\)])*\)\s*\]"
 )
 
 SKIPPED_LINE_PATTERNS = (
@@ -498,7 +512,22 @@ def combine_pdf_contents(parts: list[bytes]) -> bytes:
         except subprocess.CalledProcessError as exc:
             message = exc.stderr.decode("utf-8", errors="replace")
             raise RuntimeError(f"pdfunite failed: {message}") from exc
-        return output_path.read_bytes()
+        return canonicalize_pdf_id(output_path.read_bytes(), parts)
+
+
+def canonicalize_pdf_id(contents: bytes, source_parts: list[bytes]) -> bytes:
+    matches = list(PDF_TRAILER_ID_RE.finditer(contents))
+    if not matches:
+        raise ValueError("Combined Geography PDF does not contain a trailer ID")
+
+    digest = hashlib.sha256()
+    for part in source_parts:
+        digest.update(len(part).to_bytes(8, byteorder="big"))
+        digest.update(part)
+    identifier = digest.hexdigest()[:32].encode("ascii")
+    replacement = b"/ID [<" + identifier + b"> <" + identifier + b">]"
+    match = matches[-1]
+    return contents[: match.start()] + replacement + contents[match.end() :]
 
 
 def parse_question_token(value: str) -> str:
@@ -606,6 +635,23 @@ def parse_key_entries(key_texts: list[str], sections: list[PaperSection]) -> lis
             current = None
 
         for raw_line in key_text.splitlines():
+            two_column_match = TWO_COLUMN_CLOSED_ROW_RE.match(raw_line)
+            if two_column_match:
+                flush()
+                for side in ("left", "right"):
+                    question = parse_question_token(two_column_match.group(f"{side}Question"))
+                    answer_text = clean_line(two_column_match.group(f"{side}Answer"))
+                    section = section_for_question(sections, question)
+                    if answer_text:
+                        entries.append(
+                            {
+                                "number": question,
+                                "answerText": answer_text,
+                                "taskId": section.task_id if section else None,
+                            }
+                        )
+                continue
+
             line = clean_line(raw_line)
             if not line:
                 continue
@@ -651,6 +697,16 @@ def parse_simple_answer_pairs(text: str) -> list[tuple[str, str]]:
     pairs: list[tuple[str, str]] = []
 
     for line in text.splitlines():
+        trailing_match = TRAILING_DECIMAL_ANSWER_RE.search(line)
+        if trailing_match:
+            pairs.append(
+                (
+                    parse_question_token(trailing_match.group("question")),
+                    trailing_match.group("answer").upper(),
+                )
+            )
+            continue
+
         match = SIMPLE_ANSWER_LINE_RE.match(line)
         if match:
             pairs.append(
@@ -713,7 +769,7 @@ def expand_matching_entries(
         section = section_for_question(sections, entry["number"])
         task_id = entry.get("taskId") or (section.task_id if section else None)
         assignments = list(MATCHING_ASSIGNMENT_RE.finditer(entry["answerText"]))
-        if task_id == "povezivanje" and "." not in entry["number"] and len(assignments) >= 2:
+        if "." not in entry["number"] and len(assignments) >= 2:
             for assignment in assignments:
                 expanded.append(
                     {
@@ -833,6 +889,8 @@ def build_tasks(entries: list[dict[str, Any]], paper_text: str, sections: list[P
         answer = closed_answer(answer_text)
 
         if answer:
+            if task_id == "otvoreni-zadaci" and "." in question:
+                task_id = "povezivanje"
             question_item = {"number": question}
             if task_id in {"visestruke-kombinacije", "povezivanje"} or answer == "E":
                 question_item["options"] = ["A", "B", "C", "D", "E"]
@@ -985,6 +1043,43 @@ def region_is_blank_or_rules_only(
     )
 
 
+def trim_trailing_answer_rule_lines(
+    visible_lines: list[PdfLine],
+    y_min: int,
+    y_max: int,
+    scale_y: float,
+) -> tuple[int, int]:
+    trailing_rules: list[PdfLine] = []
+    for line in reversed(visible_lines):
+        if is_answer_rule_text(line):
+            trailing_rules.append(line)
+            continue
+        break
+
+    if len(trailing_rules) < SOURCE_TRAILING_RULE_MIN_COUNT:
+        return y_max, y_min + 48
+
+    first_rule = min(trailing_rules, key=lambda line: line.y_min)
+    content_lines = [
+        line
+        for line in visible_lines
+        if not is_answer_rule_text(line)
+        and line.y_max <= first_rule.y_min
+    ]
+    if not content_lines:
+        return y_max, y_min + 48
+
+    content_bottom = max(line.y_max for line in content_lines)
+    if first_rule.y_min - content_bottom < SOURCE_CROP_VERTICAL_PADDING:
+        return y_max, y_min + 48
+
+    candidate_y_max = min(
+        y_max,
+        math.ceil((content_bottom + SOURCE_BLANK_TRIM_PADDING) * scale_y),
+    )
+    return candidate_y_max, max(y_min + 48, candidate_y_max)
+
+
 def refine_geography_crop_box(
     image: Image.Image,
     crop: QuestionCrop,
@@ -1036,6 +1131,16 @@ def refine_geography_crop_box(
             ):
                 minimum_y_max = max(y_min + 48, candidate_y_max)
                 refined_y_max = minimum_y_max
+
+    trailing_rule_y_max, trailing_rule_minimum = trim_trailing_answer_rule_lines(
+        visible_lines,
+        y_min,
+        refined_y_max,
+        scale_y,
+    )
+    if trailing_rule_y_max < refined_y_max:
+        refined_y_max = trailing_rule_y_max
+        minimum_y_max = max(minimum_y_max, trailing_rule_minimum)
 
     _, _, _, refined_y_max = trim_crop_bottom_whitespace(
         image,

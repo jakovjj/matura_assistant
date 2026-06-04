@@ -69,7 +69,8 @@ function formatTerm(term) {
 }
 
 function essayExamIdForTerm(exam, term) {
-  return `hrvatski-${exam.year}-${slugPart(term)}-${exam.kind}`;
+  const level = exam.level ? `-${exam.level.toLocaleLowerCase("hr")}` : "";
+  return `hrvatski${level}-${exam.year}-${slugPart(term)}-${exam.kind}`;
 }
 
 function essayStorageKeyForId(id) {
@@ -629,14 +630,20 @@ function essayResultComment() {
 
 function resultDescription() {
   if (gradingResult?.invalidLength) {
-    return solverExam.kind === "sazetak"
-      ? "Sažetak se prema službenim pravilima ne vrednuje ako ima manje od 180 ili više od 275 riječi."
-      : "Školski esej se prema službenim pravilima ne vrednuje ako ima manje od 396 riječi.";
+    return `${writingName()} se prema službenim pravilima ne vrednuje ako broj riječi nije u dopuštenom rasponu: ${acceptedWordRangeText()}.`;
   }
   if (gradingResult?.unfulfilledTask) {
     return "Tekst se prema službenim pravilima ne vrednuje jer zadatak nije ispunjen.";
   }
   return "Rezultat je AI procjena prema službenim kriterijima. Zatvori prozor za nastavak uređivanja ili ponovno ocjenjivanje.";
+}
+
+function acceptedWordRangeText() {
+  const range = solverExam.wordRange || {};
+  const minimum = Number(range.acceptedMin ?? range.min);
+  const maximum = range.acceptedMax == null ? null : Number(range.acceptedMax);
+  if (!Number.isFinite(minimum)) return "nije definiran";
+  return Number.isFinite(maximum) ? `${minimum}-${maximum} riječi` : `najmanje ${minimum} riječi`;
 }
 
 function criterionScore(value, maximum = 3) {

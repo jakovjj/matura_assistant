@@ -552,6 +552,9 @@ function renderTaskTypeNavigation() {
   const navigationHtml = tasks()
     .map((task) => {
       const isActive = task.id === activeTaskTypeId;
+      const gradingNote = taskQuestions(task).some((question) => isOpenQuestion(question))
+        ? `<em class="task-button__grading">(AI ispravljanje)</em>`
+        : "";
       return `
         <a
           class="task-button${isActive ? " task-button--active" : ""}"
@@ -561,6 +564,7 @@ function renderTaskTypeNavigation() {
         >
           <strong>${escapeHtml(task.label)}</strong>
           <small>${taskAnsweredCount(task)}/${taskQuestions(task).length}</small>
+          ${gradingNote}
         </a>
       `;
     })
