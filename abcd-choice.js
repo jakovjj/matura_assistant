@@ -167,6 +167,12 @@ function geographyChoiceUrl(exam) {
   return `./geografija.html?${params.toString()}`;
 }
 
+function politicsChoiceUrl(exam) {
+  const params = new URLSearchParams({ exam: exam.id });
+  if (simulation.active) params.set("nacin", "simulacija");
+  return `./politika.html?${params.toString()}`;
+}
+
 function subjectUrl(exam = solverExam) {
   return `./?predmet=${encodeURIComponent(exam?.subject || "")}`;
 }
@@ -604,6 +610,11 @@ function startAbcdPage() {
 
   if (exam?.subject === "Povijest") {
     window.location.replace(historyChoiceUrl(exam));
+    return;
+  }
+
+  if (exam?.subject === "Politika i gospodarstvo") {
+    window.location.replace(politicsChoiceUrl(exam));
     return;
   }
 

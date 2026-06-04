@@ -4295,6 +4295,13 @@ body.solver-page {
   border-color: var(--blue-dark);
 }
 
+.physics-open-solution__toggle:disabled {
+  color: var(--muted);
+  background: var(--soft);
+  border-color: var(--line-dark);
+  cursor: not-allowed;
+}
+
 .physics-open-solution__toggle:focus-visible {
   outline: 3px solid rgba(46, 93, 172, 0.35);
   outline-offset: 2px;

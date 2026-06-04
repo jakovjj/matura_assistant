@@ -1,0 +1,1177 @@
+const data = window.ASISTENT_ZA_MATURE_POLITICS_CHOICE;
+
+if (!data || !Array.isArray(data.exams)) {
+  throw new Error("Nedostaje generirani indeks interaktivnih zadataka iz Politike i gospodarstva.");
+}
+
+const app = document.querySelector("#politics-app");
+
+const termLabels = {
+  "ljetni rok": "Ljetni rok",
+  "jesenski rok": "Jesenski rok",
+};
+
+const termAliases = {
+  "prvi rok": "ljetni rok",
+  "drugi rok": "jesenski rok",
+  "ljetni rok": "ljetni rok",
+  "jesenski rok": "jesenski rok",
+};
+
+const legacyTermAliases = {
+  "ljetni rok": ["prvi rok"],
+  "jesenski rok": ["drugi rok"],
+};
+
+const taskTypeAliases = {
+  abcd: "visestruki-izbor",
+  "visestruki-izbor": "visestruki-izbor",
+  "alternativni-izbor": "alternativni-izbor",
+  dopunjavanje: "dopunjavanje",
+  "kratki-odgovor": "kratki-odgovor",
+  "produzeni-odgovor": "produzeni-odgovor",
+  "otvoreni-zadatci": "kratki-odgovor",
+};
+
+let solverExam;
+let questionByNumber = new Map();
+let closedResponses = {};
+let openScores = {};
+let activeTaskTypeId = "visestruki-izbor";
+let activeQuestionNumber;
+let checked = false;
+let quickSelectFrame;
+let simulationRecorded = false;
+const simulation = window.createExamSimulation({ onFinish: finishSimulation });
+const selfCheck = window.createTaskSelfCheck();
+
+function isChecked(question) {
+  return checked || selfCheck.has(question);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function icon(iconName, className) {
+  return `
+    <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+      <use href="./assets/lucide-icons.svg#${iconName}"></use>
+    </svg>
+  `;
+}
+
+function checkButtonLabel() {
+  if (simulation.active && !simulation.finished) return "Predaj simulaciju";
+  return checked ? "Sakrij rješenja" : "Provjeri rješenja";
+}
+
+function checkButtonIcon() {
+  return checked && !(simulation.active && !simulation.finished) ? "eye-off" : "circle-check";
+}
+
+function checkButtonClass() {
+  return checked && !(simulation.active && !simulation.finished)
+    ? "primary-button primary-button--muted"
+    : "primary-button";
+}
+
+function renderCheckButtonContent() {
+  return `
+    ${icon(checkButtonIcon(), "solver-sticky-footer__action-icon")}
+    ${checkButtonLabel()}
+  `;
+}
+
+function normalizeSearch(value) {
+  return String(value)
+    .toLocaleLowerCase("hr")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replaceAll("đ", "d");
+}
+
+function slugPart(value) {
+  return normalizeSearch(value)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function normalizeTerm(term) {
+  return termAliases[term] || term;
+}
+
+function formatTerm(term) {
+  return termLabels[normalizeTerm(term)] || term;
+}
+
+function politicsExamIdForTerm(exam, term) {
+  return `politika-i-gospodarstvo-${exam.year}-${slugPart(term)}`;
+}
+
+function politicsStorageKeyForId(id) {
+  return `asistent-za-mature:politics-choice:${id}`;
+}
+
+function politicsStorageKeys(exam) {
+  const ids = [
+    exam.id,
+    ...(legacyTermAliases[exam.term] || []).map((term) => politicsExamIdForTerm(exam, term)),
+  ];
+
+  return [...new Set(ids)].map(politicsStorageKeyForId);
+}
+
+function openScoreStorageKeys(exam) {
+  return politicsStorageKeys(exam).map((key) => `${key}:open-scores`);
+}
+
+function buildExamMap(items) {
+  const map = new Map();
+  for (const exam of items) {
+    map.set(exam.id, exam);
+    for (const legacyTerm of legacyTermAliases[exam.term] || []) {
+      map.set(politicsExamIdForTerm(exam, legacyTerm), exam);
+    }
+  }
+  return map;
+}
+
+const exams = data.exams.map((exam) => {
+  const term = normalizeTerm(exam.term);
+  return {
+    ...exam,
+    term,
+    id: politicsExamIdForTerm(exam, term),
+  };
+});
+const examsById = buildExamMap(exams);
+
+function selectedExamId() {
+  return new URLSearchParams(window.location.search).get("exam");
+}
+
+function sourceTasks(exam = solverExam) {
+  return exam?.tasks || [];
+}
+
+function taskQuestions(task) {
+  return (task?.questions || []).map((question) => String(question.number));
+}
+
+function allQuestions(exam = solverExam) {
+  return sourceTasks(exam).flatMap(taskQuestions);
+}
+
+function closedQuestionNumbers(exam = solverExam) {
+  return (exam?.questions || []).map(String);
+}
+
+function openQuestionNumbers(exam = solverExam) {
+  return (exam?.openQuestions || []).map(String);
+}
+
+function questionSortKey(question) {
+  const [whole, decimal = "0"] = String(question || "").split(".");
+  return [Number(whole) || 0, Number(decimal) || 0];
+}
+
+function taskForId(taskTypeId, exam = solverExam) {
+  return sourceTasks(exam).find((task) => task.id === taskTypeId) || sourceTasks(exam)[0];
+}
+
+function normalizeTaskTypeId(taskTypeId, exam = solverExam) {
+  const normalized = taskTypeAliases[taskTypeId] || taskTypeId || sourceTasks(exam)[0]?.id;
+  return taskForId(normalized, exam)?.id || sourceTasks(exam)[0]?.id || "visestruki-izbor";
+}
+
+function selectedTaskTypeId(exam) {
+  const params = new URLSearchParams(window.location.search);
+  return normalizeTaskTypeId(params.get("vrsta") || params.get("cjelina"), exam);
+}
+
+function questionsForTaskType(taskTypeId = activeTaskTypeId, exam = solverExam) {
+  return taskQuestions(taskForId(taskTypeId, exam));
+}
+
+function buildQuestionMap(exam) {
+  return new Map(
+    sourceTasks(exam).flatMap((task) =>
+      (task.questions || []).map((question) => [
+        String(question.number),
+        {
+          ...question,
+          taskId: task.id,
+          taskLabel: task.label,
+        },
+      ]),
+    ),
+  );
+}
+
+function examUrl(exam, taskTypeId = sourceTasks(exam)[0]?.id) {
+  const params = new URLSearchParams({ exam: exam.id });
+  const normalizedTaskTypeId = normalizeTaskTypeId(taskTypeId, exam);
+  if (normalizedTaskTypeId !== sourceTasks(exam)[0]?.id) {
+    params.set("vrsta", normalizedTaskTypeId);
+  }
+  if (simulation.active) params.set("nacin", "simulacija");
+  return `./politika.html?${params.toString()}`;
+}
+
+function politicsSubjectUrl() {
+  return "./?predmet=Politika%20i%20gospodarstvo";
+}
+
+function correctAnswers(question) {
+  const answer = solverExam.answers[question];
+  return Array.isArray(answer) ? answer : [answer].filter(Boolean);
+}
+
+function questionOptions(question) {
+  const configured = questionByNumber.get(String(question))?.options;
+  return Array.isArray(configured) && configured.length ? configured : ["A", "B", "C", "D"];
+}
+
+function isCorrectAnswer(question, answer) {
+  return correctAnswers(question).includes(answer);
+}
+
+function isOpenQuestion(question) {
+  const number = typeof question === "object" ? String(question.number) : String(question);
+  return questionByNumber.get(number)?.type === "open" || openQuestionNumbers().includes(number);
+}
+
+function maxPointsForOpenQuestion(question) {
+  const number = typeof question === "object" ? String(question.number) : String(question);
+  const configured = Number(
+    solverExam.openAnswers?.[number]?.maxPoints || questionByNumber.get(number)?.maxPoints,
+  );
+  return Number.isInteger(configured) && configured >= 0 ? configured : 1;
+}
+
+function loadClosedResponses(exam) {
+  const storedResponses = {};
+  try {
+    const knownClosed = new Set(closedQuestionNumbers(exam));
+    for (const key of politicsStorageKeys(exam).reverse()) {
+      const stored = JSON.parse(localStorage.getItem(key) || "{}");
+      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+        Object.assign(storedResponses, stored.closedResponses || stored);
+      }
+    }
+    return Object.fromEntries(
+      Object.entries(storedResponses).filter(([question, answer]) => {
+        if (!knownClosed.has(question) || typeof answer !== "string") return false;
+        return questionOptions(question).includes(answer);
+      }),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function loadOpenScores(exam) {
+  const storedScores = {};
+  try {
+    for (const key of openScoreStorageKeys(exam).reverse()) {
+      const stored = JSON.parse(localStorage.getItem(key) || "{}");
+      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+        Object.assign(storedScores, stored);
+      }
+    }
+  } catch {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(storedScores).filter(([question, score]) => {
+      if (!openQuestionNumbers(exam).includes(question)) return false;
+      const maximum = Number(exam.openAnswers?.[question]?.maxPoints || 1);
+      return Number.isInteger(score) && score >= 0 && score <= maximum;
+    }),
+  );
+}
+
+function saveClosedResponses() {
+  if (simulation.active) return;
+
+  try {
+    localStorage.setItem(politicsStorageKeyForId(solverExam.id), JSON.stringify(closedResponses));
+  } catch {
+    // Solving still works if storage is unavailable.
+  }
+}
+
+function saveOpenScores() {
+  if (simulation.active) return;
+
+  try {
+    localStorage.setItem(
+      `${politicsStorageKeyForId(solverExam.id)}:open-scores`,
+      JSON.stringify(openScores),
+    );
+  } catch {
+    // Solving still works if storage is unavailable.
+  }
+}
+
+function hasOpenScore(question) {
+  return Number.isInteger(openScores[String(question)]);
+}
+
+function answeredCount(exam = solverExam) {
+  const closed = closedQuestionNumbers(exam).filter((question) => closedResponses[question]?.trim()).length;
+  const open = openQuestionNumbers(exam).filter((question) => hasOpenScore(question)).length;
+  return closed + open;
+}
+
+function taskAnsweredCount(task) {
+  return taskQuestions(task).filter((question) =>
+    isOpenQuestion(question) ? hasOpenScore(question) : closedResponses[question]?.trim(),
+  ).length;
+}
+
+function maxScore() {
+  return (
+    closedQuestionNumbers().length +
+    openQuestionNumbers().reduce((sum, question) => sum + maxPointsForOpenQuestion(question), 0)
+  );
+}
+
+function openScore() {
+  return openQuestionNumbers().reduce((sum, question) => {
+    if (!hasOpenScore(question)) return sum;
+    const maximum = maxPointsForOpenQuestion(question);
+    return sum + Math.max(0, Math.min(maximum, Number(openScores[question]) || 0));
+  }, 0);
+}
+
+function closedScore(onlyResolved = false) {
+  const questions = onlyResolved
+    ? closedQuestionNumbers().filter((question) => isChecked(question))
+    : closedQuestionNumbers();
+  return questions.filter((question) => isCorrectAnswer(question, closedResponses[question])).length;
+}
+
+function totalScore() {
+  return closedScore() + openScore();
+}
+
+function resolvedScore() {
+  return closedScore(true) + openScore();
+}
+
+function resolvedMaximum() {
+  const closedMaximum = closedQuestionNumbers().filter((question) => isChecked(question)).length;
+  const openMaximum = (checked ? openQuestionNumbers() : openQuestionNumbers().filter(hasOpenScore))
+    .reduce((sum, question) => sum + maxPointsForOpenQuestion(question), 0);
+  return closedMaximum + openMaximum;
+}
+
+function scorePercentage() {
+  const maximum = maxScore();
+  return maximum ? Math.round((totalScore() / maximum) * 100) : 0;
+}
+
+function renderMissingExam() {
+  document.body.classList.remove("solver-page", "history-solver-page");
+  app.classList.remove("history-solver-active");
+  app.innerHTML = `
+    <div class="empty-state">
+      <h2>Ispit nije pronađen</h2>
+      <p>Odabrani ispit iz Politike i gospodarstva nije dostupan.</p>
+      <a class="start-link" href="${politicsSubjectUrl()}">Vrati se na Politiku i gospodarstvo</a>
+    </div>
+  `;
+}
+
+function renderSolver(exam, taskTypeId) {
+  document.body.classList.add("solver-page", "history-solver-page");
+  app.classList.add("history-solver-active");
+  solverExam = exam;
+  questionByNumber = buildQuestionMap(exam);
+  closedResponses = simulation.active ? {} : loadClosedResponses(exam);
+  openScores = simulation.active ? {} : loadOpenScores(exam);
+  activeTaskTypeId = normalizeTaskTypeId(taskTypeId, exam);
+  activeQuestionNumber = questionsForTaskType(activeTaskTypeId, exam)[0] || allQuestions(exam)[0];
+  checked = false;
+  simulationRecorded = false;
+  selfCheck.reset();
+
+  app.innerHTML = `
+    ${renderSolverHeader({
+      subject: "Politika i gospodarstvo",
+      exam,
+      backHref: politicsSubjectUrl(),
+      backLabel: "← Odaberi drugi ispit",
+      paperUrl: exam.paperUrl,
+      archiveUrl: exam.archiveUrl,
+      summaryHtml: `
+        ${simulation.renderTimer()}
+        <strong id="answer-progress"></strong>
+        <span id="score-summary"></span>
+      `,
+      navigationHtml: `
+        <nav
+          class="task-navigation solver-header__task-navigation"
+          data-task-type-navigation
+          aria-label="Vrste zadataka u ispitnom zaglavlju"
+        ></nav>
+      `,
+    })}
+
+    ${simulation.renderNotice()}
+
+    <div id="section-content"></div>
+
+    <footer class="solver-sticky-footer">
+      <div class="solver-sticky-footer__inner">
+        <nav
+          class="task-navigation"
+          data-task-type-navigation
+          aria-label="Vrste zadataka u ispitu"
+        ></nav>
+        <div class="solver-sticky-footer__controls">
+          <div class="solver-sticky-footer__status">
+            ${icon("list-checks", "solver-sticky-footer__status-icon")}
+            <div class="solver-sticky-footer__status-copy">
+              <strong id="footer-answer-progress"></strong>
+              <span id="footer-score-summary"></span>
+            </div>
+          </div>
+          <div class="solver-sticky-footer__actions">
+            <button class="${checkButtonClass()}" id="check-answers" type="button">
+              ${renderCheckButtonContent()}
+            </button>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <div class="exam-results-dialog" id="exam-results-dialog" role="dialog" aria-modal="true" aria-labelledby="exam-results-title" hidden>
+      <div class="exam-results-dialog__backdrop"></div>
+      <section class="exam-results-dialog__panel">
+        <button class="exam-results-dialog__close" id="close-exam-results" type="button" aria-label="Zatvori rezultat">
+          &times;
+        </button>
+        <svg class="exam-results-dialog__check" aria-hidden="true" focusable="false" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="28"></circle>
+          <path d="m20 33 8 8 17-18"></path>
+        </svg>
+        <p class="eyebrow">Rezultat cijeloga ispita</p>
+        <h2 id="exam-results-title">Rješenja su provjerena</h2>
+        <div class="exam-results-dialog__metrics">
+          <div>
+            <strong id="exam-results-percentage"></strong>
+            <span>Riješenost</span>
+          </div>
+          <div>
+            <strong id="exam-results-score"></strong>
+            <span>Bodovi</span>
+          </div>
+        </div>
+        <p>
+          Rezultat obuhvaća zatvorene zadatke i bodove unesene nakon pregleda
+          službenih rješenja otvorenih zadataka.
+        </p>
+      </section>
+    </div>
+  `;
+
+  document.querySelector("#check-answers").addEventListener("click", checkAnswers);
+  document.querySelector("#close-exam-results").addEventListener("click", closeResultsDialog);
+  document.querySelector(".exam-results-dialog__backdrop").addEventListener("click", closeResultsDialog);
+  document.addEventListener("keydown", closeResultsDialogOnEscape);
+
+  renderTaskTypeNavigation();
+  renderSolverSummary();
+  renderTaskTypeContent();
+  simulation.start(exam.durationMinutes);
+}
+
+function renderTaskTypeNavigation() {
+  const navigationHtml = sourceTasks()
+    .map((task) => {
+      const isActive = task.id === activeTaskTypeId;
+      return `
+        <a
+          class="task-button${isActive ? " task-button--active" : ""}"
+          href="${examUrl(solverExam, task.id)}"
+          data-task-type="${escapeHtml(task.id)}"
+          ${isActive ? 'aria-current="true"' : ""}
+        >
+          <strong>${escapeHtml(task.label)}</strong>
+          <small>${taskAnsweredCount(task)}/${taskQuestions(task).length}</small>
+        </a>
+      `;
+    })
+    .join("");
+
+  document.querySelectorAll("[data-task-type-navigation]").forEach((navigation) => {
+    navigation.innerHTML = navigationHtml;
+  });
+
+  document.querySelectorAll("[data-task-type]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      selectTaskType(link.dataset.taskType);
+    });
+  });
+}
+
+function renderTaskTypePager() {
+  const all = sourceTasks();
+  if (all.length <= 1) return "";
+  const index = all.findIndex((task) => task.id === activeTaskTypeId);
+  if (index === -1) return "";
+  const prev = all[index - 1];
+  const next = all[index + 1];
+  if (!prev && !next) return "";
+
+  const button = (task, direction) => {
+    const label = direction === "prev" ? "Prethodni zadaci" : "Sljedeći zadaci";
+    const arrow = direction === "prev"
+      ? icon("arrow-left", "task-type-pager__icon")
+      : icon("arrow-right", "task-type-pager__icon");
+    const copy = `
+      <span class="task-type-pager__copy">
+        <small>${label}</small>
+        <strong>${escapeHtml(task.label)}</strong>
+      </span>
+    `;
+    return `
+      <button
+        type="button"
+        class="task-type-pager__button task-type-pager__button--${direction}"
+        data-task-pager="${escapeHtml(task.id)}"
+      >
+        ${direction === "prev" ? arrow + copy : copy + arrow}
+      </button>
+    `;
+  };
+
+  return `
+    <nav class="task-type-pager" aria-label="Navigacija među vrstama zadataka">
+      ${prev ? button(prev, "prev") : "<span></span>"}
+      ${next ? button(next, "next") : "<span></span>"}
+    </nav>
+  `;
+}
+
+function bindTaskTypePager() {
+  document.querySelectorAll("[data-task-pager]").forEach((control) => {
+    control.addEventListener("click", () => selectTaskType(control.dataset.taskPager));
+  });
+}
+
+function selectTaskType(taskTypeId) {
+  const normalizedTaskTypeId = normalizeTaskTypeId(taskTypeId);
+  if (normalizedTaskTypeId === activeTaskTypeId) return;
+
+  activeTaskTypeId = normalizedTaskTypeId;
+  activeQuestionNumber = questionsForTaskType()[0];
+  history.replaceState(null, "", examUrl(solverExam, activeTaskTypeId));
+  renderTaskTypeNavigation();
+  renderSolverSummary();
+  renderTaskTypeContent();
+  document.querySelector("#task-content-panel")?.scrollIntoView({ block: "start" });
+}
+
+function renderSolverSummary() {
+  const complete = answeredCount();
+  const total = allQuestions().length;
+  document.querySelector("#answer-progress").textContent = `${complete}/${total} odgovora`;
+  document.querySelector("#footer-answer-progress").textContent = `${complete}/${total} odgovora`;
+  const checkButton = document.querySelector("#check-answers");
+  checkButton.disabled = complete === 0 && !checked && !simulation.finished;
+  checkButton.className = checkButtonClass();
+  checkButton.innerHTML = renderCheckButtonContent();
+
+  const resolvedMax = resolvedMaximum();
+  const score = resolvedMax ? `${resolvedScore()}/${resolvedMax} bodova` : "";
+  document.querySelector("#score-summary").textContent = score;
+  document.querySelector("#footer-score-summary").textContent = score;
+  updateResultsDialog();
+}
+
+function renderTaskTypeContent() {
+  const task = taskForId(activeTaskTypeId);
+  const questions = task.questions || [];
+
+  document.querySelector("#section-content").innerHTML = `
+    <div class="solver-question-layout">
+      <div class="solver-question-main">
+        <section class="task-content-panel physics-task-content-panel" id="task-content-panel" aria-live="polite">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Pitanja iz knjižice</p>
+              <h3>${escapeHtml(task.label)}</h3>
+            </div>
+            <small>${questions.length} zadataka</small>
+          </div>
+          ${task.description ? `<p class="history-task-description">${escapeHtml(task.description)}</p>` : ""}
+          <div class="task-source physics-source-list history-source-list">
+            ${questions.map(renderSourceQuestion).join("")}
+          </div>
+        </section>
+        ${renderTaskTypePager()}
+      </div>
+
+      <aside class="question-quickselect" aria-label="Brzi odabir pitanja">
+        <div class="question-quickselect__heading">
+          <strong>Brzi odabir</strong>
+          <small>Zadatci</small>
+        </div>
+        <nav class="question-quickselect__list" id="question-quickselect"></nav>
+      </aside>
+    </div>
+  `;
+
+  bindResponseListeners();
+  renderQuickSelect();
+  bindQuickSelectTracking();
+  bindTaskTypePager();
+}
+
+function renderSourceQuestion(question) {
+  const number = String(question.number);
+  const sourceImage = renderCroppedImage(
+    question.sourceImage,
+    `Izvorni prikaz ${number}. zadatka iz službene PDF knjižice.`,
+  );
+
+  return `
+    <article
+      class="physics-source-question history-source-question${sourceImage ? " physics-source-question--image" : ""}"
+      id="pitanje-${escapeHtml(number)}"
+      data-question-number="${escapeHtml(number)}"
+    >
+      ${sourceImage ? "" : `<h4>${escapeHtml(number)}.</h4>`}
+      <div class="physics-source-question__body">
+        ${sourceImage || renderQuestionFallback(question, number)}
+      </div>
+      ${renderQuestionResponse(question, number)}
+    </article>
+  `;
+}
+
+function renderQuestionFallback(question, number) {
+  if (question.type === "open") {
+    return `<p class="history-open-question__prompt">Pronađi ${escapeHtml(number)}. zadatak u službenoj PDF knjižici i usporedi odgovor s rješenjem.</p>`;
+  }
+  return `
+    <p class="history-open-question__prompt">
+      Pronađi ${escapeHtml(number)}. zadatak u službenoj PDF knjižici i odaberi odgovor.
+    </p>
+  `;
+}
+
+function bindResponseListeners() {
+  document.querySelectorAll('input[type="radio"][data-question]').forEach((input) => {
+    input.addEventListener("change", () => updateClosedResponse(input.dataset.question, input.value));
+  });
+
+  document.querySelectorAll("[data-open-score]").forEach((input) => {
+    input.addEventListener("input", () => updateOpenScore(input.dataset.openScore, input.value, input));
+  });
+
+  document.querySelectorAll("[data-open-solution]").forEach((button) => {
+    button.addEventListener("click", () => toggleOpenSolution(button));
+  });
+
+  selfCheck.bind(document.querySelector("#task-content-panel"), toggleSelfCheck);
+}
+
+function toggleSelfCheck(question) {
+  if (simulation.active || checked) return;
+  selfCheck.toggle(question, Boolean(closedResponses[question]));
+  renderTaskTypeNavigation();
+  renderSolverSummary();
+  renderTaskTypeContent();
+}
+
+function quickSelectAnswerState(question) {
+  if (isOpenQuestion(question)) return hasOpenScore(question) ? "bodovano" : "nije bodovano";
+  return closedResponses[question] ? "odgovoreno" : "nije odgovoreno";
+}
+
+function quickSelectIsAnswered(question) {
+  return isOpenQuestion(question) ? hasOpenScore(question) : Boolean(closedResponses[question]);
+}
+
+function quickSelectResultClass(question) {
+  if (isOpenQuestion(question)) {
+    if (!checked || !hasOpenScore(question)) return "";
+    return Number(openScores[question]) >= maxPointsForOpenQuestion(question)
+      ? " question-quickselect__link--correct"
+      : " question-quickselect__link--wrong";
+  }
+  if (!isChecked(question)) return "";
+  return isCorrectAnswer(question, closedResponses[question])
+    ? " question-quickselect__link--correct"
+    : " question-quickselect__link--wrong";
+}
+
+function renderQuickSelect() {
+  const quickSelect = document.querySelector("#question-quickselect");
+  if (!quickSelect) return;
+
+  const questions = questionsForTaskType();
+  const quickSelectPanel = quickSelect.closest(".question-quickselect");
+  if (quickSelectPanel) quickSelectPanel.hidden = questions.length <= 2;
+
+  quickSelect.innerHTML = questions
+    .map((question) => {
+      const stateClass = quickSelectIsAnswered(question) ? " question-quickselect__link--answered" : "";
+      const resultClass = quickSelectResultClass(question);
+      const activeClass =
+        String(question) === String(activeQuestionNumber) ? " question-quickselect__link--active" : "";
+      return `
+        <a
+          class="question-quickselect__link${stateClass}${resultClass}${activeClass}"
+          href="#pitanje-${escapeHtml(question)}"
+          data-quick-question="${escapeHtml(question)}"
+          aria-label="Zadatak ${escapeHtml(question)}, ${quickSelectAnswerState(question)}"
+          ${activeClass ? 'aria-current="true"' : ""}
+        >
+          ${escapeHtml(question)}
+        </a>
+      `;
+    })
+    .join("");
+
+  quickSelect.querySelectorAll("[data-quick-question]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      const question = link.dataset.quickQuestion;
+      const target = document.getElementById(`pitanje-${question}`);
+      activeQuestionNumber = question;
+      updateQuickSelectActiveState();
+      target?.scrollIntoView({ block: "start", behavior: "auto" });
+      if (target) history.replaceState(null, "", `#pitanje-${question}`);
+    });
+  });
+}
+
+function bindQuickSelectTracking() {
+  window.removeEventListener("scroll", queueActiveQuestionUpdate);
+  window.addEventListener("scroll", queueActiveQuestionUpdate, { passive: true });
+  updateActiveQuestionFromScroll();
+}
+
+function queueActiveQuestionUpdate() {
+  if (quickSelectFrame) return;
+  quickSelectFrame = window.requestAnimationFrame(updateActiveQuestionFromScroll);
+}
+
+function updateActiveQuestionFromScroll() {
+  quickSelectFrame = undefined;
+  const questions = [...document.querySelectorAll("[data-question-number]")];
+  if (!questions.length) return;
+
+  const focusLine = Math.min(window.innerHeight * 0.28, 240);
+  let activeQuestion = questions[0];
+  for (const question of questions) {
+    if (question.getBoundingClientRect().top > focusLine) break;
+    activeQuestion = question;
+  }
+
+  const nextQuestionNumber = activeQuestion.dataset.questionNumber;
+  if (nextQuestionNumber === activeQuestionNumber) return;
+  activeQuestionNumber = nextQuestionNumber;
+  updateQuickSelectActiveState();
+}
+
+function updateQuickSelectActiveState() {
+  document.querySelectorAll("[data-quick-question]").forEach((link) => {
+    const isActive = String(link.dataset.quickQuestion) === String(activeQuestionNumber);
+    link.classList.toggle("question-quickselect__link--active", isActive);
+    if (isActive) link.setAttribute("aria-current", "true");
+    else link.removeAttribute("aria-current");
+  });
+}
+
+function renderQuestionResponse(question, number) {
+  if (question.type === "open") return renderOpenQuestionResponse(number);
+  return renderClosedQuestionResponse(number);
+}
+
+function renderClosedQuestionResponse(question) {
+  const answer = closedResponses[question] || "";
+  const resultClass = isChecked(question)
+    ? isCorrectAnswer(question, answer)
+      ? " response-question--correct"
+      : " response-question--wrong"
+    : "";
+
+  return `
+    <fieldset class="physics-inline-response ${resultClass}">
+      <legend>Odgovor na ${escapeHtml(question)}. zadatak</legend>
+      <span class="physics-inline-response__label">Odaberi odgovor</span>
+      <div class="choice-list">
+        ${questionOptions(question)
+          .map((option) => renderChoice(question, option, answer))
+          .join("")}
+      </div>
+      ${selfCheck.renderButton(question, {
+        answered: Boolean(answer),
+        hidden: simulation.active || checked,
+      })}
+      ${renderClosedFeedback(question, answer)}
+    </fieldset>
+  `;
+}
+
+function renderChoice(question, option, answer) {
+  const selected = option === answer;
+  const correct = isCorrectAnswer(question, option);
+  let resultClass = "";
+  if (isChecked(question) && correct) resultClass = " answer-choice--correct";
+  if (isChecked(question) && selected && !correct) resultClass = " answer-choice--wrong";
+
+  return `
+    <label class="answer-choice${resultClass}">
+      <input
+        data-question="${escapeHtml(question)}"
+        type="radio"
+        name="answer-${escapeHtml(question)}"
+        value="${escapeHtml(option)}"
+        ${selected ? "checked" : ""}
+        ${simulation.inputDisabledAttribute()}
+      >
+      <span>${escapeHtml(option)}</span>
+    </label>
+  `;
+}
+
+function renderClosedFeedback(question, answer) {
+  if (!isChecked(question)) return "";
+  const answers = correctAnswers(question);
+  if (answers.includes(answer)) return `<small class="response-feedback">Točno.</small>`;
+  const label = answers.length > 1 ? "Točni odgovori" : "Točan odgovor";
+  return `<small class="response-feedback">${label}: ${answers.join(" ili ")}.</small>`;
+}
+
+function renderOpenQuestionResponse(number) {
+  const maximum = maxPointsForOpenQuestion(number);
+  const score = hasOpenScore(number) ? openScores[number] : "";
+  const resultClass = checked && hasOpenScore(number)
+    ? Number(score) >= maximum
+      ? " history-open-question--correct"
+      : " history-open-question--reviewed"
+    : "";
+
+  return `
+    <div class="physics-open-solution history-open-question${resultClass}">
+      <div class="physics-open-solution__controls">
+        <button
+          class="physics-open-solution__toggle"
+          type="button"
+          data-open-solution="${escapeHtml(number)}"
+          aria-controls="rjesenje-${escapeHtml(number)}"
+          aria-expanded="false"
+          ${simulation.active && !simulation.finished ? "disabled" : ""}
+        >
+          ${simulation.active && !simulation.finished ? "Rješenje nakon predaje" : "Otvori rješenje"}
+        </button>
+        <label class="physics-open-score">
+          <span>Bodovi</span>
+          <input
+            data-open-score="${escapeHtml(number)}"
+            type="number"
+            min="0"
+            max="${maximum}"
+            step="1"
+            inputmode="numeric"
+            value="${escapeHtml(score)}"
+            aria-label="Dodijeljeni bodovi za ${escapeHtml(number)}. zadatak"
+            ${simulation.active && !simulation.finished ? "disabled" : ""}
+          >
+          <strong>/ ${maximum}</strong>
+        </label>
+      </div>
+      <div class="physics-open-solution__body" id="rjesenje-${escapeHtml(number)}" hidden>
+        ${renderOfficialModelAnswer(solverExam.openAnswers?.[number]?.modelAnswer)}
+      </div>
+    </div>
+  `;
+}
+
+function toggleOpenSolution(button) {
+  if (button.disabled) return;
+  const body = document.getElementById(button.getAttribute("aria-controls"));
+  if (!body) return;
+
+  const isOpen = button.getAttribute("aria-expanded") === "true";
+  button.setAttribute("aria-expanded", String(!isOpen));
+  button.textContent = isOpen ? "Otvori rješenje" : "Sakrij rješenje";
+  body.hidden = isOpen;
+}
+
+function renderCroppedImage(source, alt) {
+  const crop = source?.crop;
+  const dimensions = [
+    source?.width,
+    source?.height,
+    crop?.x,
+    crop?.y,
+    crop?.width,
+    crop?.height,
+  ].map(Number);
+  if (!source?.url || dimensions.some((value) => !Number.isFinite(value) || value < 0)) return "";
+  if (!source.width || !source.height || !crop.width || !crop.height) return "";
+
+  const width = (source.width / crop.width) * 100;
+  const offsetX = (-crop.x / source.width) * 100;
+  const offsetY = (-crop.y / source.height) * 100;
+
+  return `
+    <figure class="physics-source-figure">
+      <div class="physics-source-crop" style="aspect-ratio: ${crop.width} / ${crop.height}">
+        <img
+          src="${escapeHtml(source.url)}"
+          alt="${escapeHtml(alt)}"
+          width="${source.width}"
+          height="${source.height}"
+          loading="eager"
+          decoding="async"
+          style="width: ${width}%; transform: translate(${offsetX}%, ${offsetY}%);"
+        >
+      </div>
+    </figure>
+  `;
+}
+
+function renderOfficialModelAnswer(value) {
+  const blocks = officialModelAnswerBlocks(value);
+  if (!blocks.length) {
+    return `<p class="history-model-answer history-model-answer--empty">Službeno rješenje nije dostupno.</p>`;
+  }
+
+  return `
+    <div class="history-model-answer">
+      ${blocks.map(renderOfficialModelAnswerBlock).join("")}
+    </div>
+  `;
+}
+
+function renderOfficialModelAnswerBlock(block) {
+  if (block.type === "list") {
+    return `
+      <ul>
+        ${block.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+      </ul>
+    `;
+  }
+
+  return `<p>${escapeHtml(block.text)}</p>`;
+}
+
+function officialModelAnswerBlocks(value) {
+  const lines = String(value || "")
+    .replace(/\r\n?/g, "\n")
+    .replaceAll("\uf0b7", "•")
+    .replace(/\u00a0/g, " ")
+    .split("\n")
+    .map((line) => line.trim());
+  const blocks = [];
+  let paragraph = "";
+  let listItems = [];
+
+  const flushParagraph = () => {
+    if (!paragraph) return;
+    blocks.push({ type: "paragraph", text: paragraph });
+    paragraph = "";
+  };
+  const flushList = () => {
+    if (!listItems.length) return;
+    blocks.push({ type: "list", items: listItems });
+    listItems = [];
+  };
+
+  for (const line of lines) {
+    if (!line || /^MODEL (?:MOGU[ĆC]EGA )?TO[ČC]NOG[ A]* ODGOVORA:?$/i.test(line)) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+
+    const listMatch = line.match(/^[•*▪▫‣-]\s*(.+)$/u);
+    if (listMatch) {
+      flushParagraph();
+      listItems.push(listMatch[1].trim());
+      continue;
+    }
+
+    flushList();
+    paragraph = paragraph ? `${paragraph} ${line}` : line;
+    if (/[.!?]$/.test(line) && paragraph.length >= 360) flushParagraph();
+  }
+
+  flushParagraph();
+  flushList();
+  return blocks;
+}
+
+function updateClosedResponse(question, answer) {
+  if (simulation.finished) return;
+
+  const wasChecked = checked;
+  const wasSelfChecked = selfCheck.has(question);
+  checked = false;
+  selfCheck.delete(question);
+  const normalizedAnswer = String(answer || "").trim();
+  if (normalizedAnswer) closedResponses[question] = normalizedAnswer;
+  else delete closedResponses[question];
+  saveClosedResponses();
+  renderTaskTypeNavigation();
+  renderSolverSummary();
+  renderQuickSelect();
+  if (wasChecked || wasSelfChecked) renderTaskTypeContent();
+}
+
+function updateOpenScore(question, value, input) {
+  if (simulation.active && !simulation.finished) return;
+
+  const maximum = maxPointsForOpenQuestion(question);
+  const normalizedValue = String(value).trim();
+  if (normalizedValue === "") {
+    input.setCustomValidity("");
+    delete openScores[question];
+    saveOpenScores();
+    renderTaskTypeNavigation();
+    renderSolverSummary();
+    renderQuickSelect();
+    return;
+  }
+
+  const parsedScore = Number(normalizedValue);
+  if (!Number.isInteger(parsedScore)) {
+    input.setCustomValidity(`Upiši cijeli broj od 0 do ${maximum}.`);
+    return;
+  }
+
+  const score = Math.min(Math.max(parsedScore, 0), maximum);
+  input.setCustomValidity("");
+  input.value = String(score);
+  openScores[question] = score;
+  saveOpenScores();
+  renderTaskTypeNavigation();
+  renderSolverSummary();
+  renderQuickSelect();
+}
+
+function checkAnswers() {
+  if (simulation.active && !simulation.finished) {
+    if (!window.confirm("Predati simulaciju i završiti rješavanje?")) return;
+    simulation.finish("submitted");
+    return;
+  }
+
+  if (checked) {
+    checked = false;
+    selfCheck.reset();
+    closeResultsDialog();
+    renderTaskTypeNavigation();
+    renderSolverSummary();
+    renderTaskTypeContent();
+    return;
+  }
+
+  checked = true;
+  selfCheck.reset();
+  renderTaskTypeNavigation();
+  renderSolverSummary();
+  renderTaskTypeContent();
+  openResultsDialog();
+}
+
+function finishSimulation(reason) {
+  checked = true;
+  selfCheck.reset();
+  renderTaskTypeNavigation();
+  renderSolverSummary();
+  renderTaskTypeContent();
+
+  if (reason === "submitted") recordSubmittedSimulation();
+
+  if (reason === "expired") {
+    window.alert("Vrijeme za simulaciju je isteklo. Odgovori više nisu promjenjivi.");
+  }
+  openResultsDialog();
+}
+
+function recordSubmittedSimulation() {
+  if (!window.AsistentProfile || simulationRecorded) return;
+  simulationRecorded = true;
+
+  window.AsistentProfile.recordSimulationAttempt({
+    solver: "politics-choice",
+    subject: "Politika i gospodarstvo",
+    part: "Cijeli ispit",
+    examId: solverExam.id,
+    year: solverExam.year,
+    term: solverExam.term,
+    level: solverExam.level,
+    schoolYear: solverExam.schoolYear,
+    durationMinutes: solverExam.durationMinutes,
+    answered: answeredCount(solverExam),
+    totalQuestions: allQuestions(solverExam).length,
+    score: totalScore(),
+    maxScore: maxScore(),
+    checkingSupported: true,
+  });
+}
+
+function openResultsDialog() {
+  const dialog = document.querySelector("#exam-results-dialog");
+  if (!dialog) return;
+  updateResultsDialog();
+  dialog.hidden = false;
+  document.body.classList.add("results-dialog-open");
+  document.querySelector("#close-exam-results")?.focus();
+}
+
+function closeResultsDialog() {
+  const dialog = document.querySelector("#exam-results-dialog");
+  if (!dialog || dialog.hidden) return;
+  dialog.hidden = true;
+  document.body.classList.remove("results-dialog-open");
+}
+
+function closeResultsDialogOnEscape(event) {
+  if (event.key === "Escape") closeResultsDialog();
+}
+
+function updateResultsDialog() {
+  const percentage = document.querySelector("#exam-results-percentage");
+  const score = document.querySelector("#exam-results-score");
+  if (!percentage || !score) return;
+
+  percentage.textContent = `${scorePercentage()}%`;
+  score.textContent = `${totalScore()}/${maxScore()}`;
+}
+
+function startPoliticsPage() {
+  const id = selectedExamId();
+  if (!id) {
+    window.location.replace(politicsSubjectUrl());
+    return;
+  }
+
+  const exam = examsById.get(id);
+  if (exam) renderSolver(exam, selectedTaskTypeId(exam));
+  else renderMissingExam();
+}
+
+if (!simulation.active && window.AsistentProfile?.ready) {
+  window.AsistentProfile.ready.finally(startPoliticsPage);
+} else {
+  startPoliticsPage();
+}

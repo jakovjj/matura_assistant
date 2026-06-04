@@ -8,6 +8,7 @@ const mathChoiceData = window.ASISTENT_ZA_MATURE_MATH_CHOICE;
 const croatianChoiceData = window.ASISTENT_ZA_MATURE_CROATIAN_CHOICE;
 const historyChoiceData = window.ASISTENT_ZA_MATURE_HISTORY_CHOICE;
 const geographyChoiceData = window.ASISTENT_ZA_MATURE_GEOGRAPHY_CHOICE;
+const politicsChoiceData = window.ASISTENT_ZA_MATURE_POLITICS_CHOICE;
 const abcdChoiceData = window.ASISTENT_ZA_MATURE_ABCD_CHOICE;
 
 if (!archiveData || !Array.isArray(archiveData.exams)) {
@@ -308,6 +309,10 @@ function geographyChoiceIdForTerm(exam, term) {
   return `geografija-${exam.year}-${slugPart(term)}`;
 }
 
+function politicsChoiceIdForTerm(exam, term) {
+  return `politika-i-gospodarstvo-${exam.year}-${slugPart(term)}`;
+}
+
 function abcdChoiceIdForTerm(exam, term) {
   const level = exam.level ? `-${exam.level.toLocaleLowerCase("hr")}` : "";
   return `${slugPart(exam.subject)}${level}-${exam.year}-${slugPart(term)}`;
@@ -418,6 +423,17 @@ function geographyChoiceStorageKeys(choiceExam) {
   ];
 
   return [...new Set(ids)].map((id) => `asistent-za-mature:geography-choice:${id}`);
+}
+
+function politicsChoiceStorageKeys(choiceExam) {
+  const ids = [
+    choiceExam.id,
+    ...(legacyTermAliases[choiceExam.term] || []).map((term) =>
+      politicsChoiceIdForTerm(choiceExam, term),
+    ),
+  ];
+
+  return [...new Set(ids)].map((id) => `asistent-za-mature:politics-choice:${id}`);
 }
 
 function abcdChoiceStorageKeys(choiceExam) {
@@ -534,6 +550,17 @@ const geographyChoiceExams = (geographyChoiceData?.exams || []).map((exam) => {
 });
 const geographyChoiceByArchiveUrl = new Map(
   geographyChoiceExams.map((exam) => [exam.archiveUrl, exam]),
+);
+const politicsChoiceExams = (politicsChoiceData?.exams || []).map((exam) => {
+  const term = normalizeTerm(exam.term);
+  return {
+    ...exam,
+    term,
+    id: politicsChoiceIdForTerm(exam, term),
+  };
+});
+const politicsChoiceByArchiveUrl = new Map(
+  politicsChoiceExams.map((exam) => [exam.archiveUrl, exam]),
 );
 const abcdChoiceExams = (abcdChoiceData?.exams || []).map((exam) => {
   const term = normalizeTerm(exam.term);
@@ -1084,6 +1111,12 @@ function geographyChoiceUrl(choiceExam, simulation = false) {
   return `./geografija.html?${params.toString()}`;
 }
 
+function politicsChoiceUrl(choiceExam, simulation = false) {
+  const params = new URLSearchParams({ exam: choiceExam.id });
+  if (simulation) params.set("nacin", "simulacija");
+  return `./politika.html?${params.toString()}`;
+}
+
 function abcdChoiceUrl(choiceExam, simulation = false) {
   const params = new URLSearchParams({ exam: choiceExam.id });
   if (simulation) params.set("nacin", "simulacija");
@@ -1124,6 +1157,10 @@ function historyChoiceExamForArchive(exam) {
 
 function geographyChoiceExamForArchive(exam) {
   return geographyChoiceByArchiveUrl.get(exam.url) || null;
+}
+
+function politicsChoiceExamForArchive(exam) {
+  return politicsChoiceByArchiveUrl.get(exam.url) || null;
 }
 
 function abcdChoiceExamForArchive(exam) {
@@ -1389,6 +1426,24 @@ function interactiveParts(exam) {
         },
         choiceExam,
         geographyChoiceUrl,
+      ),
+    ];
+  }
+
+  if (exam.subject === "Politika i gospodarstvo") {
+    const choiceExam = politicsChoiceExamForArchive(exam);
+    return [
+      linkedPart(
+        exam,
+        {
+          id: "politika",
+          label: "Ispit",
+          description: "Zadatci zatvorenoga tipa i otvoreni zadatci iz ispitne knjižice.",
+          durationMinutes: singleExamDuration(exam),
+          requiresManualChecking: true,
+        },
+        choiceExam,
+        politicsChoiceUrl,
       ),
     ];
   }
@@ -1832,6 +1887,60 @@ function geographyProgress(exam) {
   };
 }
 
+function readPoliticsChoiceResponses(choiceExam) {
+  const storedResponses = {};
+  try {
+    for (const key of politicsChoiceStorageKeys(choiceExam).reverse()) {
+      const stored = JSON.parse(localStorage.getItem(key) || "{}");
+      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+        Object.assign(storedResponses, stored.closedResponses || stored);
+      }
+    }
+  } catch {
+    return {};
+  }
+  return storedResponses;
+}
+
+function readPoliticsOpenScores(choiceExam) {
+  const storedScores = {};
+  try {
+    for (const key of politicsChoiceStorageKeys(choiceExam).map((key) => `${key}:open-scores`).reverse()) {
+      const stored = JSON.parse(localStorage.getItem(key) || "{}");
+      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+        Object.assign(storedScores, stored);
+      }
+    }
+  } catch {
+    return {};
+  }
+  return storedScores;
+}
+
+function politicsProgress(exam) {
+  const choiceExam = politicsChoiceExamForArchive(exam);
+  if (!choiceExam) return null;
+
+  const knownClosed = new Set((choiceExam.questions || []).map(String));
+  const knownOpen = new Set((choiceExam.openQuestions || []).map(String));
+  const responses = readPoliticsChoiceResponses(choiceExam);
+  const openScores = readPoliticsOpenScores(choiceExam);
+  const answeredClosed = Object.entries(responses).filter(
+    ([question, answer]) =>
+      knownClosed.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+  const answeredOpen = Object.entries(openScores).filter(
+    ([question, score]) =>
+      knownOpen.has(question) && Number.isInteger(score),
+  ).length;
+
+  return {
+    answered: answeredClosed + answeredOpen,
+    id: choiceExam.id,
+    total: knownClosed.size + knownOpen.size,
+  };
+}
+
 function readAbcdChoiceResponses(choiceExam) {
   const storedResponses = {};
   try {
@@ -1856,6 +1965,7 @@ function abcdChoiceProgress(exam) {
     exam.subject === "Matematika"
     || exam.subject === "Povijest"
     || exam.subject === "Geografija"
+    || exam.subject === "Politika i gospodarstvo"
   ) return null;
 
   const choiceExam = abcdChoiceExamForArchive(exam);
@@ -1886,6 +1996,7 @@ function examProgress(exam) {
     croatianProgress(exam),
     historyProgress(exam),
     geographyProgress(exam),
+    politicsProgress(exam),
     abcdChoiceProgress(exam),
   ].filter(Boolean);
   const answered = progressItems.reduce((sum, item) => sum + item.answered, 0);

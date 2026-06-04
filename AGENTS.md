@@ -24,6 +24,9 @@ official NCVVO service.
 
 This is a dependency-free static site:
 
+For a human-oriented map of data flow, solver mapping, generated files, and
+maintenance steps, see `ARCHITECTURE.md`.
+
 - `index.html`: page structure and Croatian copy
 - `styles.css`: responsive styling
 - `app.js`: client-side filters and exam table rendering

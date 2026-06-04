@@ -2944,6 +2944,8 @@ function isPublicPath(pathname) {
     "/matematika.html",
     "/math-choice.js",
     "/physics-choice.js",
+    "/politics-choice.js",
+    "/politika.html",
     "/povijest.html",
     "/prijava.html",
     "/profil.html",
