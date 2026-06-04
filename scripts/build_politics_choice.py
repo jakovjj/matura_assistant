@@ -7,8 +7,6 @@ import json
 import math
 import re
 import shutil
-import struct
-import subprocess
 import sys
 import tempfile
 import unicodedata
@@ -18,6 +16,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote, unquote, urlparse
 from xml.etree import ElementTree
+
+from pdf_utils import pdftotext, png_dimensions, render_pdf_page_to_png
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -183,39 +183,20 @@ def normalized_name(name: str) -> str:
 
 
 def pdf_text(contents: bytes, *args: str) -> str:
-    try:
-        completed = subprocess.run(
-            ["pdftotext", *args, "-", "-"],
-            input=contents,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-    except FileNotFoundError as exc:
-        raise RuntimeError("pdftotext is required to build Politics practice data") from exc
-    except subprocess.CalledProcessError as exc:
-        message = exc.stderr.decode("utf-8", errors="replace")
-        raise RuntimeError(f"pdftotext failed: {message}") from exc
-
-    return completed.stdout.decode("utf-8", errors="replace")
+    return pdftotext(
+        contents,
+        *args,
+        required_message="pdftotext is required to build Politics practice data",
+    )
 
 
 def pdf_bbox_pages(contents: bytes) -> list[PdfPage]:
-    try:
-        completed = subprocess.run(
-            ["pdftotext", "-bbox-layout", "-", "-"],
-            input=contents,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-    except FileNotFoundError as exc:
-        raise RuntimeError("pdftotext is required to build Politics source images") from exc
-    except subprocess.CalledProcessError as exc:
-        message = exc.stderr.decode("utf-8", errors="replace")
-        raise RuntimeError(f"pdftotext -bbox-layout failed: {message}") from exc
-
-    xml = completed.stdout.decode("utf-8", errors="replace")
+    xml = pdftotext(
+        contents,
+        "-bbox-layout",
+        required_message="pdftotext is required to build Politics source images",
+        failure_prefix="pdftotext -bbox-layout failed",
+    )
     xml = "".join(character for character in xml if character in "\t\n\r" or ord(character) >= 32)
     root = ElementTree.fromstring(xml)
     pages: list[PdfPage] = []
@@ -623,12 +604,6 @@ def find_question_crops(markers: dict[str, QuestionMarker]) -> dict[str, Questio
     return crops
 
 
-def png_dimensions(contents: bytes) -> tuple[int, int]:
-    if contents[:8] != b"\x89PNG\r\n\x1a\n":
-        raise ValueError("Rendered Politics source image is not a PNG")
-    return struct.unpack(">II", contents[16:24])
-
-
 def render_source_pages(
     paper_path: Path,
     identifier: str,
@@ -650,32 +625,19 @@ def render_source_pages(
             if image_path.is_file():
                 contents = image_path.read_bytes()
             else:
-                try:
-                    subprocess.run(
-                        [
-                            "pdftocairo",
-                            "-png",
-                            "-singlefile",
-                            "-r",
-                            str(SOURCE_RENDER_DPI),
-                            "-f",
-                            str(page_number),
-                            "-l",
-                            str(page_number),
-                            str(paper_path),
-                            str(temporary_prefix),
-                        ],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        check=True,
-                    )
-                except FileNotFoundError as exc:
-                    raise RuntimeError("pdftocairo is required to build Politics source images") from exc
-                except subprocess.CalledProcessError as exc:
-                    message = exc.stderr.decode("utf-8", errors="replace")
-                    raise RuntimeError(f"pdftocairo failed: {message}") from exc
+                render_pdf_page_to_png(
+                    paper_path,
+                    temporary_prefix,
+                    page_number,
+                    SOURCE_RENDER_DPI,
+                    required_message="pdftocairo is required to build Politics source images",
+                )
                 contents = temporary_prefix.with_suffix(".png").read_bytes()
-            image_width, image_height = png_dimensions(contents)
+            image_width, image_height = png_dimensions(
+                contents,
+                error_message="Rendered Politics source image is not a PNG",
+                strict_ihdr=False,
+            )
             write_if_changed(image_path, contents)
             expected_assets.add(filename)
 

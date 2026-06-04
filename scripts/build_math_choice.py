@@ -7,8 +7,6 @@ import json
 import math
 import re
 import shutil
-import struct
-import subprocess
 import sys
 import tempfile
 import unicodedata
@@ -22,6 +20,7 @@ from xml.etree import ElementTree
 from PIL import Image
 
 from crop_utils import grayscale_image_from_png, trim_crop_bottom_whitespace
+from pdf_utils import pdftotext, png_dimensions, render_pdf_page_to_png
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -165,6 +164,32 @@ def line_starts_with_known_question_token(line: PdfLine, wanted_numbers: set[str
     return number if number in wanted_numbers else None
 
 
+def whole_question_number(question: str) -> int:
+    return int(question.split(".", 1)[0])
+
+
+def solution_layout_markers(pages: list[PdfPage], question_numbers: list[str]) -> list[QuestionMarker]:
+    whole_min = min(whole_question_number(number) for number in question_numbers)
+    whole_max = max(whole_question_number(number) for number in question_numbers)
+    markers: list[QuestionMarker] = []
+    seen: set[tuple[int, str, float, float]] = set()
+
+    for page in pages:
+        for line in sorted_page_lines(page):
+            number = line_starts_with_question_token(line)
+            if number is None:
+                continue
+            if not whole_min <= whole_question_number(number) <= whole_max:
+                continue
+            key = (page.number, number, round(line.x_min, 1), round(line.y_min, 1))
+            if key in seen:
+                continue
+            seen.add(key)
+            markers.append(QuestionMarker(number=number, page=page, y_min=line.y_min, x_min=line.x_min))
+
+    return markers
+
+
 def load_archive_index() -> dict[str, Any]:
     source = ARCHIVE_INDEX.read_text(encoding="utf-8").strip()
     if not source.startswith(ARCHIVE_PREFIX) or not source.endswith(";"):
@@ -202,39 +227,20 @@ def local_archive_path(url: str) -> Path:
 
 
 def pdf_text(contents: bytes) -> str:
-    try:
-        completed = subprocess.run(
-            ["pdftotext", "-layout", "-", "-"],
-            input=contents,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-    except FileNotFoundError as exc:
-        raise RuntimeError("pdftotext is required to build Mathematics practice data") from exc
-    except subprocess.CalledProcessError as exc:
-        message = exc.stderr.decode("utf-8", errors="replace")
-        raise RuntimeError(f"pdftotext failed: {message}") from exc
-
-    return completed.stdout.decode("utf-8", errors="replace")
+    return pdftotext(
+        contents,
+        "-layout",
+        required_message="pdftotext is required to build Mathematics practice data",
+    )
 
 
 def pdf_bbox_pages(contents: bytes) -> list[PdfPage]:
-    try:
-        completed = subprocess.run(
-            ["pdftotext", "-bbox-layout", "-", "-"],
-            input=contents,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-    except FileNotFoundError as exc:
-        raise RuntimeError("pdftotext is required to build Mathematics source images") from exc
-    except subprocess.CalledProcessError as exc:
-        message = exc.stderr.decode("utf-8", errors="replace")
-        raise RuntimeError(f"pdftotext -bbox-layout failed: {message}") from exc
-
-    xml = completed.stdout.decode("utf-8", errors="replace")
+    xml = pdftotext(
+        contents,
+        "-bbox-layout",
+        required_message="pdftotext is required to build Mathematics source images",
+        failure_prefix="pdftotext -bbox-layout failed",
+    )
     # Older NCVVO PDFs contain control glyphs that pdftotext writes into its
     # XHTML output even though XML does not allow them.
     xml = "".join(character for character in xml if character in "\t\n\r" or ord(character) >= 32)
@@ -269,21 +275,12 @@ def pdf_bbox_pages(contents: bytes) -> list[PdfPage]:
 
 
 def pdf_bbox_words(contents: bytes) -> list[PdfWord]:
-    try:
-        completed = subprocess.run(
-            ["pdftotext", "-bbox-layout", "-", "-"],
-            input=contents,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-    except FileNotFoundError as exc:
-        raise RuntimeError("pdftotext is required to read Mathematics answer sheets") from exc
-    except subprocess.CalledProcessError as exc:
-        message = exc.stderr.decode("utf-8", errors="replace")
-        raise RuntimeError(f"pdftotext -bbox-layout failed: {message}") from exc
-
-    xml = completed.stdout.decode("utf-8", errors="replace")
+    xml = pdftotext(
+        contents,
+        "-bbox-layout",
+        required_message="pdftotext is required to read Mathematics answer sheets",
+        failure_prefix="pdftotext -bbox-layout failed",
+    )
     xml = "".join(character for character in xml if character in "\t\n\r" or ord(character) >= 32)
     root = ElementTree.fromstring(xml)
     return [
@@ -598,16 +595,31 @@ def solution_crop_from_marker(
 ) -> QuestionCrop:
     page = marker.page
     x_min, x_max, cluster_index = solution_column_bounds(page, page_markers, marker)
-    cluster_indexes = {
-        item.number: solution_column_bounds(page, page_markers, item)[2]
+    marker_clusters = [
+        (item, solution_column_bounds(page, page_markers, item)[2])
         for item in page_markers
-    }
+    ]
+    same_cluster_markers = sorted(
+        [
+            item
+            for item, item_cluster_index in marker_clusters
+            if item_cluster_index == cluster_index
+        ],
+        key=lambda item: (item.y_min, question_sort_key(item.number)),
+    )
+    previous_marker = next(
+        (
+            item
+            for item in reversed(same_cluster_markers)
+            if item.y_min < marker.y_min - 2
+        ),
+        None,
+    )
     next_marker = next(
         (
             item
-            for item in sorted(page_markers, key=lambda item: item.y_min)
+            for item in same_cluster_markers
             if item.y_min > marker.y_min + 2
-            and cluster_indexes.get(item.number) == cluster_index
         ),
         None,
     )
@@ -635,7 +647,12 @@ def solution_crop_from_marker(
     )
 
     y_min = max(0, marker.y_min - 10)
-    if previous_rule and marker.y_min - previous_rule.y_min <= 140:
+    previous_rule_is_current_boundary = (
+        previous_rule is not None
+        and marker.y_min - previous_rule.y_min <= 140
+        and (previous_marker is None or previous_rule.y_min > previous_marker.y_min)
+    )
+    if previous_rule_is_current_boundary:
         y_min = max(0, previous_rule.y_max + SOLUTION_TABLE_CROP_PADDING)
 
     y_max = page.height - SOLUTION_FOOTER_MARGIN
@@ -879,19 +896,27 @@ def find_solution_page_crops(
 ) -> tuple[dict[str, QuestionCrop], dict[str, str]]:
     pages = pdf_bbox_pages(contents)
     wanted_numbers = set(question_numbers)
-    markers: list[QuestionMarker] = []
-
-    for page in pages:
-        for line in sorted_page_lines(page):
-            number = line_starts_with_known_question_token(line, wanted_numbers)
-            if number is None or number not in wanted_numbers:
-                continue
-            if any(marker.number == number for marker in markers):
-                continue
-            markers.append(QuestionMarker(number=number, page=page, y_min=line.y_min, x_min=line.x_min))
+    layout_markers = solution_layout_markers(pages, question_numbers)
+    markers = []
+    for marker in layout_markers:
+        if marker.number not in wanted_numbers:
+            continue
+        if any(item.number == marker.number for item in markers):
+            continue
+        markers.append(marker)
 
     found_numbers = [marker.number for marker in markers]
-    points = solution_points_from_blocks(markers)
+    if sorted(found_numbers, key=question_sort_key) != sorted(question_numbers, key=question_sort_key):
+        for page in pages:
+            for line in sorted_page_lines(page):
+                number = line_starts_with_known_question_token(line, wanted_numbers)
+                if number is None or number not in wanted_numbers:
+                    continue
+                if any(marker.number == number for marker in markers):
+                    continue
+                markers.append(QuestionMarker(number=number, page=page, y_min=line.y_min, x_min=line.x_min))
+
+    found_numbers = [marker.number for marker in markers]
     if sorted(found_numbers, key=question_sort_key) != sorted(question_numbers, key=question_sort_key):
         found_set = set(found_numbers)
         for missing_number in question_numbers:
@@ -914,16 +939,31 @@ def find_solution_page_crops(
                 )
             )
 
+    points = solution_points_from_blocks(markers)
     crops: dict[str, QuestionCrop] = {}
     pages_by_number = {page.number: page for page in pages}
     rules_by_page = detect_horizontal_rules(contents, pages_by_number)
+    layout_markers_by_page: dict[int, list[QuestionMarker]] = {}
+    for marker in layout_markers:
+        layout_markers_by_page.setdefault(marker.page.number, []).append(marker)
+
     markers_by_page: dict[int, list[QuestionMarker]] = {}
     for marker in markers:
-        markers_by_page.setdefault(marker.page.number, []).append(marker)
+        page_markers = markers_by_page.setdefault(
+            marker.page.number,
+            list(layout_markers_by_page.get(marker.page.number, [])),
+        )
+        if not any(
+            item.number == marker.number
+            and abs(item.x_min - marker.x_min) < 0.5
+            and abs(item.y_min - marker.y_min) < 0.5
+            for item in page_markers
+        ):
+            page_markers.append(marker)
 
     for page_markers in markers_by_page.values():
         page_markers.sort(key=lambda marker: (marker.x_min, marker.y_min, question_sort_key(marker.number)))
-        for marker in page_markers:
+        for marker in [item for item in page_markers if item.number in wanted_numbers]:
             crops[marker.number] = solution_crop_from_marker(
                 marker,
                 page_markers,
@@ -1062,12 +1102,6 @@ def write_if_changed(path: Path, contents: bytes) -> None:
     path.write_bytes(contents)
 
 
-def png_dimensions(contents: bytes) -> tuple[int, int]:
-    if contents[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR":
-        raise ValueError("Expected a PNG source page")
-    return struct.unpack(">II", contents[16:24])
-
-
 def longest_dark_run(row: bytes, threshold: int = 180) -> tuple[int, int, int]:
     best_start = 0
     best_length = 0
@@ -1104,30 +1138,14 @@ def detect_horizontal_rules(contents: bytes, pages: dict[int, PdfPage]) -> dict[
 
         for page_number, page in sorted(pages.items()):
             temporary_prefix = temporary_root / f"rules-{page_number}"
-            try:
-                subprocess.run(
-                    [
-                        "pdftocairo",
-                        "-png",
-                        "-singlefile",
-                        "-r",
-                        str(SOURCE_RENDER_DPI),
-                        "-f",
-                        str(page_number),
-                        "-l",
-                        str(page_number),
-                        str(pdf_path),
-                        str(temporary_prefix),
-                    ],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    check=True,
-                )
-            except FileNotFoundError as exc:
-                raise RuntimeError("pdftocairo is required to locate Mathematics solution rows") from exc
-            except subprocess.CalledProcessError as exc:
-                message = exc.stderr.decode("utf-8", errors="replace")
-                raise RuntimeError(f"pdftocairo failed while locating solution rows: {message}") from exc
+            render_pdf_page_to_png(
+                pdf_path,
+                temporary_prefix,
+                page_number,
+                SOURCE_RENDER_DPI,
+                required_message="pdftocairo is required to locate Mathematics solution rows",
+                failure_prefix="pdftocairo failed while locating solution rows",
+            )
 
             image = Image.open(temporary_prefix.with_suffix(".png")).convert("L")
             width, height = image.size
@@ -1182,30 +1200,13 @@ def render_source_pages(
         for page_number, page_crops in sorted(crops_by_page.items()):
             filename = f"{page_prefix}-{page_number}.png"
             temporary_prefix = temporary_root / f"{page_prefix}-{page_number}"
-            try:
-                subprocess.run(
-                    [
-                        "pdftocairo",
-                        "-png",
-                        "-singlefile",
-                        "-r",
-                        str(SOURCE_RENDER_DPI),
-                        "-f",
-                        str(page_number),
-                        "-l",
-                        str(page_number),
-                        str(paper_path),
-                        str(temporary_prefix),
-                    ],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    check=True,
-                )
-            except FileNotFoundError as exc:
-                raise RuntimeError("pdftocairo is required to build Mathematics source images") from exc
-            except subprocess.CalledProcessError as exc:
-                message = exc.stderr.decode("utf-8", errors="replace")
-                raise RuntimeError(f"pdftocairo failed: {message}") from exc
+            render_pdf_page_to_png(
+                paper_path,
+                temporary_prefix,
+                page_number,
+                SOURCE_RENDER_DPI,
+                required_message="pdftocairo is required to build Mathematics source images",
+            )
 
             contents = temporary_prefix.with_suffix(".png").read_bytes()
             image_width, image_height = png_dimensions(contents)
@@ -1641,30 +1642,14 @@ def parse_filled_answer_sheet_pixels(contents: bytes) -> dict[str, list[str]]:
         pdf_path = temporary_root / "answer-sheet.pdf"
         pdf_path.write_bytes(contents)
         output_prefix = temporary_root / "answer-sheet"
-        try:
-            subprocess.run(
-                [
-                    "pdftocairo",
-                    "-png",
-                    "-singlefile",
-                    "-r",
-                    str(SOURCE_RENDER_DPI),
-                    "-f",
-                    "1",
-                    "-l",
-                    "1",
-                    str(pdf_path),
-                    str(output_prefix),
-                ],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=True,
-            )
-        except FileNotFoundError as exc:
-            raise RuntimeError("pdftocairo is required to read Mathematics answer sheets") from exc
-        except subprocess.CalledProcessError as exc:
-            message = exc.stderr.decode("utf-8", errors="replace")
-            raise RuntimeError(f"pdftocairo failed while reading answer sheet: {message}") from exc
+        render_pdf_page_to_png(
+            pdf_path,
+            output_prefix,
+            1,
+            SOURCE_RENDER_DPI,
+            required_message="pdftocairo is required to read Mathematics answer sheets",
+            failure_prefix="pdftocairo failed while reading answer sheet",
+        )
 
         image = Image.open(output_prefix.with_suffix(".png")).convert("L")
         scale_x = image.width / page.width

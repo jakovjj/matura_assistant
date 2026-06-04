@@ -34,14 +34,12 @@ const temporarilyUnavailableSubjects = new Set([
   "Likovna umjetnost",
   "Logika",
   "Mađarski jezik",
-  "Mađarski jezik i književnost",
   "Njemački jezik",
   "Psihologija",
   "Sociologija",
   "Srpski jezik",
   "Španjolski jezik",
   "Talijanski jezik",
-  "Talijanski jezik i književnost",
   "Vjeronauk",
 ]);
 
@@ -62,7 +60,6 @@ const subjectIcons = {
   "Likovna umjetnost": "palette",
   Logika: "workflow",
   "Mađarski jezik": "languages",
-  "Mađarski jezik i književnost": "library",
   Matematika: "sigma",
   "Njemački jezik": "languages",
   "Politika i gospodarstvo": "landmark",
@@ -72,7 +69,6 @@ const subjectIcons = {
   "Srpski jezik": "languages",
   "Španjolski jezik": "languages",
   "Talijanski jezik": "languages",
-  "Talijanski jezik i književnost": "library",
   Vjeronauk: "church",
 };
 
@@ -93,7 +89,6 @@ const subjectColors = {
   "Likovna umjetnost": "#6a4f3d",
   Logika: "#4c5870",
   "Mađarski jezik": "#4e5d47",
-  "Mađarski jezik i književnost": "#465a4f",
   Matematika: "#4f4b78",
   "Njemački jezik": "#3e5876",
   "Politika i gospodarstvo": "#5c4a42",
@@ -103,7 +98,6 @@ const subjectColors = {
   "Srpski jezik": "#574a70",
   "Španjolski jezik": "#6b4a3f",
   "Talijanski jezik": "#405e55",
-  "Talijanski jezik i književnost": "#4b5a5f",
   Vjeronauk: "#4f5943",
 };
 
@@ -124,7 +118,6 @@ const subjectImages = {
   "Likovna umjetnost": "art",
   Logika: "logic-chess",
   "Mađarski jezik": "hungarian-budapest",
-  "Mađarski jezik i književnost": "books",
   Matematika: "mathematics",
   "Njemački jezik": "german-brandenburg",
   "Politika i gospodarstvo": "civics",
@@ -134,7 +127,6 @@ const subjectImages = {
   "Srpski jezik": "serbian-typewriter",
   "Španjolski jezik": "spanish-madrid",
   "Talijanski jezik": "italian-colosseum",
-  "Talijanski jezik i književnost": "literature-book",
   Vjeronauk: "religion-bible",
 };
 
@@ -155,7 +147,6 @@ const subjectAccusativeLabels = {
   "Likovna umjetnost": "Likovnu umjetnost",
   Logika: "Logiku",
   "Mađarski jezik": "Mađarski jezik",
-  "Mađarski jezik i književnost": "Mađarski jezik i književnost",
   Matematika: "Matematiku",
   "Njemački jezik": "Njemački jezik",
   "Politika i gospodarstvo": "Politiku i gospodarstvo",
@@ -165,7 +156,6 @@ const subjectAccusativeLabels = {
   "Srpski jezik": "Srpski jezik",
   "Španjolski jezik": "Španjolski jezik",
   "Talijanski jezik": "Talijanski jezik",
-  "Talijanski jezik i književnost": "Talijanski jezik i književnost",
   Vjeronauk: "Vjeronauk",
 };
 
@@ -270,181 +260,257 @@ function buildExamMap(items) {
   return map;
 }
 
-function englishReadingIdForTerm(exam, term) {
+function englishExamIdForTerm(exam, term) {
   return `engleski-${exam.level.toLocaleLowerCase("hr")}-${exam.year}-${slugPart(term)}`;
+}
+
+function prefixedExamIdForTerm(prefix, exam, term) {
+  const level = exam.level ? `-${exam.level.toLocaleLowerCase("hr")}` : "";
+  return `${prefix}${level}-${exam.year}-${slugPart(term)}`;
+}
+
+function archiveUrlKey(exam) {
+  return exam.archiveUrl;
+}
+
+function archiveExamUrlKey(exam) {
+  return exam.url;
+}
+
+function croatianWritingArchiveKey(exam) {
+  return `${exam.archiveUrl}|${exam.kind}`;
+}
+
+function croatianWritingArchiveLookupKey(exam, kind) {
+  return `${exam.url}|${kind}`;
+}
+
+const solverDefinitions = {
+  englishReading: {
+    data: englishReadingData?.exams || [],
+    idForTerm: englishExamIdForTerm,
+    page: "./engleski-citanje.html",
+    storagePrefix: "english-reading",
+  },
+  englishListening: {
+    data: englishListeningData?.exams || [],
+    idForTerm: englishExamIdForTerm,
+    page: "./engleski-slusanje.html",
+    storagePrefix: "english-listening",
+  },
+  englishEssay: {
+    data: englishEssayData?.exams || [],
+    idForTerm: englishExamIdForTerm,
+    page: "./engleski-esej.html",
+    storagePrefix: "english-essay",
+  },
+  croatianWriting: {
+    archiveKey: croatianWritingArchiveKey,
+    archiveLookupKey: croatianWritingArchiveLookupKey,
+    data: croatianWritingData?.exams || [],
+    idForTerm: (exam, term) => `${prefixedExamIdForTerm("hrvatski", exam, term)}-${exam.kind}`,
+    page: "./hrvatski-pisanje.html",
+    storagePrefix: "croatian-writing",
+  },
+  physicsChoice: {
+    data: physicsChoiceData?.exams || [],
+    idForTerm: (exam, term) => `fizika-${exam.year}-${slugPart(term)}`,
+    page: "./fizika.html",
+    storagePrefix: "physics-choice",
+  },
+  mathChoice: {
+    data: mathChoiceData?.exams || [],
+    idForTerm: (exam, term) => prefixedExamIdForTerm("matematika", exam, term),
+    page: "./matematika.html",
+    storagePrefix: "math-choice",
+  },
+  croatianChoice: {
+    data: croatianChoiceData?.exams || [],
+    idForTerm: (exam, term) => prefixedExamIdForTerm("hrvatski", exam, term),
+    page: "./hrvatski.html",
+    storagePrefix: "croatian-choice",
+  },
+  historyChoice: {
+    data: historyChoiceData?.exams || [],
+    idForTerm: (exam, term) => `povijest-${exam.year}-${slugPart(term)}`,
+    page: "./povijest.html",
+    storagePrefix: "history-choice",
+  },
+  geographyChoice: {
+    data: geographyChoiceData?.exams || [],
+    idForTerm: (exam, term) => `geografija-${exam.year}-${slugPart(term)}`,
+    page: "./geografija.html",
+    storagePrefix: "geography-choice",
+  },
+  politicsChoice: {
+    data: politicsChoiceData?.exams || [],
+    idForTerm: (exam, term) => `politika-i-gospodarstvo-${exam.year}-${slugPart(term)}`,
+    page: "./politika.html",
+    storagePrefix: "politics-choice",
+  },
+  abcdChoice: {
+    data: abcdChoiceData?.exams || [],
+    idForTerm: (exam, term) => prefixedExamIdForTerm(slugPart(exam.subject), exam, term),
+    page: "./abcd.html",
+    storagePrefix: "abcd-choice",
+  },
+};
+
+function normalizeSolverExam(definition, exam) {
+  const term = normalizeTerm(exam.term);
+  return {
+    ...exam,
+    term,
+    id: definition.idForTerm(exam, term),
+  };
+}
+
+function buildSolverRegistry(definitions) {
+  return Object.fromEntries(
+    Object.entries(definitions).map(([key, definition]) => {
+      const exams = definition.data.map((exam) => normalizeSolverExam(definition, exam));
+      const archiveKey = definition.archiveKey || archiveUrlKey;
+      return [
+        key,
+        {
+          ...definition,
+          archiveKey,
+          archiveLookupKey: definition.archiveLookupKey || archiveExamUrlKey,
+          byArchive: new Map(exams.map((exam) => [archiveKey(exam), exam])),
+          exams,
+        },
+      ];
+    }),
+  );
+}
+
+const solverRegistry = buildSolverRegistry(solverDefinitions);
+
+function solverIdForTerm(solverKey, exam, term) {
+  return solverRegistry[solverKey].idForTerm(exam, term);
+}
+
+function solverStorageKeys(solverKey, practiceExam) {
+  const definition = solverRegistry[solverKey];
+  const ids = [
+    practiceExam.id,
+    ...(legacyTermAliases[practiceExam.term] || []).map((term) =>
+      definition.idForTerm(practiceExam, term),
+    ),
+  ];
+
+  return [...new Set(ids)].map((id) => `asistent-za-mature:${definition.storagePrefix}:${id}`);
+}
+
+function solverOpenScoreStorageKeys(solverKey, practiceExam) {
+  return solverStorageKeys(solverKey, practiceExam).map((key) => `${key}:open-scores`);
+}
+
+function solverUrl(solverKey, practiceExam, simulation = false) {
+  const params = new URLSearchParams({ exam: practiceExam.id });
+  if (simulation) params.set("nacin", "simulacija");
+  return `${solverRegistry[solverKey].page}?${params.toString()}`;
+}
+
+function solverExamForArchive(solverKey, exam, archivePart = undefined) {
+  const definition = solverRegistry[solverKey];
+  return definition.byArchive.get(definition.archiveLookupKey(exam, archivePart)) || null;
+}
+
+function englishReadingIdForTerm(exam, term) {
+  return solverIdForTerm("englishReading", exam, term);
 }
 
 function englishListeningIdForTerm(exam, term) {
-  return `engleski-${exam.level.toLocaleLowerCase("hr")}-${exam.year}-${slugPart(term)}`;
+  return solverIdForTerm("englishListening", exam, term);
 }
 
 function englishEssayIdForTerm(exam, term) {
-  return `engleski-${exam.level.toLocaleLowerCase("hr")}-${exam.year}-${slugPart(term)}`;
+  return solverIdForTerm("englishEssay", exam, term);
 }
 
 function croatianWritingIdForTerm(exam, term) {
-  const level = exam.level ? `-${exam.level.toLocaleLowerCase("hr")}` : "";
-  return `hrvatski${level}-${exam.year}-${slugPart(term)}-${exam.kind}`;
+  return solverIdForTerm("croatianWriting", exam, term);
 }
 
 function physicsChoiceIdForTerm(exam, term) {
-  return `fizika-${exam.year}-${slugPart(term)}`;
+  return solverIdForTerm("physicsChoice", exam, term);
 }
 
 function mathChoiceIdForTerm(exam, term) {
-  const level = exam.level ? `-${exam.level.toLocaleLowerCase("hr")}` : "";
-  return `matematika${level}-${exam.year}-${slugPart(term)}`;
+  return solverIdForTerm("mathChoice", exam, term);
 }
 
 function croatianChoiceIdForTerm(exam, term) {
-  const level = exam.level ? `-${exam.level.toLocaleLowerCase("hr")}` : "";
-  return `hrvatski${level}-${exam.year}-${slugPart(term)}`;
+  return solverIdForTerm("croatianChoice", exam, term);
 }
 
 function historyChoiceIdForTerm(exam, term) {
-  return `povijest-${exam.year}-${slugPart(term)}`;
+  return solverIdForTerm("historyChoice", exam, term);
 }
 
 function geographyChoiceIdForTerm(exam, term) {
-  return `geografija-${exam.year}-${slugPart(term)}`;
+  return solverIdForTerm("geographyChoice", exam, term);
 }
 
 function politicsChoiceIdForTerm(exam, term) {
-  return `politika-i-gospodarstvo-${exam.year}-${slugPart(term)}`;
+  return solverIdForTerm("politicsChoice", exam, term);
 }
 
 function abcdChoiceIdForTerm(exam, term) {
-  const level = exam.level ? `-${exam.level.toLocaleLowerCase("hr")}` : "";
-  return `${slugPart(exam.subject)}${level}-${exam.year}-${slugPart(term)}`;
+  return solverIdForTerm("abcdChoice", exam, term);
 }
 
 function englishReadingStorageKeys(readingExam) {
-  const ids = [
-    readingExam.id,
-    ...(legacyTermAliases[readingExam.term] || []).map((term) =>
-      englishReadingIdForTerm(readingExam, term),
-    ),
-  ];
-
-  return [...new Set(ids)].map((id) => `asistent-za-mature:english-reading:${id}`);
+  return solverStorageKeys("englishReading", readingExam);
 }
 
 function englishListeningStorageKeys(listeningExam) {
-  const ids = [
-    listeningExam.id,
-    ...(legacyTermAliases[listeningExam.term] || []).map((term) =>
-      englishListeningIdForTerm(listeningExam, term),
-    ),
-  ];
-
-  return [...new Set(ids)].map((id) => `asistent-za-mature:english-listening:${id}`);
+  return solverStorageKeys("englishListening", listeningExam);
 }
 
 function englishEssayStorageKeys(essayExam) {
-  const ids = [
-    essayExam.id,
-    ...(legacyTermAliases[essayExam.term] || []).map((term) =>
-      englishEssayIdForTerm(essayExam, term),
-    ),
-  ];
-
-  return [...new Set(ids)].map((id) => `asistent-za-mature:english-essay:${id}`);
+  return solverStorageKeys("englishEssay", essayExam);
 }
 
 function croatianWritingStorageKeys(writingExam) {
-  const ids = [
-    writingExam.id,
-    ...(legacyTermAliases[writingExam.term] || []).map((term) =>
-      croatianWritingIdForTerm(writingExam, term),
-    ),
-  ];
-
-  return [...new Set(ids)].map((id) => `asistent-za-mature:croatian-writing:${id}`);
+  return solverStorageKeys("croatianWriting", writingExam);
 }
 
 function physicsChoiceStorageKeys(choiceExam) {
-  const ids = [
-    choiceExam.id,
-    ...(legacyTermAliases[choiceExam.term] || []).map((term) =>
-      physicsChoiceIdForTerm(choiceExam, term),
-    ),
-  ];
-
-  return [...new Set(ids)].map((id) => `asistent-za-mature:physics-choice:${id}`);
+  return solverStorageKeys("physicsChoice", choiceExam);
 }
 
 function physicsOpenScoreStorageKeys(choiceExam) {
-  return physicsChoiceStorageKeys(choiceExam).map((key) => `${key}:open-scores`);
+  return solverOpenScoreStorageKeys("physicsChoice", choiceExam);
 }
 
 function mathChoiceStorageKeys(choiceExam) {
-  const ids = [
-    choiceExam.id,
-    ...(legacyTermAliases[choiceExam.term] || []).map((term) =>
-      mathChoiceIdForTerm(choiceExam, term),
-    ),
-  ];
-
-  return [...new Set(ids)].map((id) => `asistent-za-mature:math-choice:${id}`);
+  return solverStorageKeys("mathChoice", choiceExam);
 }
 
 function mathOpenScoreStorageKeys(choiceExam) {
-  return mathChoiceStorageKeys(choiceExam).map((key) => `${key}:open-scores`);
+  return solverOpenScoreStorageKeys("mathChoice", choiceExam);
 }
 
 function croatianChoiceStorageKeys(choiceExam) {
-  const ids = [
-    choiceExam.id,
-    ...(legacyTermAliases[choiceExam.term] || []).map((term) =>
-      croatianChoiceIdForTerm(choiceExam, term),
-    ),
-  ];
-
-  return [...new Set(ids)].map((id) => `asistent-za-mature:croatian-choice:${id}`);
+  return solverStorageKeys("croatianChoice", choiceExam);
 }
 
 function historyChoiceStorageKeys(choiceExam) {
-  const ids = [
-    choiceExam.id,
-    ...(legacyTermAliases[choiceExam.term] || []).map((term) =>
-      historyChoiceIdForTerm(choiceExam, term),
-    ),
-  ];
-
-  return [...new Set(ids)].map((id) => `asistent-za-mature:history-choice:${id}`);
+  return solverStorageKeys("historyChoice", choiceExam);
 }
 
 function geographyChoiceStorageKeys(choiceExam) {
-  const ids = [
-    choiceExam.id,
-    ...(legacyTermAliases[choiceExam.term] || []).map((term) =>
-      geographyChoiceIdForTerm(choiceExam, term),
-    ),
-  ];
-
-  return [...new Set(ids)].map((id) => `asistent-za-mature:geography-choice:${id}`);
+  return solverStorageKeys("geographyChoice", choiceExam);
 }
 
 function politicsChoiceStorageKeys(choiceExam) {
-  const ids = [
-    choiceExam.id,
-    ...(legacyTermAliases[choiceExam.term] || []).map((term) =>
-      politicsChoiceIdForTerm(choiceExam, term),
-    ),
-  ];
-
-  return [...new Set(ids)].map((id) => `asistent-za-mature:politics-choice:${id}`);
+  return solverStorageKeys("politicsChoice", choiceExam);
 }
 
 function abcdChoiceStorageKeys(choiceExam) {
-  const ids = [
-    choiceExam.id,
-    ...(legacyTermAliases[choiceExam.term] || []).map((term) =>
-      abcdChoiceIdForTerm(choiceExam, term),
-    ),
-  ];
-
-  return [...new Set(ids)].map((id) => `asistent-za-mature:abcd-choice:${id}`);
+  return solverStorageKeys("abcdChoice", choiceExam);
 }
 
 const exams = archiveData.exams.map((exam) => {
@@ -452,127 +518,6 @@ const exams = archiveData.exams.map((exam) => {
   return { ...exam, term, id: examIdForTerm(exam, term) };
 });
 const examsById = buildExamMap(exams);
-const englishReadingExams = (englishReadingData?.exams || []).map((exam) => {
-  const term = normalizeTerm(exam.term);
-  return {
-    ...exam,
-    term,
-    id: englishReadingIdForTerm(exam, term),
-  };
-});
-const englishReadingByArchiveUrl = new Map(
-  englishReadingExams.map((exam) => [exam.archiveUrl, exam]),
-);
-const englishListeningExams = (englishListeningData?.exams || []).map((exam) => {
-  const term = normalizeTerm(exam.term);
-  return {
-    ...exam,
-    term,
-    id: englishListeningIdForTerm(exam, term),
-  };
-});
-const englishListeningByArchiveUrl = new Map(
-  englishListeningExams.map((exam) => [exam.archiveUrl, exam]),
-);
-const englishEssayExams = (englishEssayData?.exams || []).map((exam) => {
-  const term = normalizeTerm(exam.term);
-  return {
-    ...exam,
-    term,
-    id: englishEssayIdForTerm(exam, term),
-  };
-});
-const englishEssayByArchiveUrl = new Map(
-  englishEssayExams.map((exam) => [exam.archiveUrl, exam]),
-);
-const croatianWritingExams = (croatianWritingData?.exams || []).map((exam) => {
-  const term = normalizeTerm(exam.term);
-  return {
-    ...exam,
-    term,
-    id: croatianWritingIdForTerm(exam, term),
-  };
-});
-const croatianWritingByArchivePart = new Map(
-  croatianWritingExams.map((exam) => [`${exam.archiveUrl}|${exam.kind}`, exam]),
-);
-const physicsChoiceExams = (physicsChoiceData?.exams || []).map((exam) => {
-  const term = normalizeTerm(exam.term);
-  return {
-    ...exam,
-    term,
-    id: physicsChoiceIdForTerm(exam, term),
-  };
-});
-const physicsChoiceByArchiveUrl = new Map(
-  physicsChoiceExams.map((exam) => [exam.archiveUrl, exam]),
-);
-const mathChoiceExams = (mathChoiceData?.exams || []).map((exam) => {
-  const term = normalizeTerm(exam.term);
-  return {
-    ...exam,
-    term,
-    id: mathChoiceIdForTerm(exam, term),
-  };
-});
-const mathChoiceByArchiveUrl = new Map(
-  mathChoiceExams.map((exam) => [exam.archiveUrl, exam]),
-);
-const croatianChoiceExams = (croatianChoiceData?.exams || []).map((exam) => {
-  const term = normalizeTerm(exam.term);
-  return {
-    ...exam,
-    term,
-    id: croatianChoiceIdForTerm(exam, term),
-  };
-});
-const croatianChoiceByArchiveUrl = new Map(
-  croatianChoiceExams.map((exam) => [exam.archiveUrl, exam]),
-);
-const historyChoiceExams = (historyChoiceData?.exams || []).map((exam) => {
-  const term = normalizeTerm(exam.term);
-  return {
-    ...exam,
-    term,
-    id: historyChoiceIdForTerm(exam, term),
-  };
-});
-const historyChoiceByArchiveUrl = new Map(
-  historyChoiceExams.map((exam) => [exam.archiveUrl, exam]),
-);
-const geographyChoiceExams = (geographyChoiceData?.exams || []).map((exam) => {
-  const term = normalizeTerm(exam.term);
-  return {
-    ...exam,
-    term,
-    id: geographyChoiceIdForTerm(exam, term),
-  };
-});
-const geographyChoiceByArchiveUrl = new Map(
-  geographyChoiceExams.map((exam) => [exam.archiveUrl, exam]),
-);
-const politicsChoiceExams = (politicsChoiceData?.exams || []).map((exam) => {
-  const term = normalizeTerm(exam.term);
-  return {
-    ...exam,
-    term,
-    id: politicsChoiceIdForTerm(exam, term),
-  };
-});
-const politicsChoiceByArchiveUrl = new Map(
-  politicsChoiceExams.map((exam) => [exam.archiveUrl, exam]),
-);
-const abcdChoiceExams = (abcdChoiceData?.exams || []).map((exam) => {
-  const term = normalizeTerm(exam.term);
-  return {
-    ...exam,
-    term,
-    id: abcdChoiceIdForTerm(exam, term),
-  };
-});
-const abcdChoiceByArchiveUrl = new Map(
-  abcdChoiceExams.map((exam) => [exam.archiveUrl, exam]),
-);
 const englishPracticeParts = [
   {
     id: "citanje",
@@ -648,7 +593,6 @@ const unavailableForeignLanguageParts = [
 ];
 const literatureLanguageSubjects = new Set([
   "Mađarski jezik",
-  "Mađarski jezik i književnost",
   "Srpski jezik",
 ]);
 const literatureLanguageParts = [
@@ -668,29 +612,11 @@ const literatureLanguageDurations = {
     "knjizevnost-jezik": 80,
     "skolski-esej": 180,
   },
-  "Mađarski jezik i književnost": {
-    "knjizevnost-jezik": 80,
-    "skolski-esej": 180,
-  },
   "Srpski jezik": {
     "knjizevnost-jezik": 90,
     "skolski-esej": 150,
   },
 };
-const italianLiteratureParts = [
-  {
-    id: "strukturirani-ispit",
-    label: "Strukturirani ispit",
-    description: "Zadatci iz jezika i književnosti.",
-    durationMinutes: 100,
-  },
-  {
-    id: "pisani-rad",
-    label: "Pisani rad",
-    description: "Pisani dio ispita.",
-    durationMinutes: 180,
-  },
-];
 const musicPracticeParts = [
   {
     id: "glazba-u-kontekstu",
@@ -1058,113 +984,91 @@ function setMissingSeo(title, description) {
 }
 
 function englishReadingUrl(readingExam, simulation = false) {
-  const params = new URLSearchParams({ exam: readingExam.id });
-  if (simulation) params.set("nacin", "simulacija");
-  return `./engleski-citanje.html?${params.toString()}`;
+  return solverUrl("englishReading", readingExam, simulation);
 }
 
 function englishListeningUrl(listeningExam, simulation = false) {
-  const params = new URLSearchParams({ exam: listeningExam.id });
-  if (simulation) params.set("nacin", "simulacija");
-  return `./engleski-slusanje.html?${params.toString()}`;
+  return solverUrl("englishListening", listeningExam, simulation);
 }
 
 function englishEssayUrl(essayExam, simulation = false) {
-  const params = new URLSearchParams({ exam: essayExam.id });
-  if (simulation) params.set("nacin", "simulacija");
-  return `./engleski-esej.html?${params.toString()}`;
+  return solverUrl("englishEssay", essayExam, simulation);
 }
 
 function croatianWritingUrl(writingExam, simulation = false) {
-  const params = new URLSearchParams({ exam: writingExam.id });
-  if (simulation) params.set("nacin", "simulacija");
-  return `./hrvatski-pisanje.html?${params.toString()}`;
+  return solverUrl("croatianWriting", writingExam, simulation);
 }
 
 function physicsChoiceUrl(choiceExam, simulation = false) {
-  const params = new URLSearchParams({ exam: choiceExam.id });
-  if (simulation) params.set("nacin", "simulacija");
-  return `./fizika.html?${params.toString()}`;
+  return solverUrl("physicsChoice", choiceExam, simulation);
 }
 
 function mathChoiceUrl(choiceExam, simulation = false) {
-  const params = new URLSearchParams({ exam: choiceExam.id });
-  if (simulation) params.set("nacin", "simulacija");
-  return `./matematika.html?${params.toString()}`;
+  return solverUrl("mathChoice", choiceExam, simulation);
 }
 
 function croatianChoiceUrl(choiceExam, simulation = false) {
-  const params = new URLSearchParams({ exam: choiceExam.id });
-  if (simulation) params.set("nacin", "simulacija");
-  return `./hrvatski.html?${params.toString()}`;
+  return solverUrl("croatianChoice", choiceExam, simulation);
 }
 
 function historyChoiceUrl(choiceExam, simulation = false) {
-  const params = new URLSearchParams({ exam: choiceExam.id });
-  if (simulation) params.set("nacin", "simulacija");
-  return `./povijest.html?${params.toString()}`;
+  return solverUrl("historyChoice", choiceExam, simulation);
 }
 
 function geographyChoiceUrl(choiceExam, simulation = false) {
-  const params = new URLSearchParams({ exam: choiceExam.id });
-  if (simulation) params.set("nacin", "simulacija");
-  return `./geografija.html?${params.toString()}`;
+  return solverUrl("geographyChoice", choiceExam, simulation);
 }
 
 function politicsChoiceUrl(choiceExam, simulation = false) {
-  const params = new URLSearchParams({ exam: choiceExam.id });
-  if (simulation) params.set("nacin", "simulacija");
-  return `./politika.html?${params.toString()}`;
+  return solverUrl("politicsChoice", choiceExam, simulation);
 }
 
 function abcdChoiceUrl(choiceExam, simulation = false) {
-  const params = new URLSearchParams({ exam: choiceExam.id });
-  if (simulation) params.set("nacin", "simulacija");
-  return `./abcd.html?${params.toString()}`;
+  return solverUrl("abcdChoice", choiceExam, simulation);
 }
 
 function readingExamForArchive(exam) {
-  return englishReadingByArchiveUrl.get(exam.url) || null;
+  return solverExamForArchive("englishReading", exam);
 }
 
 function listeningExamForArchive(exam) {
-  return englishListeningByArchiveUrl.get(exam.url) || null;
+  return solverExamForArchive("englishListening", exam);
 }
 
 function essayExamForArchive(exam) {
-  return englishEssayByArchiveUrl.get(exam.url) || null;
+  return solverExamForArchive("englishEssay", exam);
 }
 
 function croatianWritingExamForArchive(exam, kind) {
-  return croatianWritingByArchivePart.get(`${exam.url}|${kind}`) || null;
+  return solverExamForArchive("croatianWriting", exam, kind);
 }
 
 function physicsChoiceExamForArchive(exam) {
-  return physicsChoiceByArchiveUrl.get(exam.url) || null;
+  return solverExamForArchive("physicsChoice", exam);
 }
 
 function mathChoiceExamForArchive(exam) {
-  return mathChoiceByArchiveUrl.get(exam.url) || null;
+  return solverExamForArchive("mathChoice", exam);
 }
 
 function croatianChoiceExamForArchive(exam) {
-  return croatianChoiceByArchiveUrl.get(exam.url) || null;
+  return solverExamForArchive("croatianChoice", exam);
 }
 
 function historyChoiceExamForArchive(exam) {
-  return historyChoiceByArchiveUrl.get(exam.url) || null;
+  return solverExamForArchive("historyChoice", exam);
 }
 
 function geographyChoiceExamForArchive(exam) {
-  return geographyChoiceByArchiveUrl.get(exam.url) || null;
+  return solverExamForArchive("geographyChoice", exam);
 }
 
 function politicsChoiceExamForArchive(exam) {
-  return politicsChoiceByArchiveUrl.get(exam.url) || null;
+  return solverExamForArchive("politicsChoice", exam);
 }
 
 function abcdChoiceExamForArchive(exam) {
-  return abcdChoiceByArchiveUrl.get(exam.url) || null;
+  return solverExamForArchive("abcdChoice", exam);
 }
 
 function unavailablePart(exam, part) {
@@ -1460,14 +1364,6 @@ function interactiveParts(exam) {
     );
   }
 
-  if (exam.subject === "Talijanski jezik i književnost") {
-    return italianLiteratureParts.map((part) =>
-      part.id === "strukturirani-ispit"
-        ? genericAbcdPart(exam, part)
-        : unavailablePart(exam, part),
-    );
-  }
-
   if (exam.subject === "Glazbena umjetnost") {
     return unavailableParts(exam, musicPracticeParts);
   }
@@ -1485,19 +1381,39 @@ function interactiveParts(exam) {
   return unavailableParts(exam, withDurations(exam, [singleExamPart]));
 }
 
-function readEnglishResponses(readingExam) {
-  const storedResponses = {};
+function isStorageObject(value) {
+  return value && typeof value === "object" && !Array.isArray(value);
+}
+
+function readMergedStorageObjects(storageKeys, selectStoredObject = (stored) => stored) {
+  const storedObjects = {};
   try {
-    for (const key of englishReadingStorageKeys(readingExam).reverse()) {
+    for (const key of storageKeys.slice().reverse()) {
       const stored = JSON.parse(localStorage.getItem(key) || "{}");
-      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-        Object.assign(storedResponses, stored);
+      if (isStorageObject(stored)) {
+        Object.assign(storedObjects, selectStoredObject(stored));
       }
     }
   } catch {
     return {};
   }
-  return storedResponses;
+  return storedObjects;
+}
+
+function readFirstStorageObject(storageKeys) {
+  try {
+    for (const key of storageKeys.slice().reverse()) {
+      const stored = JSON.parse(localStorage.getItem(key) || "{}");
+      if (isStorageObject(stored)) return stored;
+    }
+  } catch {
+    return {};
+  }
+  return {};
+}
+
+function readEnglishResponses(readingExam) {
+  return readMergedStorageObjects(englishReadingStorageKeys(readingExam));
 }
 
 function englishQuestionNumbers(readingExam) {
@@ -1529,18 +1445,7 @@ function englishProgress(exam) {
 }
 
 function readEnglishListeningResponses(listeningExam) {
-  const storedResponses = {};
-  try {
-    for (const key of englishListeningStorageKeys(listeningExam).reverse()) {
-      const stored = JSON.parse(localStorage.getItem(key) || "{}");
-      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-        Object.assign(storedResponses, stored);
-      }
-    }
-  } catch {
-    return {};
-  }
-  return storedResponses;
+  return readMergedStorageObjects(englishListeningStorageKeys(listeningExam));
 }
 
 function englishListeningProgress(exam) {
@@ -1562,17 +1467,8 @@ function englishListeningProgress(exam) {
 }
 
 function readEnglishEssayDraft(essayExam) {
-  try {
-    for (const key of englishEssayStorageKeys(essayExam).reverse()) {
-      const stored = JSON.parse(localStorage.getItem(key) || "{}");
-      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-        return typeof stored.essayText === "string" ? stored.essayText : "";
-      }
-    }
-  } catch {
-    return "";
-  }
-  return "";
+  const stored = readFirstStorageObject(englishEssayStorageKeys(essayExam));
+  return typeof stored.essayText === "string" ? stored.essayText : "";
 }
 
 function englishEssayProgress(exam) {
@@ -1587,17 +1483,8 @@ function englishEssayProgress(exam) {
 }
 
 function readCroatianWritingDraft(writingExam) {
-  try {
-    for (const key of croatianWritingStorageKeys(writingExam).reverse()) {
-      const stored = JSON.parse(localStorage.getItem(key) || "{}");
-      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-        return typeof stored.writingText === "string" ? stored.writingText : "";
-      }
-    }
-  } catch {
-    return "";
-  }
-  return "";
+  const stored = readFirstStorageObject(croatianWritingStorageKeys(writingExam));
+  return typeof stored.writingText === "string" ? stored.writingText : "";
 }
 
 function croatianWritingProgress(exam) {
@@ -1612,33 +1499,11 @@ function croatianWritingProgress(exam) {
 }
 
 function readPhysicsResponses(choiceExam) {
-  const storedResponses = {};
-  try {
-    for (const key of physicsChoiceStorageKeys(choiceExam).reverse()) {
-      const stored = JSON.parse(localStorage.getItem(key) || "{}");
-      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-        Object.assign(storedResponses, stored);
-      }
-    }
-  } catch {
-    return {};
-  }
-  return storedResponses;
+  return readMergedStorageObjects(physicsChoiceStorageKeys(choiceExam));
 }
 
 function readPhysicsOpenScores(choiceExam) {
-  const storedScores = {};
-  try {
-    for (const key of physicsOpenScoreStorageKeys(choiceExam).reverse()) {
-      const stored = JSON.parse(localStorage.getItem(key) || "{}");
-      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-        Object.assign(storedScores, stored);
-      }
-    }
-  } catch {
-    return {};
-  }
-  return storedScores;
+  return readMergedStorageObjects(physicsOpenScoreStorageKeys(choiceExam));
 }
 
 function physicsQuestionNumbers(choiceExam) {
@@ -1684,33 +1549,11 @@ function physicsProgress(exam) {
 }
 
 function readMathResponses(choiceExam) {
-  const storedResponses = {};
-  try {
-    for (const key of mathChoiceStorageKeys(choiceExam).reverse()) {
-      const stored = JSON.parse(localStorage.getItem(key) || "{}");
-      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-        Object.assign(storedResponses, stored);
-      }
-    }
-  } catch {
-    return {};
-  }
-  return storedResponses;
+  return readMergedStorageObjects(mathChoiceStorageKeys(choiceExam));
 }
 
 function readMathOpenScores(choiceExam) {
-  const storedScores = {};
-  try {
-    for (const key of mathOpenScoreStorageKeys(choiceExam).reverse()) {
-      const stored = JSON.parse(localStorage.getItem(key) || "{}");
-      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-        Object.assign(storedScores, stored);
-      }
-    }
-  } catch {
-    return {};
-  }
-  return storedScores;
+  return readMergedStorageObjects(mathOpenScoreStorageKeys(choiceExam));
 }
 
 function mathQuestionNumbers(choiceExam) {
@@ -1756,18 +1599,7 @@ function mathProgress(exam) {
 }
 
 function readCroatianResponses(choiceExam) {
-  const storedResponses = {};
-  try {
-    for (const key of croatianChoiceStorageKeys(choiceExam).reverse()) {
-      const stored = JSON.parse(localStorage.getItem(key) || "{}");
-      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-        Object.assign(storedResponses, stored);
-      }
-    }
-  } catch {
-    return {};
-  }
-  return storedResponses;
+  return readMergedStorageObjects(croatianChoiceStorageKeys(choiceExam));
 }
 
 function croatianQuestionNumbers(choiceExam) {
@@ -1793,18 +1625,7 @@ function croatianProgress(exam) {
 }
 
 function readHistoryChoiceState(choiceExam) {
-  const storedState = {};
-  try {
-    for (const key of historyChoiceStorageKeys(choiceExam).reverse()) {
-      const stored = JSON.parse(localStorage.getItem(key) || "{}");
-      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-        Object.assign(storedState, stored);
-      }
-    }
-  } catch {
-    return {};
-  }
-  return storedState;
+  return readMergedStorageObjects(historyChoiceStorageKeys(choiceExam));
 }
 
 function historyQuestionNumbers(choiceExam) {
@@ -1888,33 +1709,14 @@ function geographyProgress(exam) {
 }
 
 function readPoliticsChoiceResponses(choiceExam) {
-  const storedResponses = {};
-  try {
-    for (const key of politicsChoiceStorageKeys(choiceExam).reverse()) {
-      const stored = JSON.parse(localStorage.getItem(key) || "{}");
-      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-        Object.assign(storedResponses, stored.closedResponses || stored);
-      }
-    }
-  } catch {
-    return {};
-  }
-  return storedResponses;
+  return readMergedStorageObjects(
+    politicsChoiceStorageKeys(choiceExam),
+    (stored) => stored.closedResponses || stored,
+  );
 }
 
 function readPoliticsOpenScores(choiceExam) {
-  const storedScores = {};
-  try {
-    for (const key of politicsChoiceStorageKeys(choiceExam).map((key) => `${key}:open-scores`).reverse()) {
-      const stored = JSON.parse(localStorage.getItem(key) || "{}");
-      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-        Object.assign(storedScores, stored);
-      }
-    }
-  } catch {
-    return {};
-  }
-  return storedScores;
+  return readMergedStorageObjects(solverOpenScoreStorageKeys("politicsChoice", choiceExam));
 }
 
 function politicsProgress(exam) {
@@ -1942,18 +1744,7 @@ function politicsProgress(exam) {
 }
 
 function readAbcdChoiceResponses(choiceExam) {
-  const storedResponses = {};
-  try {
-    for (const key of abcdChoiceStorageKeys(choiceExam).reverse()) {
-      const stored = JSON.parse(localStorage.getItem(key) || "{}");
-      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-        Object.assign(storedResponses, stored);
-      }
-    }
-  } catch {
-    return {};
-  }
-  return storedResponses;
+  return readMergedStorageObjects(abcdChoiceStorageKeys(choiceExam));
 }
 
 function abcdChoiceQuestionNumbers(choiceExam) {

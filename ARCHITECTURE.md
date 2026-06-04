@@ -79,6 +79,7 @@ python3 -m py_compile scripts/fetch_ncvvo.py scripts/build_croatian_writing.py
 | `solver-self-check.js` | Zajednicki `Provjeri zadatak` za auto-checkable zadatke. |
 | `solver-header.js` | Zajednicki header za standalone solvere. |
 | `site-header.js`, `site-footer.js` | Zajednicki layout chrome. |
+| `scripts/pdf_utils.py` | Zajednicki helperi za `pdftotext`, `pdfinfo`, `pdftocairo`, PNG dimenzije i osnovni slug/term utility. |
 
 ## Generirani podaci
 
@@ -134,7 +135,7 @@ pakete.
 ```
 
 Svaki interaktivni `data/<solver>.js` zapis sadrzi `archiveUrl`. `app.js` radi
-mapiranje ovako:
+mapiranje kroz `solverDefinitions` registry ovako:
 
 | Solver | Map key u `app.js` |
 | --- | --- |
@@ -145,6 +146,13 @@ mapiranje ovako:
 
 Ako mapiranje ne nadje zapis, UI prikaze dio kao nedostupan:
 `Nema definiranog interaktivnog ispita za sada.`
+
+`solverDefinitions` je izvor istine za frontend povezivanje arhive i solvera.
+Svaka definicija drzi data array, storage prefix, standalone page, `idForTerm`
+builder i po potrebi poseban archive key. `buildSolverRegistry()` normalizira
+rokove, dodaje deterministicki ID i gradi `byArchive` mapu. Stare tanke helper
+funkcije poput `mathChoiceUrl()` i `physicsChoiceExamForArchive()` delegiraju na
+registry radi manjeg diff-a u render/progress kodu.
 
 ## ID sheme
 
@@ -219,9 +227,7 @@ Ako dodajes novu ispitnu cjelinu, najcesce diras:
 
 ```text
 app.js
-  -> data normalization block
-  -> byArchive map
-  -> urlBuilder
+  -> solverDefinitions entry (data, storagePrefix, page, idForTerm, archive key)
   -> interactiveParts(exam)
   -> progress helpers ako treba
 ```
@@ -408,4 +414,3 @@ solutions/sourceImages   # za prikaz zadataka i rjesenja
 
 Self-review otvoreni zadaci koriste bodovni input i rjesenje. Povijest i
 geografija imaju i AI endpoint za otvorene zadatke.
-

@@ -7,8 +7,6 @@ import json
 import math
 import re
 import shutil
-import struct
-import subprocess
 import sys
 import tempfile
 import unicodedata
@@ -22,6 +20,7 @@ from xml.etree import ElementTree
 from PIL import Image
 
 from crop_utils import grayscale_image_from_png, trim_crop_bottom_whitespace
+from pdf_utils import pdftotext, png_dimensions, render_pdf_page_to_png
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -190,39 +189,20 @@ def local_archive_path(url: str) -> Path:
 
 
 def pdf_text(contents: bytes) -> str:
-    try:
-        completed = subprocess.run(
-            ["pdftotext", "-layout", "-", "-"],
-            input=contents,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-    except FileNotFoundError as exc:
-        raise RuntimeError("pdftotext is required to build Physics choice data") from exc
-    except subprocess.CalledProcessError as exc:
-        message = exc.stderr.decode("utf-8", errors="replace")
-        raise RuntimeError(f"pdftotext failed: {message}") from exc
-
-    return completed.stdout.decode("utf-8", errors="replace")
+    return pdftotext(
+        contents,
+        "-layout",
+        required_message="pdftotext is required to build Physics choice data",
+    )
 
 
 def pdf_bbox_pages(contents: bytes) -> list[PdfPage]:
-    try:
-        completed = subprocess.run(
-            ["pdftotext", "-bbox-layout", "-", "-"],
-            input=contents,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-    except FileNotFoundError as exc:
-        raise RuntimeError("pdftotext is required to build Physics source images") from exc
-    except subprocess.CalledProcessError as exc:
-        message = exc.stderr.decode("utf-8", errors="replace")
-        raise RuntimeError(f"pdftotext -bbox-layout failed: {message}") from exc
-
-    xml = completed.stdout.decode("utf-8", errors="replace")
+    xml = pdftotext(
+        contents,
+        "-bbox-layout",
+        required_message="pdftotext is required to build Physics source images",
+        failure_prefix="pdftotext -bbox-layout failed",
+    )
     # Older NCVVO PDFs contain control glyphs that pdftotext writes into its
     # XHTML output even though XML does not allow them.
     xml = "".join(character for character in xml if character in "\t\n\r" or ord(character) >= 32)
@@ -611,12 +591,6 @@ def write_if_changed(path: Path, contents: bytes) -> None:
     path.write_bytes(contents)
 
 
-def png_dimensions(contents: bytes) -> tuple[int, int]:
-    if contents[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR":
-        raise ValueError("Expected a PNG source page")
-    return struct.unpack(">II", contents[16:24])
-
-
 def longest_dark_run(row: bytes, threshold: int = 180) -> tuple[int, int, int]:
     best_start = 0
     best_length = 0
@@ -653,30 +627,14 @@ def detect_horizontal_rules(contents: bytes, pages: dict[int, PdfPage]) -> dict[
 
         for page_number, page in sorted(pages.items()):
             temporary_prefix = temporary_root / f"rules-{page_number}"
-            try:
-                subprocess.run(
-                    [
-                        "pdftocairo",
-                        "-png",
-                        "-singlefile",
-                        "-r",
-                        str(SOURCE_RENDER_DPI),
-                        "-f",
-                        str(page_number),
-                        "-l",
-                        str(page_number),
-                        str(pdf_path),
-                        str(temporary_prefix),
-                    ],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    check=True,
-                )
-            except FileNotFoundError as exc:
-                raise RuntimeError("pdftocairo is required to locate Physics solution rows") from exc
-            except subprocess.CalledProcessError as exc:
-                message = exc.stderr.decode("utf-8", errors="replace")
-                raise RuntimeError(f"pdftocairo failed while locating solution rows: {message}") from exc
+            render_pdf_page_to_png(
+                pdf_path,
+                temporary_prefix,
+                page_number,
+                SOURCE_RENDER_DPI,
+                required_message="pdftocairo is required to locate Physics solution rows",
+                failure_prefix="pdftocairo failed while locating solution rows",
+            )
 
             image = Image.open(temporary_prefix.with_suffix(".png")).convert("L")
             width, height = image.size
@@ -731,30 +689,13 @@ def render_source_pages(
         for page_number, page_crops in sorted(crops_by_page.items()):
             filename = f"{page_prefix}-{page_number}.png"
             temporary_prefix = temporary_root / f"{page_prefix}-{page_number}"
-            try:
-                subprocess.run(
-                    [
-                        "pdftocairo",
-                        "-png",
-                        "-singlefile",
-                        "-r",
-                        str(SOURCE_RENDER_DPI),
-                        "-f",
-                        str(page_number),
-                        "-l",
-                        str(page_number),
-                        str(paper_path),
-                        str(temporary_prefix),
-                    ],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    check=True,
-                )
-            except FileNotFoundError as exc:
-                raise RuntimeError("pdftocairo is required to build Physics source images") from exc
-            except subprocess.CalledProcessError as exc:
-                message = exc.stderr.decode("utf-8", errors="replace")
-                raise RuntimeError(f"pdftocairo failed: {message}") from exc
+            render_pdf_page_to_png(
+                paper_path,
+                temporary_prefix,
+                page_number,
+                SOURCE_RENDER_DPI,
+                required_message="pdftocairo is required to build Physics source images",
+            )
 
             contents = temporary_prefix.with_suffix(".png").read_bytes()
             image_width, image_height = png_dimensions(contents)

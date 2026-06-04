@@ -6,8 +6,6 @@ from __future__ import annotations
 import json
 import re
 import shutil
-import struct
-import subprocess
 import tempfile
 import unicodedata
 import zipfile
@@ -15,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote, unquote, urlparse
+
+from pdf_utils import pdfinfo_page_count, pdftotext, png_dimensions, render_pdf_page_to_png
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -142,42 +142,24 @@ def normalized_name(name: str) -> str:
     return f"{normalized} {ascii_name}"
 
 
-def run_pdf_command(arguments: list[str], contents: bytes, purpose: str) -> bytes:
-    try:
-        completed = subprocess.run(
-            arguments,
-            input=contents,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-    except FileNotFoundError as exc:
-        raise RuntimeError(f"{arguments[0]} is required to build Croatian writing data") from exc
-    except subprocess.CalledProcessError as exc:
-        message = exc.stderr.decode("utf-8", errors="replace")
-        raise RuntimeError(f"{purpose} failed: {message}") from exc
-    return completed.stdout
-
-
 def pdf_text(contents: bytes, first_page: int | None = None, last_page: int | None = None) -> str:
-    arguments = ["pdftotext", "-layout"]
+    arguments = ["-layout"]
     if first_page is not None:
         arguments.extend(["-f", str(first_page)])
     if last_page is not None:
         arguments.extend(["-l", str(last_page)])
-    arguments.extend(["-", "-"])
-    output = run_pdf_command(arguments, contents, "pdftotext")
-    return output.decode("utf-8", errors="replace")
+    return pdftotext(
+        contents,
+        *arguments,
+        required_message="pdftotext is required to build Croatian writing data",
+    )
 
 
 def pdf_page_count(contents: bytes) -> int:
-    output = run_pdf_command(["pdfinfo", "-"], contents, "pdfinfo").decode(
-        "utf-8", errors="replace"
+    return pdfinfo_page_count(
+        contents,
+        required_message="pdfinfo is required to build Croatian writing data",
     )
-    match = re.search(r"^Pages:\s+(\d+)\s*$", output, flags=re.MULTILINE)
-    if not match:
-        raise ValueError("Could not read PDF page count")
-    return int(match.group(1))
 
 
 def find_summary_paper(names: list[str]) -> str:
@@ -351,12 +333,6 @@ def clean_task_text(text: str, part: WritingPart) -> str:
     return task_text
 
 
-def png_dimensions(contents: bytes) -> tuple[int, int]:
-    if contents[:16] != b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR":
-        raise ValueError("Expected a PNG source page")
-    return struct.unpack(">II", contents[16:24])
-
-
 def render_source_pages(paper_path: Path, identifier: str, pages: list[int]) -> list[dict[str, Any]]:
     destination = ASSET_ROOT / identifier
     source_images: list[dict[str, Any]] = []
@@ -365,32 +341,13 @@ def render_source_pages(paper_path: Path, identifier: str, pages: list[int]) -> 
         temporary_root = Path(temporary_directory)
         for page in pages:
             temporary_prefix = temporary_root / f"page-{page}"
-            try:
-                subprocess.run(
-                    [
-                        "pdftocairo",
-                        "-png",
-                        "-singlefile",
-                        "-r",
-                        str(SOURCE_RENDER_DPI),
-                        "-f",
-                        str(page),
-                        "-l",
-                        str(page),
-                        str(paper_path),
-                        str(temporary_prefix),
-                    ],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    check=True,
-                )
-            except FileNotFoundError as exc:
-                raise RuntimeError(
-                    "pdftocairo is required to build Croatian writing source images"
-                ) from exc
-            except subprocess.CalledProcessError as exc:
-                message = exc.stderr.decode("utf-8", errors="replace")
-                raise RuntimeError(f"pdftocairo failed: {message}") from exc
+            render_pdf_page_to_png(
+                paper_path,
+                temporary_prefix,
+                page,
+                SOURCE_RENDER_DPI,
+                required_message="pdftocairo is required to build Croatian writing source images",
+            )
 
             contents = temporary_prefix.with_suffix(".png").read_bytes()
             width, height = png_dimensions(contents)

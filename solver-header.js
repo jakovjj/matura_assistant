@@ -27,13 +27,11 @@
     "Likovna umjetnost": "#6a4f3d",
     Matematika: "#4f4b78",
     "Mađarski jezik": "#4e5d47",
-    "Mađarski jezik i književnost": "#465a4f",
     "Politika i gospodarstvo": "#5c4a42",
     Povijest: "#6a4b3d",
     Psihologija: "#5a4968",
     Sociologija: "#4e5960",
     "Srpski jezik": "#574a70",
-    "Talijanski jezik i književnost": "#4b5a5f",
     Vjeronauk: "#4f5943",
   };
 
@@ -53,13 +51,11 @@
     "Likovna umjetnost": "palette",
     Matematika: "sigma",
     "Mađarski jezik": "languages",
-    "Mađarski jezik i književnost": "library",
     "Politika i gospodarstvo": "landmark",
     Povijest: "history",
     Psihologija: "brain",
     Sociologija: "users-round",
     "Srpski jezik": "languages",
-    "Talijanski jezik i književnost": "library",
     Vjeronauk: "church",
   };
 

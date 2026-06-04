@@ -56,16 +56,19 @@ SUBJECTS = (
     "Glazbena umjetnost",
     "Vjeronauk",
     "Njemački jezik",
-    "Talijanski jezik i književnost",
     "Talijanski jezik",
     "Francuski jezik",
     "Španjolski jezik",
     "Latinski jezik",
     "Grčki jezik",
     "Srpski jezik",
-    "Mađarski jezik i književnost",
     "Mađarski jezik",
 )
+
+EXCLUDED_SUBJECTS = {
+    "Mađarski jezik i književnost",
+    "Talijanski jezik i književnost",
+}
 
 PRIORITY_SUBJECTS = {
     "Hrvatski jezik",
@@ -150,6 +153,10 @@ def clean_label(value: str) -> str:
 def parse_subject(label: str) -> str | None:
     normalized = clean_label(label)
     lower_label = normalized.casefold()
+
+    for subject in EXCLUDED_SUBJECTS:
+        if lower_label.startswith(subject.casefold()):
+            return None
 
     for subject in SUBJECTS:
         if lower_label.startswith(subject.casefold()):

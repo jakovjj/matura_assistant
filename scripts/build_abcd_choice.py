@@ -6,13 +6,14 @@ from __future__ import annotations
 import json
 import re
 import shutil
-import subprocess
 import sys
 import unicodedata
 import zipfile
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote, unquote, urlparse
+
+from pdf_utils import pdftotext
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,8 +39,10 @@ EXCLUDED_SUBJECTS = {
     "Glazbena umjetnost",
     "Hrvatski jezik",
     "Matematika",
+    "Mađarski jezik i književnost",
     "Njemački jezik",
     "Talijanski jezik",
+    "Talijanski jezik i književnost",
     "Španjolski jezik",
 }
 DURATION_FALLBACKS = {
@@ -54,13 +57,11 @@ DURATION_FALLBACKS = {
     "Likovna umjetnost": 120,
     "Matematika": {"A": 180, "B": 150, "default": 180},
     "Mađarski jezik": 80,
-    "Mađarski jezik i književnost": 80,
     "Politika i gospodarstvo": 90,
     "Povijest": 135,
     "Psihologija": 90,
     "Sociologija": 90,
     "Srpski jezik": 90,
-    "Talijanski jezik i književnost": 100,
     "Vjeronauk": 70,
 }
 
@@ -115,21 +116,11 @@ def normalized_name(name: str) -> str:
 
 
 def pdf_text(contents: bytes) -> str:
-    try:
-        completed = subprocess.run(
-            ["pdftotext", "-layout", "-", "-"],
-            input=contents,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True,
-        )
-    except FileNotFoundError as exc:
-        raise RuntimeError("pdftotext is required to build ABCD choice data") from exc
-    except subprocess.CalledProcessError as exc:
-        message = exc.stderr.decode("utf-8", errors="replace")
-        raise RuntimeError(f"pdftotext failed: {message}") from exc
-
-    return completed.stdout.decode("utf-8", errors="replace")
+    return pdftotext(
+        contents,
+        "-layout",
+        required_message="pdftotext is required to build ABCD choice data",
+    )
 
 
 def is_key_name(name: str) -> bool:
