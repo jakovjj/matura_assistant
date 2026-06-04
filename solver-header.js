@@ -137,7 +137,7 @@
 
     return `
       <svg class="${escapeHtml(className)}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-        <use href="./assets/lucide-icons.svg#${escapeHtml(iconName)}"></use>
+        <use href="#${escapeHtml(iconName)}"></use>
       </svg>
     `;
   }

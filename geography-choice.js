@@ -68,7 +68,7 @@ function escapeHtml(value) {
 function icon(iconName, className) {
   return `
     <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="./assets/lucide-icons.svg#${iconName}"></use>
+      <use href="#${iconName}"></use>
     </svg>
   `;
 }

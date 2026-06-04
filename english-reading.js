@@ -68,7 +68,7 @@ function checkButtonClass() {
 function renderCheckButtonContent() {
   return `
     <svg class="solver-sticky-footer__action-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="./assets/lucide-icons.svg#${checkButtonIcon()}"></use>
+      <use href="#${checkButtonIcon()}"></use>
     </svg>
     ${checkButtonLabel()}
   `;
@@ -787,7 +787,7 @@ function renderSolver(exam) {
         <div class="solver-sticky-footer__controls">
           <div class="solver-sticky-footer__status">
             <svg class="solver-sticky-footer__status-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-              <use href="./assets/lucide-icons.svg#list-checks"></use>
+              <use href="#list-checks"></use>
             </svg>
             <div class="solver-sticky-footer__status-copy">
               <strong id="footer-answer-progress"></strong>

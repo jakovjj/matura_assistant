@@ -10,7 +10,7 @@
   function icon(name) {
     return `
       <svg class="inline-check-button__icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-        <use href="./assets/lucide-icons.svg#${name}"></use>
+        <use href="#${name}"></use>
       </svg>
     `;
   }

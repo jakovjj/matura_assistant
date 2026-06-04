@@ -65,7 +65,7 @@
         return `
           <div class="simulation-timer">
             <svg class="simulation-timer__icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-              <use href="./assets/lucide-icons.svg#clock"></use>
+              <use href="#clock"></use>
             </svg>
             <span>
               <span>Simulacija mature</span>

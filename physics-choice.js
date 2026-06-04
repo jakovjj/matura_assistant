@@ -32,6 +32,8 @@ const taskTypeAliases = {
   "produzeni-odgovor": taskTypes.open,
   "otvoreni-zadatci": taskTypes.open,
 };
+// NCVVO 2025./2026. "Knjižica formula", mirrored with the other local NCVVO files.
+const formulaSheetUrl = "./files/ncvvo/formule/fizika-2025-2026-knjizica-formula.pdf";
 
 let solverExam;
 let questionByNumber = new Map();
@@ -60,7 +62,7 @@ function escapeHtml(value) {
 function icon(iconName, className) {
   return `
     <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="./assets/lucide-icons.svg#${iconName}"></use>
+      <use href="#${iconName}"></use>
     </svg>
   `;
 }
@@ -604,12 +606,22 @@ function renderTaskTypeContent() {
         <section class="task-content-panel physics-task-content-panel" id="task-content-panel"></section>
         <div id="task-type-pager-slot"></div>
       </div>
-      <aside class="question-quickselect" aria-label="Brzi odabir pitanja">
+      <aside class="question-quickselect question-quickselect--with-action" aria-label="Brzi odabir pitanja">
         <div class="question-quickselect__heading">
           <strong>Brzi odabir</strong>
           <small>Pitanja</small>
         </div>
         <nav class="question-quickselect__list" id="question-quickselect"></nav>
+        <a
+          class="question-quickselect__action"
+          href="${formulaSheetUrl}"
+          target="_blank"
+          rel="noreferrer"
+          data-physics-formulas-link
+        >
+          ${icon("book-open-text", "question-quickselect__action-icon")}
+          <span>Vidi formule</span>
+        </a>
       </aside>
     </div>
   `;
@@ -800,7 +812,10 @@ function renderQuickSelect() {
 
   const questions = questionsForTaskType(activeTaskTypeId);
   const quickSelectPanel = quickSelect.closest(".question-quickselect");
-  if (quickSelectPanel) quickSelectPanel.hidden = questions.length <= 2;
+  if (quickSelectPanel) {
+    quickSelectPanel.hidden =
+      questions.length <= 2 && !quickSelectPanel.querySelector("[data-physics-formulas-link]");
+  }
 
   quickSelect.innerHTML = questions
     .map((question) => {

@@ -3545,6 +3545,7 @@ body.solver-page {
 
 .question-quickselect,
 .physics-quickselect {
+  --quickselect-list-max-height: calc(100vh - 172px);
   position: sticky;
   top: 16px;
   max-height: calc(100vh - 118px);
@@ -3552,6 +3553,10 @@ body.solver-page {
   overflow: hidden;
   background: var(--white);
   border: 1px solid var(--line-dark);
+}
+
+.question-quickselect--with-action {
+  --quickselect-list-max-height: calc(100vh - 216px);
 }
 
 .question-quickselect__heading,
@@ -3574,7 +3579,7 @@ body.solver-page {
 .question-quickselect__list,
 .physics-quickselect__list {
   display: grid;
-  max-height: calc(100vh - 172px);
+  max-height: var(--quickselect-list-max-height);
   grid-template-columns: repeat(4, 31px);
   justify-content: start;
   gap: 5px;
@@ -3633,6 +3638,44 @@ body.solver-page {
   color: #8a2020;
   background: #fbe7e7;
   border-color: #d69494;
+}
+
+.question-quickselect__action {
+  display: inline-flex;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 7px 9px;
+  color: var(--navy);
+  background: var(--soft);
+  border: 1px solid var(--line-dark);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.question-quickselect__action:hover,
+.question-quickselect__action:focus-visible {
+  color: var(--white);
+  background: var(--blue-dark);
+  border-color: var(--blue-dark);
+  text-decoration: none;
+}
+
+.question-quickselect__action-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .task-audio {
@@ -4621,6 +4664,97 @@ body.solver-page {
     gap: 12px;
   }
 
+  .practice-year-block .practice-table-wrap {
+    overflow: visible;
+    border-top: 0;
+  }
+
+  .subject-exam-table,
+  .subject-exam-table--with-levels {
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0 10px;
+  }
+
+  .subject-exam-table colgroup,
+  .subject-exam-table thead {
+    display: none;
+  }
+
+  .subject-exam-table tbody,
+  .subject-exam-table tr,
+  .subject-exam-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .subject-exam-table tr {
+    padding: 12px;
+    background: var(--white);
+    border: 1px solid var(--line-dark);
+    border-top: 4px solid var(--subject-color, var(--navy));
+  }
+
+  .subject-exam-table tr + tr {
+    margin-top: 10px;
+  }
+
+  .subject-exam-table td {
+    display: grid;
+    grid-template-columns: minmax(82px, 34%) minmax(0, 1fr);
+    gap: 10px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+    white-space: normal;
+    text-align: left;
+  }
+
+  .subject-exam-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .subject-exam-table td:first-child {
+    padding-top: 0;
+  }
+
+  .subject-exam-table td:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+    text-align: left;
+  }
+
+  .subject-exam-table__progress-cell {
+    min-width: 0;
+  }
+
+  .subject-exam-table__best-cell {
+    text-align: left;
+  }
+
+  .subject-best-scores {
+    justify-content: flex-start;
+  }
+
+  .exam-progress__meter-row {
+    width: 100%;
+  }
+
+  .exam-progress .progress-meter {
+    width: auto;
+    flex: 1 1 auto;
+  }
+
+  .subject-exam-table .exam-actions {
+    justify-content: flex-start;
+  }
+
   .solver-workspace {
     grid-template-columns: 1fr;
   }
@@ -4693,6 +4827,20 @@ body.solver-page {
     width: 32px;
     min-height: 30px;
     flex: 0 0 32px;
+  }
+
+  .question-quickselect__action {
+    width: auto;
+    min-height: 30px;
+    flex: 0 0 auto;
+    margin-top: 0;
+    padding: 6px 8px;
+    white-space: nowrap;
+  }
+
+  .question-quickselect__action-icon {
+    width: 14px;
+    height: 14px;
   }
 
   .croatian-solver-page .question-quickselect__link {

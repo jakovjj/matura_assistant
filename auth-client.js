@@ -29,7 +29,7 @@
   function icon(iconName, className) {
     return `
       <svg class="${className}" aria-hidden="true">
-        <use href="./assets/lucide-icons.svg?v=20260602-cookie#${iconName}"></use>
+        <use href="#${iconName}"></use>
       </svg>
     `;
   }

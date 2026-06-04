@@ -56,6 +56,7 @@ TOTAL_POINT_LABEL_RE = re.compile(
     r"Ukupno\s+(\d+)\s+bod(?:a|ova)?", flags=re.IGNORECASE
 )
 POSTUPAK_RE = re.compile(r"^\s*Postupak\s*:?\s*$", flags=re.IGNORECASE)
+SOLUTION_SEPARATOR_RE = re.compile(r"[\s_\-–—]{6,}")
 
 @dataclass(frozen=True)
 class ParsedQuestion:
@@ -588,6 +589,47 @@ def horizontal_rule_overlaps_crop(rule: HorizontalRule, x_min: float, x_max: flo
     return overlap >= min(30, max(8, (x_max - x_min) * 0.25))
 
 
+def solution_separator_line(line: PdfLine, x_min: float, x_max: float) -> bool:
+    if not SOLUTION_SEPARATOR_RE.fullmatch(line.text):
+        return False
+    return horizontal_rule_overlaps_crop(
+        HorizontalRule(line.x_min, line.y_min, line.x_max, line.y_max),
+        x_min,
+        x_max,
+    )
+
+
+def line_overlaps_x_range(line: PdfLine, x_min: float, x_max: float) -> bool:
+    return min(line.x_max, x_max) - max(line.x_min, x_min) >= 2
+
+
+def trim_trailing_solution_separator(
+    page: PdfPage,
+    x_min: float,
+    y_min: float,
+    x_max: float,
+    y_max: float,
+    marker_y_min: float,
+) -> float:
+    trailing_separator: PdfLine | None = None
+    for line in reversed(sorted_page_lines(page)):
+        if line.y_min < marker_y_min + 18:
+            break
+        if line.y_min >= y_max or line.y_max <= y_min:
+            continue
+        if not line_overlaps_x_range(line, x_min, x_max):
+            continue
+        if solution_separator_line(line, x_min, x_max):
+            trailing_separator = line
+            continue
+        break
+
+    if not trailing_separator:
+        return y_max
+
+    return min(y_max, max(y_min + 24, trailing_separator.y_min - SOLUTION_CROP_VERTICAL_PADDING))
+
+
 def solution_crop_from_marker(
     marker: QuestionMarker,
     page_markers: list[QuestionMarker],
@@ -670,6 +712,8 @@ def solution_crop_from_marker(
     if y_max <= y_min:
         y_min = max(0, marker.y_min - 10)
         y_max = min(page.height - SOLUTION_FOOTER_MARGIN, marker.y_min + 220)
+
+    y_max = trim_trailing_solution_separator(page, x_min, y_min, x_max, y_max, marker.y_min)
 
     return QuestionCrop(
         page=page,

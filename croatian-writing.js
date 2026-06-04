@@ -297,7 +297,7 @@ function renderSolver(exam) {
           </div>
           <label class="secondary-button essay-photo-upload__button">
             <svg class="essay-photo-upload__icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-              <use href="./assets/lucide-icons.svg?v=20260603-essay-layout#camera"></use>
+              <use href="#camera"></use>
             </svg>
             <span id="essay-photo-label">Iščitaj fotografiju</span>
             <input
@@ -338,7 +338,7 @@ function renderSolver(exam) {
           <div class="solver-sticky-footer__actions">
             <button class="primary-button" id="grade-essay" type="button">
               <svg class="solver-sticky-footer__action-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-                <use href="./assets/lucide-icons.svg#circle-check"></use>
+                <use href="#circle-check"></use>
               </svg>
               <span id="grade-essay-label">${simulation.active ? "Predaj i ocijeni" : `Ocijeni ${escapeHtml(writingNameLower(exam))}`}</span>
             </button>

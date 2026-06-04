@@ -1,19 +1,57 @@
 const archiveData = window.ASISTENT_ZA_MATURE_DATA;
-const englishReadingData = window.ASISTENT_ZA_MATURE_ENGLISH_READING;
-const englishListeningData = window.ASISTENT_ZA_MATURE_ENGLISH_LISTENING;
-const englishEssayData = window.ASISTENT_ZA_MATURE_ENGLISH_ESSAY;
-const croatianWritingData = window.ASISTENT_ZA_MATURE_CROATIAN_WRITING;
-const physicsChoiceData = window.ASISTENT_ZA_MATURE_PHYSICS_CHOICE;
-const mathChoiceData = window.ASISTENT_ZA_MATURE_MATH_CHOICE;
-const croatianChoiceData = window.ASISTENT_ZA_MATURE_CROATIAN_CHOICE;
-const historyChoiceData = window.ASISTENT_ZA_MATURE_HISTORY_CHOICE;
-const geographyChoiceData = window.ASISTENT_ZA_MATURE_GEOGRAPHY_CHOICE;
-const politicsChoiceData = window.ASISTENT_ZA_MATURE_POLITICS_CHOICE;
-const abcdChoiceData = window.ASISTENT_ZA_MATURE_ABCD_CHOICE;
 
 if (!archiveData || !Array.isArray(archiveData.exams)) {
   throw new Error("Nedostaje generirani indeks ispita.");
 }
+
+const solverDataSources = {
+  englishReading: {
+    globalName: "ASISTENT_ZA_MATURE_ENGLISH_READING",
+    src: "./data/english-reading.js",
+  },
+  englishListening: {
+    globalName: "ASISTENT_ZA_MATURE_ENGLISH_LISTENING",
+    src: "./data/english-listening.js",
+  },
+  englishEssay: {
+    globalName: "ASISTENT_ZA_MATURE_ENGLISH_ESSAY",
+    src: "./data/english-essay.js?v=20260602-english-essay",
+  },
+  croatianWriting: {
+    globalName: "ASISTENT_ZA_MATURE_CROATIAN_WRITING",
+    src: "./data/croatian-writing.js?v=20260604-croatian-writing",
+  },
+  physicsChoice: {
+    globalName: "ASISTENT_ZA_MATURE_PHYSICS_CHOICE",
+    src: "./data/physics-choice.js",
+  },
+  mathChoice: {
+    globalName: "ASISTENT_ZA_MATURE_MATH_CHOICE",
+    src: "./data/math-choice.js?v=20260602-math-groups",
+  },
+  croatianChoice: {
+    globalName: "ASISTENT_ZA_MATURE_CROATIAN_CHOICE",
+    src: "./data/croatian-choice.js?v=20260602-croatian-tasks",
+  },
+  historyChoice: {
+    globalName: "ASISTENT_ZA_MATURE_HISTORY_CHOICE",
+    src: "./data/history-choice.js?v=20260603-history-choice",
+  },
+  geographyChoice: {
+    globalName: "ASISTENT_ZA_MATURE_GEOGRAPHY_CHOICE",
+    src: "./data/geography-choice.js?v=20260604-geography-choice",
+  },
+  politicsChoice: {
+    globalName: "ASISTENT_ZA_MATURE_POLITICS_CHOICE",
+    src: "./data/politics-choice.js?v=20260604-politics-choice",
+  },
+  abcdChoice: {
+    globalName: "ASISTENT_ZA_MATURE_ABCD_CHOICE",
+    src: "./data/abcd-choice.js?v=20260602-abcd-choice",
+  },
+};
+
+const solverDataLoadPromises = new Map();
 
 const mandatorySubjects = [
   "Matematika",
@@ -196,6 +234,7 @@ if (!appRoot) {
 }
 
 let yearNavigationCleanup = null;
+let renderAppRequestId = 0;
 let serverSimulationAttempts = [];
 let serverSimulationAttemptsLoaded = false;
 
@@ -287,19 +326,16 @@ function croatianWritingArchiveLookupKey(exam, kind) {
 
 const solverDefinitions = {
   englishReading: {
-    data: englishReadingData?.exams || [],
     idForTerm: englishExamIdForTerm,
     page: "./engleski-citanje.html",
     storagePrefix: "english-reading",
   },
   englishListening: {
-    data: englishListeningData?.exams || [],
     idForTerm: englishExamIdForTerm,
     page: "./engleski-slusanje.html",
     storagePrefix: "english-listening",
   },
   englishEssay: {
-    data: englishEssayData?.exams || [],
     idForTerm: englishExamIdForTerm,
     page: "./engleski-esej.html",
     storagePrefix: "english-essay",
@@ -307,49 +343,41 @@ const solverDefinitions = {
   croatianWriting: {
     archiveKey: croatianWritingArchiveKey,
     archiveLookupKey: croatianWritingArchiveLookupKey,
-    data: croatianWritingData?.exams || [],
     idForTerm: (exam, term) => `${prefixedExamIdForTerm("hrvatski", exam, term)}-${exam.kind}`,
     page: "./hrvatski-pisanje.html",
     storagePrefix: "croatian-writing",
   },
   physicsChoice: {
-    data: physicsChoiceData?.exams || [],
     idForTerm: (exam, term) => `fizika-${exam.year}-${slugPart(term)}`,
     page: "./fizika.html",
     storagePrefix: "physics-choice",
   },
   mathChoice: {
-    data: mathChoiceData?.exams || [],
     idForTerm: (exam, term) => prefixedExamIdForTerm("matematika", exam, term),
     page: "./matematika.html",
     storagePrefix: "math-choice",
   },
   croatianChoice: {
-    data: croatianChoiceData?.exams || [],
     idForTerm: (exam, term) => prefixedExamIdForTerm("hrvatski", exam, term),
     page: "./hrvatski.html",
     storagePrefix: "croatian-choice",
   },
   historyChoice: {
-    data: historyChoiceData?.exams || [],
     idForTerm: (exam, term) => `povijest-${exam.year}-${slugPart(term)}`,
     page: "./povijest.html",
     storagePrefix: "history-choice",
   },
   geographyChoice: {
-    data: geographyChoiceData?.exams || [],
     idForTerm: (exam, term) => `geografija-${exam.year}-${slugPart(term)}`,
     page: "./geografija.html",
     storagePrefix: "geography-choice",
   },
   politicsChoice: {
-    data: politicsChoiceData?.exams || [],
     idForTerm: (exam, term) => `politika-i-gospodarstvo-${exam.year}-${slugPart(term)}`,
     page: "./politika.html",
     storagePrefix: "politics-choice",
   },
   abcdChoice: {
-    data: abcdChoiceData?.exams || [],
     idForTerm: (exam, term) => prefixedExamIdForTerm(slugPart(exam.subject), exam, term),
     page: "./abcd.html",
     storagePrefix: "abcd-choice",
@@ -365,10 +393,20 @@ function normalizeSolverExam(definition, exam) {
   };
 }
 
+function solverData(key) {
+  const source = solverDataSources[key];
+  return source ? window[source.globalName] : null;
+}
+
+function solverExams(key) {
+  const data = solverData(key);
+  return Array.isArray(data?.exams) ? data.exams : [];
+}
+
 function buildSolverRegistry(definitions) {
   return Object.fromEntries(
     Object.entries(definitions).map(([key, definition]) => {
-      const exams = definition.data.map((exam) => normalizeSolverExam(definition, exam));
+      const exams = solverExams(key).map((exam) => normalizeSolverExam(definition, exam));
       const archiveKey = definition.archiveKey || archiveUrlKey;
       return [
         key,
@@ -384,7 +422,52 @@ function buildSolverRegistry(definitions) {
   );
 }
 
-const solverRegistry = buildSolverRegistry(solverDefinitions);
+let solverRegistry = buildSolverRegistry(solverDefinitions);
+
+function refreshSolverRegistry() {
+  solverRegistry = buildSolverRegistry(solverDefinitions);
+}
+
+function loadSolverDataScript(key) {
+  const source = solverDataSources[key];
+  if (!source) return Promise.resolve();
+  if (Array.isArray(solverData(key)?.exams)) return Promise.resolve();
+  if (solverDataLoadPromises.has(key)) return solverDataLoadPromises.get(key);
+
+  const promise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = source.src;
+    script.async = true;
+    script.dataset.asistentSolverData = key;
+
+    script.addEventListener("load", () => resolve(), { once: true });
+    script.addEventListener(
+      "error",
+      () => {
+        solverDataLoadPromises.delete(key);
+        reject(new Error(`Nije moguće učitati podatke: ${source.src}`));
+      },
+      { once: true },
+    );
+
+    document.head.append(script);
+  });
+
+  solverDataLoadPromises.set(key, promise);
+  return promise;
+}
+
+async function ensureSolverData(keys) {
+  const uniqueKeys = [...new Set(keys)].filter(Boolean);
+  await Promise.all(uniqueKeys.map(loadSolverDataScript));
+
+  const missingKeys = uniqueKeys.filter((key) => !Array.isArray(solverData(key)?.exams));
+  if (missingKeys.length) {
+    throw new Error(`Nedostaju interaktivni podatci: ${missingKeys.join(", ")}`);
+  }
+
+  refreshSolverRegistry();
+}
 
 function solverIdForTerm(solverKey, exam, term) {
   return solverRegistry[solverKey].idForTerm(exam, term);
@@ -682,7 +765,7 @@ const allSubjects = [...subjectCounts.keys()].sort((a, b) => {
 function icon(iconName, className) {
   return `
     <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="./assets/lucide-icons.svg?v=20260603-subject-status#${iconName}"></use>
+      <use href="#${iconName}"></use>
     </svg>
   `;
 }
@@ -2038,9 +2121,73 @@ function route() {
   };
 }
 
-function renderApp() {
+function solverKeysForSubject(subject) {
+  if (subject === "Engleski jezik") {
+    return ["englishReading", "englishListening", "englishEssay"];
+  }
+
+  if (subject === "Hrvatski jezik") {
+    return ["croatianChoice", "croatianWriting"];
+  }
+
+  if (subject === "Fizika") return ["physicsChoice"];
+  if (subject === "Matematika") return ["mathChoice"];
+  if (subject === "Povijest") return ["historyChoice"];
+  if (subject === "Geografija") return ["geographyChoice"];
+  if (subject === "Politika i gospodarstvo") return ["politicsChoice"];
+
+  if (modernForeignLanguageSubjects.has(subject) || subject === "Glazbena umjetnost") {
+    return [];
+  }
+
+  return ["abcdChoice"];
+}
+
+function solverKeysForRoute(currentRoute) {
+  if (currentRoute.examId) {
+    const exam = examsById.get(currentRoute.examId);
+    return exam ? solverKeysForSubject(exam.subject) : [];
+  }
+
+  return currentRoute.subject ? solverKeysForSubject(currentRoute.subject) : [];
+}
+
+function solverDataReady(keys) {
+  return keys.every((key) => Array.isArray(solverData(key)?.exams));
+}
+
+function renderDataLoading() {
+  cleanupYearNavigation();
+  appRoot.innerHTML = `
+    <div class="empty-state" aria-live="polite">
+      <h2>Učitavam podatke ispita</h2>
+      <p>Pripremam interaktivne cjeline i spremljeni napredak.</p>
+    </div>
+  `;
+}
+
+async function renderApp() {
+  const requestId = ++renderAppRequestId;
   const currentRoute = route();
   syncHomeHeadingVisibility(currentRoute);
+  const requiredSolverKeys = solverKeysForRoute(currentRoute);
+
+  if (!solverDataReady(requiredSolverKeys)) {
+    renderDataLoading();
+
+    try {
+      await ensureSolverData(requiredSolverKeys);
+    } catch {
+      if (requestId !== renderAppRequestId) return;
+      renderMissing(
+        "Podatci nisu učitani",
+        "Interaktivni podatci za odabrani ispit nisu se mogli učitati. Pokušaj osvježiti stranicu.",
+      );
+      return;
+    }
+
+    if (requestId !== renderAppRequestId) return;
+  }
 
   if (currentRoute.examId) {
     const exam = examsById.get(currentRoute.examId);
@@ -2450,11 +2597,11 @@ function renderSubjectExamRow(exam, hasLevels, simulationAttempts) {
 
   return `
     <tr>
-      <td>
+      <td data-label="Rok">
         <strong>${escapeHtml(formatTerm(exam.term))}</strong>
       </td>
-      ${hasLevels ? `<td>${levelBadge(exam.level)}</td>` : ""}
-      <td class="subject-exam-table__progress-cell">
+      ${hasLevels ? `<td data-label="Razina">${levelBadge(exam.level)}</td>` : ""}
+      <td class="subject-exam-table__progress-cell" data-label="Napredak">
         <div class="exam-progress">
           <div class="exam-progress__meter-row">
             ${progressMeter(progress.percent, `Napredak: ${progress.percent}%`)}
@@ -2462,10 +2609,10 @@ function renderSubjectExamRow(exam, hasLevels, simulationAttempts) {
           </div>
         </div>
       </td>
-      <td class="subject-exam-table__best-cell">
+      <td class="subject-exam-table__best-cell" data-label="Najbolji rezultat">
         ${renderBestSimulationPercentages(bestPercentages)}
       </td>
-      <td>
+      <td data-label="Materijali">
         <div class="exam-actions">
           <a class="primary-button" href="${examUrl(exam)}">Otvori maturu</a>
           <a
