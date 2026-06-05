@@ -108,6 +108,10 @@
     "viewBox": "0 0 24 24",
     "content": "<path d=\"M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z\" />\n    <circle cx=\"13.5\" cy=\"6.5\" r=\".5\" fill=\"currentColor\" />\n    <circle cx=\"17.5\" cy=\"10.5\" r=\".5\" fill=\"currentColor\" />\n    <circle cx=\"6.5\" cy=\"12.5\" r=\".5\" fill=\"currentColor\" />\n    <circle cx=\"8.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />"
   },
+  "rotate-ccw": {
+    "viewBox": "0 0 24 24",
+    "content": "<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\" />\n    <path d=\"M3 3v5h5\" />"
+  },
   "scale": {
     "viewBox": "0 0 24 24",
     "content": "<path d=\"M12 3v18\" />\n    <path d=\"m19 8 3 8a5 5 0 0 1-6 0zV7\" />\n    <path d=\"M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1\" />\n    <path d=\"m5 8 3 8a5 5 0 0 1-6 0zV7\" />\n    <path d=\"M7 21h10\" />"
@@ -131,6 +135,18 @@
   "workflow": {
     "viewBox": "0 0 24 24",
     "content": "<rect width=\"8\" height=\"8\" x=\"3\" y=\"3\" rx=\"2\" />\n    <path d=\"M7 11v4a2 2 0 0 0 2 2h4\" />\n    <rect width=\"8\" height=\"8\" x=\"13\" y=\"13\" rx=\"2\" />"
+  },
+  "x": {
+    "viewBox": "0 0 24 24",
+    "content": "<path d=\"M18 6 6 18\" />\n    <path d=\"m6 6 12 12\" />"
+  },
+  "zoom-in": {
+    "viewBox": "0 0 24 24",
+    "content": "<circle cx=\"11\" cy=\"11\" r=\"8\" />\n    <path d=\"m21 21-4.3-4.3\" />\n    <path d=\"M11 8v6\" />\n    <path d=\"M8 11h6\" />"
+  },
+  "zoom-out": {
+    "viewBox": "0 0 24 24",
+    "content": "<circle cx=\"11\" cy=\"11\" r=\"8\" />\n    <path d=\"m21 21-4.3-4.3\" />\n    <path d=\"M8 11h6\" />"
   }
 };
 

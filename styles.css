@@ -68,7 +68,6 @@ button {
 .auth-widget,
 .auth-page-card__brand,
 .auth-google-button,
-.cookie-notice__button,
 .subject-card,
 .subject-card__status,
 .subject-card__action,
@@ -818,87 +817,6 @@ button {
 
 .profile-agent-key__help p {
   margin: 0;
-}
-
-.cookie-notice {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 180;
-  display: grid;
-  width: min(calc(100% - 32px), 720px);
-  grid-template-columns: 36px minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  padding: 13px 14px;
-  color: var(--ink);
-  background: var(--white);
-  border: 1px solid var(--line-dark);
-  border-left: 4px solid var(--navy);
-  box-shadow: 0 12px 36px rgba(0, 29, 77, 0.18);
-}
-
-.cookie-notice__icon {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
-  color: var(--navy);
-}
-
-.cookie-notice__symbol {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
-}
-
-.cookie-notice__content strong {
-  display: block;
-  color: var(--navy);
-  font-size: 14px;
-}
-
-.cookie-notice__content p {
-  margin: 2px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.cookie-notice__button {
-  min-height: 36px;
-  white-space: nowrap;
-}
-
-.cookie-notice__actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.footer-cookie-settings {
-  width: fit-content;
-  padding: 0;
-  color: inherit;
-  font: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.footer-cookie-settings:hover {
-  color: var(--white);
-}
-
-.footer-cookie-settings:focus-visible {
-  outline: 2px solid currentColor;
-  outline-offset: 3px;
 }
 
 .page-heading {
@@ -4582,6 +4500,148 @@ body.solver-page {
   height: auto;
 }
 
+.physics-source-crop[role="button"],
+.pdf-source-crop[role="button"] {
+  cursor: zoom-in;
+}
+
+.physics-source-crop[role="button"]:focus-visible,
+.pdf-source-crop[role="button"]:focus-visible {
+  outline: 3px solid rgba(46, 93, 172, 0.35);
+  outline-offset: 2px;
+}
+
+.source-image-viewer[hidden] {
+  display: none;
+}
+
+.source-image-viewer {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  background: rgba(3, 18, 43, 0.82);
+}
+
+.source-image-viewer__backdrop {
+  position: absolute;
+  inset: 0;
+}
+
+.source-image-viewer__panel {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  grid-template-rows: auto minmax(0, 1fr);
+  color: var(--white);
+}
+
+.source-image-viewer__toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+  background: rgba(3, 18, 43, 0.96);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.source-image-viewer__toolbar strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-image-viewer__controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.source-image-viewer__button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  padding: 0;
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  cursor: pointer;
+}
+
+.source-image-viewer__button:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.source-image-viewer__button:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.35);
+  outline-offset: 2px;
+}
+
+.source-image-viewer__button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.source-image-viewer__icon {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.source-image-viewer__viewport {
+  position: relative;
+  overflow: hidden;
+  background: #172234;
+  cursor: grab;
+  outline: 0;
+  touch-action: none;
+  user-select: none;
+}
+
+.source-image-viewer__viewport:focus-visible {
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.3);
+}
+
+.source-image-viewer__viewport--dragging {
+  cursor: grabbing;
+}
+
+.source-image-viewer__canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-origin: center;
+  will-change: transform;
+}
+
+.source-image-viewer__crop {
+  background: var(--white);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.42);
+  pointer-events: none;
+}
+
+.source-image-viewer__crop img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.source-image-viewer-open {
+  overflow: hidden;
+}
+
 .physics-open-solution {
   margin-top: 10px;
   padding-top: 11px;
@@ -5151,6 +5211,114 @@ body.solver-page {
     scroll-margin-top: 60px;
   }
 
+  body.solver-page {
+    overflow-x: hidden;
+  }
+
+  body.solver-page .practice-container {
+    width: 100%;
+  }
+
+  body.solver-page .solver-question-layout,
+  body.solver-page .physics-practice-layout {
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  body.solver-page .solver-question-main {
+    gap: 10px;
+  }
+
+  body.solver-page .task-content-panel {
+    border-right: 0;
+    border-left: 0;
+    overflow-x: clip;
+  }
+
+  body.solver-page .panel-heading {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 6px 10px;
+    padding: 10px;
+  }
+
+  body.solver-page .panel-heading > div {
+    min-width: 0;
+  }
+
+  body.solver-page .panel-heading h3 {
+    font-size: 17px;
+    line-height: 1.18;
+  }
+
+  body.solver-page .panel-heading small {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  body.solver-page .history-task-description {
+    overflow-wrap: anywhere;
+  }
+
+  body.solver-page .task-source,
+  body.solver-page .physics-source-list,
+  body.solver-page .history-source-list,
+  body.solver-page .pdf-source-list {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  body.solver-page .task-source {
+    padding-top: 12px;
+    padding-bottom: 18px;
+  }
+
+  body.solver-page .pdf-source-list {
+    gap: 12px;
+  }
+
+  body.solver-page .physics-source-question {
+    min-width: 0;
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  body.solver-page .physics-source-question--image {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  body.solver-page .physics-source-question--image .physics-inline-response,
+  body.solver-page .physics-source-question--image .physics-open-solution,
+  body.solver-page .physics-source-question--image .physics-source-question__meta,
+  body.solver-page .physics-source-question--image .history-open-question {
+    margin-right: 8px;
+    margin-left: 8px;
+  }
+
+  body.solver-page .history-open-question,
+  body.solver-page .history-open-question__field,
+  body.solver-page .history-open-question__field textarea {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  body.solver-page .physics-source-figure,
+  body.solver-page .pdf-source-figure {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  body.solver-page .physics-source-crop,
+  body.solver-page .pdf-source-crop {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  body.solver-page .english-source-question {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
   .answer-panel {
     position: static;
     max-height: none;
@@ -5315,30 +5483,6 @@ body.solver-page {
     max-width: 112px;
   }
 
-  .cookie-notice {
-    right: 14px;
-    bottom: 14px;
-    width: calc(100% - 28px);
-    grid-template-columns: 32px minmax(0, 1fr);
-    align-items: start;
-    padding: 12px;
-  }
-
-  .cookie-notice__icon {
-    width: 32px;
-    height: 32px;
-  }
-
-  .cookie-notice__actions {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .cookie-notice__button {
-    width: 100%;
-  }
-
   @media (max-width: 360px) {
     .topbar__actions > a {
       display: none;
@@ -5469,6 +5613,14 @@ body.solver-page {
 
   .practice-container {
     width: min(calc(100% - 28px), 1440px);
+  }
+
+  body.solver-page {
+    overflow-x: hidden;
+  }
+
+  body.solver-page .practice-container {
+    width: 100%;
   }
 
   .practice-filter-bar {
@@ -5659,6 +5811,93 @@ body.solver-page {
   .physics-source-crop img,
   .pdf-source-crop img {
     user-select: none;
+  }
+
+  body.solver-page .solver-question-layout,
+  body.solver-page .physics-practice-layout {
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  body.solver-page .solver-question-main {
+    gap: 10px;
+  }
+
+  body.solver-page .task-content-panel {
+    border-right: 0;
+    border-left: 0;
+    overflow-x: clip;
+  }
+
+  body.solver-page .panel-heading {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 6px 10px;
+    padding: 10px;
+  }
+
+  body.solver-page .panel-heading > div {
+    min-width: 0;
+  }
+
+  body.solver-page .panel-heading h3 {
+    font-size: 17px;
+    line-height: 1.18;
+  }
+
+  body.solver-page .panel-heading small {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  body.solver-page .task-source,
+  body.solver-page .physics-source-list,
+  body.solver-page .history-source-list,
+  body.solver-page .pdf-source-list {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  body.solver-page .task-source {
+    padding-top: 12px;
+    padding-bottom: 18px;
+  }
+
+  body.solver-page .pdf-source-list {
+    gap: 12px;
+  }
+
+  body.solver-page .physics-source-question {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  body.solver-page .physics-source-question--image {
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  body.solver-page .physics-source-question--image .physics-inline-response,
+  body.solver-page .physics-source-question--image .physics-open-solution,
+  body.solver-page .physics-source-question--image .physics-source-question__meta {
+    margin-right: 8px;
+    margin-left: 8px;
+  }
+
+  body.solver-page .physics-source-figure,
+  body.solver-page .pdf-source-figure {
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  body.solver-page .physics-source-crop,
+  body.solver-page .pdf-source-crop {
+    width: 100% !important;
+    max-width: 100%;
+  }
+
+  body.solver-page .english-source-question {
+    grid-template-columns: 30px minmax(0, 1fr);
   }
 
   body.solver-page {

@@ -72,7 +72,7 @@ python3 -m py_compile scripts/fetch_ncvvo.py scripts/build_croatian_writing.py
 | `index.html` | Home/subject/archive shell. Ucitava sve glavne `data/*.js` i `app.js`. |
 | `app.js` | Router bez frameworka, filteri, subject pages, exam detail pages, progress, mapiranje na solvere. |
 | `styles.css` | Sav styling za home, arhivu, solvere, modalne prozore i responsive layout. |
-| `analytics.js` | Zajednicki GA4/Clarity loader, consent signali, kontekst stranice i kljucni dogadjaji. |
+| `analytics.js` | Zajednicki GA4/Clarity loader, kontekst stranice i kljucni dogadjaji. |
 | `server.js` | Opcionalni Node backend za auth, profil sync, AI OCR/ocjenjivanje i staticko serviranje. |
 | `profile-store.js` | Local/profile persistence adapter za pokusaje, vjezbe i kljuceve. |
 | `auth-client.js` | Frontend auth klijent i profile sync hookovi. |
@@ -82,20 +82,15 @@ python3 -m py_compile scripts/fetch_ncvvo.py scripts/build_croatian_writing.py
 | `site-header.js`, `site-footer.js` | Zajednicki layout chrome. |
 | `scripts/pdf_utils.py` | Zajednicki helperi za `pdftotext`, `pdfinfo`, `pdftocairo`, PNG dimenzije i osnovni slug/term utility. |
 
-## Analitika i consent
+## Analitika
 
 `analytics.js` ucitava GA4 measurement ID `G-3W2D6EJZ94` i Clarity projekt
-`x0a1kkmiqz`. Oba sustava dobivaju isti analytics consent signal:
-
-```text
-bez odluke / Samo nuzni -> analytics_storage: denied
-Prihvati analitiku      -> analytics_storage: granted
-```
-
-Oglasni storage, user data i personalizacija uvijek ostaju `denied`. Odluka se
-sprema u first-party cookie `azm_analytics_consent`, a footer nudi ponovno
-otvaranje postavki. Ne slati odgovore, uneseni tekst, email adresu ni drugi PII
-preko `window.AsistentAnalytics.track()`.
+`x0a1kkmiqz` bez posebnog first-party consent cookieja u aplikaciji. GA4
+consent defaults postavljaju `analytics_storage: granted`, dok oglasni storage,
+user data, Google signals i personalizacija ostaju iskljuceni. Stari
+`azm_analytics_consent` cookie se brise pri ucitavanju analitike. Ne slati
+odgovore, uneseni tekst, email adresu ni drugi PII preko
+`window.AsistentAnalytics.track()`.
 
 GA4 i Clarity dobivaju isti kontekst kroz `azm_page_type`, `azm_subject`,
 `azm_exam_id`, `azm_exam_part` i `azm_mode`. Za prikaz tih parametara u GA4

@@ -1,10 +1,11 @@
 (() => {
   const measurementId = "G-3W2D6EJZ94";
   const clarityTagId = "x0a1kkmiqz";
-  const consentCookieName = "azm_analytics_consent";
   const loginPendingKey = "azm_analytics_login_pending";
-  const consentMaxAgeSeconds = 180 * 24 * 60 * 60;
-  const validConsentChoices = new Set(["granted", "denied"]);
+  const clarityConsent = {
+    ad_Storage: "denied",
+    analytics_Storage: "granted",
+  };
   const solverContextByPage = {
     "abcd.html": { examPart: "višestruki izbor" },
     "engleski-citanje.html": { examPart: "Čitanje", subject: "Engleski jezik" },
@@ -27,65 +28,30 @@
     (window.clarity.q = window.clarity.q || []).push(arguments);
   };
 
-  let consentChoice = readCookie(consentCookieName);
-  if (!validConsentChoices.has(consentChoice)) consentChoice = "";
-
-  function readCookie(name) {
-    return document.cookie
-      .split(";")
-      .map((part) => part.trim())
-      .find((part) => part.startsWith(`${name}=`))
-      ?.slice(name.length + 1) || "";
-  }
-
-  function writeCookie(name, value, maxAgeSeconds) {
-    const secure = window.location.protocol === "https:" ? "Secure" : "";
-    document.cookie = [
-      `${name}=${encodeURIComponent(value)}`,
-      "Path=/",
-      "SameSite=Lax",
-      `Max-Age=${maxAgeSeconds}`,
-      secure,
-    ]
-      .filter(Boolean)
-      .join("; ");
-  }
-
-  function clearAnalyticsCookies() {
-    const cookieNames = document.cookie
-      .split(";")
-      .map((part) => part.trim().split("=")[0])
-      .filter((name) => name.startsWith("_ga") || name.startsWith("_cl"));
+  function clearLegacyConsentCookie() {
     const domains = ["", window.location.hostname, ".matura.com.hr"];
 
-    for (const name of cookieNames) {
-      for (const domain of domains) {
-        const domainAttribute = domain ? `; Domain=${domain}` : "";
-        document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax${domainAttribute}`;
-      }
+    for (const domain of domains) {
+      const domainAttribute = domain ? `; Domain=${domain}` : "";
+      document.cookie = `azm_analytics_consent=; Path=/; Max-Age=0; SameSite=Lax${domainAttribute}`;
     }
   }
 
-  function analyticsStorage(choice = consentChoice) {
-    return choice === "granted" ? "granted" : "denied";
+  function applyClarityConsent() {
+    window.clarity("consentv2", clarityConsent);
   }
 
-  function updateConsentSignals(command, choice = consentChoice) {
-    const storage = analyticsStorage(choice);
-
-    window.gtag("consent", command, {
+  function setAnalyticsConsentDefaults() {
+    window.gtag("consent", "default", {
       ad_personalization: "denied",
       ad_storage: "denied",
       ad_user_data: "denied",
-      analytics_storage: storage,
+      analytics_storage: "granted",
       functionality_storage: "granted",
       personalization_storage: "denied",
       security_storage: "granted",
     });
-    window.clarity("consentv2", {
-      ad_Storage: "denied",
-      analytics_Storage: storage,
-    });
+    applyClarityConsent();
   }
 
   function pageName() {
@@ -149,17 +115,6 @@
       ...cleanParameters(parameters),
     });
     window.clarity("event", eventName);
-  }
-
-  function setConsent(choice) {
-    if (!validConsentChoices.has(choice)) return;
-
-    consentChoice = choice;
-    writeCookie(consentCookieName, choice, consentMaxAgeSeconds);
-    updateConsentSignals("update", choice);
-    if (choice === "denied") clearAnalyticsCookies();
-    track("analytics_consent_update", { consent_choice: choice });
-    window.dispatchEvent(new CustomEvent("asistent:analytics-consent", { detail: { choice } }));
   }
 
   function targetParameters(element) {
@@ -252,31 +207,34 @@
   }
 
   function loadClarity() {
-    if (document.querySelector(`[data-clarity-tag="${clarityTagId}"]`)) return;
+    if (document.querySelector(`[data-clarity-tag="${clarityTagId}"]`)) {
+      applyClarityConsent();
+      setClarityContext();
+      return;
+    }
 
     const script = document.createElement("script");
     script.async = true;
     script.dataset.clarityTag = clarityTagId;
     script.src = `https://www.clarity.ms/tag/${clarityTagId}`;
+    script.addEventListener("load", () => {
+      applyClarityConsent();
+      setClarityContext();
+    });
     document.head.append(script);
   }
 
-  function scheduleAnalytics() {
-    const load = () => {
-      loadGoogleAnalytics();
-      loadClarity();
-    };
-
+  function scheduleGoogleAnalytics() {
     if ("requestIdleCallback" in window) {
-      window.requestIdleCallback(load, { timeout: 1500 });
+      window.requestIdleCallback(loadGoogleAnalytics, { timeout: 1500 });
       return;
     }
 
-    window.setTimeout(load, 0);
+    window.setTimeout(loadGoogleAnalytics, 0);
   }
 
-  updateConsentSignals("default");
-  if (consentChoice !== "granted") clearAnalyticsCookies();
+  clearLegacyConsentCookie();
+  setAnalyticsConsentDefaults();
   window.gtag("set", "ads_data_redaction", true);
   window.gtag("js", new Date());
   const context = pageContext();
@@ -291,8 +249,6 @@
 
   window.AsistentAnalytics = {
     completeLogin,
-    getConsent: () => consentChoice,
-    setConsent,
     track,
   };
 
@@ -300,5 +256,6 @@
   document.addEventListener("play", (event) => {
     if (event.target instanceof HTMLAudioElement) track("audio_play");
   }, true);
-  scheduleAnalytics();
+  loadClarity();
+  scheduleGoogleAnalytics();
 })();

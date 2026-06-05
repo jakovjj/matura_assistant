@@ -33,9 +33,6 @@
               >NCVVO</a
             >
           </p>
-          <button class="footer-cookie-settings" type="button" data-analytics-settings>
-            Postavke analitike
-          </button>
         </div>
         <a
           class="footer-github"
