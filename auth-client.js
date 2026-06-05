@@ -1,7 +1,7 @@
 (function () {
   const widgets = document.querySelectorAll("[data-auth-widget]");
   const authPage = document.querySelector("[data-auth-page]");
-  if (!widgets.length && !authPage) return;
+  const hasAuthUi = widgets.length || authPage;
 
   const analyticsConsentCookieName = "azm_analytics_consent";
   const analyticsConsentMaxAgeSeconds = 180 * 24 * 60 * 60;
@@ -307,5 +307,5 @@
   renderWidgets();
   renderAuthPage();
   renderCookieNotice();
-  loadAuthState();
+  if (hasAuthUi) loadAuthState();
 })();

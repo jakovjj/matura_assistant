@@ -46,7 +46,7 @@
     <link rel="canonical" href="https://matura.com.hr/" />
     <link rel="sitemap" type="application/xml" href="https://matura.com.hr/sitemap.xml" />
     <link rel="icon" type="image/webp" href="./assets/asistent_za_maturu.webp" />
-    <link rel="stylesheet" href="./styles.css?v=20260605-level-a-badge-visible" />
+    <link rel="stylesheet" href="./styles.css?v=20260605-contact-email" />
     <script id="seo-structured-data" type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -125,6 +125,21 @@
                   <path d="M6 3h7v7M13 3 5 11M3 6v7h7" />
                 </svg>
               </a>
+              <div
+                class="source-note__contact"
+                data-contact-email
+                data-contact-user="vokaj"
+                data-contact-host="moc.cirdnaj"
+              >
+                <span>Kontakt:</span>
+                <button
+                  class="source-note__contact-reveal"
+                  type="button"
+                  data-contact-email-reveal
+                >
+                  Prikaži email
+                </button>
+              </div>
             </aside>
           </div>
         </div>
@@ -197,6 +212,33 @@
     <script src="./profile-store.js?v=20260603-cross-host-sync"></script>
     <script src="./exam-simulation.js?v=20260605-prestart-modal"></script>
     <script src="./app.js?v=20260605-chemistry-table-crops"></script>
-    <script src="./auth-client.js?v=20260605-cookie-consent"></script>
+    <script src="./auth-client.js?v=20260605-clarity-consent-fix"></script>
+    <script>
+      (() => {
+        const contact = document.querySelector("[data-contact-email]");
+        if (!contact) return;
+
+        const revealButton = contact.querySelector("[data-contact-email-reveal]");
+        if (!revealButton) return;
+
+        const reverse = (value) => Array.from(value || "").reverse().join("");
+        const user = reverse(contact.dataset.contactUser);
+        const host = reverse(contact.dataset.contactHost);
+        if (!user || !host) return;
+
+        revealButton.addEventListener(
+          "click",
+          () => {
+            const link = document.createElement("a");
+            link.className = "source-note__contact-link";
+            link.href = `mailto:${user}@${host}`;
+            link.textContent = `${user}@${host}`;
+            revealButton.replaceWith(link);
+            link.focus();
+          },
+          { once: true },
+        );
+      })();
+    </script>
   </body>
 </html>

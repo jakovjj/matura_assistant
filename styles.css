@@ -1025,6 +1025,39 @@ h2 {
   font-weight: 700;
 }
 
+.source-note__contact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: baseline;
+  margin-top: 10px;
+}
+
+.source-note__contact span {
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.source-note__contact-reveal {
+  padding: 0;
+  color: var(--blue);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-weight: 700;
+}
+
+.source-note__contact-reveal:hover {
+  color: var(--blue-dark);
+  text-decoration: underline;
+}
+
+.source-note__contact-reveal:focus-visible,
+.source-note__contact-link:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+
 .workspace-section {
   padding: 32px 0 72px;
 }
