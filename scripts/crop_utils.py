@@ -128,14 +128,16 @@ def trim_crop_bottom_whitespace(
     threshold: int = 244,
     scan_margin: int = 10,
     min_dark_ratio: float = 0.004,
+    detect_legacy_answer_frame: bool = True,
 ) -> tuple[int, int, int, int]:
-    x_min, y_min, x_max, y_max = trim_legacy_answer_frame(
-        image,
-        x_min,
-        y_min,
-        x_max,
-        y_max,
-    )
+    if detect_legacy_answer_frame:
+        x_min, y_min, x_max, y_max = trim_legacy_answer_frame(
+            image,
+            x_min,
+            y_min,
+            x_max,
+            y_max,
+        )
     width = x_max - x_min
     height = y_max - y_min
     if width <= 0 or height <= 0:

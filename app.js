@@ -29,6 +29,10 @@ const solverDataSources = {
     globalName: "ASISTENT_ZA_MATURE_MATH_CHOICE",
     src: "./data/math-choice.js?v=20260602-math-groups",
   },
+  chemistryChoice: {
+    globalName: "ASISTENT_ZA_MATURE_CHEMISTRY_CHOICE",
+    src: "./data/chemistry-choice.js?v=20260605-chemistry-choice",
+  },
   croatianChoice: {
     globalName: "ASISTENT_ZA_MATURE_CROATIAN_CHOICE",
     src: "./data/croatian-choice.js?v=20260602-croatian-tasks",
@@ -40,6 +44,10 @@ const solverDataSources = {
   geographyChoice: {
     globalName: "ASISTENT_ZA_MATURE_GEOGRAPHY_CHOICE",
     src: "./data/geography-choice.js?v=20260604-geography-choice",
+  },
+  psychologyChoice: {
+    globalName: "ASISTENT_ZA_MATURE_PSYCHOLOGY_CHOICE",
+    src: "./data/psychology-choice.js?v=20260605-psychology-choice",
   },
   politicsChoice: {
     globalName: "ASISTENT_ZA_MATURE_POLITICS_CHOICE",
@@ -61,22 +69,13 @@ const mandatorySubjects = [
 
 const temporarilyUnavailableSubjects = new Set([
   "Biologija",
-  "Etika",
   "Filozofija",
-  "Francuski jezik",
   "Glazbena umjetnost",
-  "Grčki jezik",
   "Informatika",
-  "Kemija",
-  "Latinski jezik",
   "Likovna umjetnost",
   "Logika",
-  "Mađarski jezik",
   "Njemački jezik",
-  "Psihologija",
   "Sociologija",
-  "Srpski jezik",
-  "Španjolski jezik",
   "Talijanski jezik",
   "Vjeronauk",
 ]);
@@ -84,28 +83,21 @@ const temporarilyUnavailableSubjects = new Set([
 const subjectIcons = {
   Biologija: "dna",
   "Engleski jezik": "languages",
-  Etika: "scale",
   Filozofija: "lightbulb",
   Fizika: "atom",
-  "Francuski jezik": "languages",
   Geografija: "earth",
   "Glazbena umjetnost": "music-2",
-  "Grčki jezik": "omega",
   "Hrvatski jezik": "book-open-text",
   Informatika: "binary",
   Kemija: "flask-conical",
-  "Latinski jezik": "amphora",
   "Likovna umjetnost": "palette",
   Logika: "workflow",
-  "Mađarski jezik": "languages",
   Matematika: "sigma",
   "Njemački jezik": "languages",
   "Politika i gospodarstvo": "landmark",
   Povijest: "history",
   Psihologija: "brain",
   Sociologija: "users-round",
-  "Srpski jezik": "languages",
-  "Španjolski jezik": "languages",
   "Talijanski jezik": "languages",
   Vjeronauk: "church",
 };
@@ -113,28 +105,21 @@ const subjectIcons = {
 const subjectColors = {
   Biologija: "#2f5d50",
   "Engleski jezik": "#36517c",
-  Etika: "#5b4b63",
   Filozofija: "#574d3f",
   Fizika: "#225b67",
-  "Francuski jezik": "#5a4e7a",
   Geografija: "#3f5f3b",
   "Glazbena umjetnost": "#6a4a5b",
-  "Grčki jezik": "#4d5370",
   "Hrvatski jezik": "#7a3f4a",
   Informatika: "#2e5c72",
   Kemija: "#315f69",
-  "Latinski jezik": "#5b5140",
   "Likovna umjetnost": "#6a4f3d",
   Logika: "#4c5870",
-  "Mađarski jezik": "#4e5d47",
   Matematika: "#4f4b78",
   "Njemački jezik": "#3e5876",
   "Politika i gospodarstvo": "#5c4a42",
   Povijest: "#6a4b3d",
   Psihologija: "#5a4968",
   Sociologija: "#4e5960",
-  "Srpski jezik": "#574a70",
-  "Španjolski jezik": "#6b4a3f",
   "Talijanski jezik": "#405e55",
   Vjeronauk: "#4f5943",
 };
@@ -142,28 +127,21 @@ const subjectColors = {
 const subjectImages = {
   Biologija: "biology",
   "Engleski jezik": "english-dictionary",
-  Etika: "ethics-justice",
   Filozofija: "philosophy-thinker",
   Fizika: "physics",
-  "Francuski jezik": "french-eiffel",
   Geografija: "geography",
   "Glazbena umjetnost": "music",
-  "Grčki jezik": "greek-columns",
   "Hrvatski jezik": "croatian-writing",
   Informatika: "informatics",
   Kemija: "chemistry",
-  "Latinski jezik": "latin-rome",
   "Likovna umjetnost": "art",
   Logika: "logic-chess",
-  "Mađarski jezik": "hungarian-budapest",
   Matematika: "mathematics",
   "Njemački jezik": "german-brandenburg",
   "Politika i gospodarstvo": "civics",
   Povijest: "history-document",
   Psihologija: "psychology-brain",
   Sociologija: "sociology-crowd",
-  "Srpski jezik": "serbian-typewriter",
-  "Španjolski jezik": "spanish-madrid",
   "Talijanski jezik": "italian-colosseum",
   Vjeronauk: "religion-bible",
 };
@@ -171,28 +149,21 @@ const subjectImages = {
 const subjectAccusativeLabels = {
   Biologija: "Biologiju",
   "Engleski jezik": "Engleski jezik",
-  Etika: "Etiku",
   Filozofija: "Filozofiju",
   Fizika: "Fiziku",
-  "Francuski jezik": "Francuski jezik",
   Geografija: "Geografiju",
   "Glazbena umjetnost": "Glazbenu umjetnost",
-  "Grčki jezik": "Grčki jezik",
   "Hrvatski jezik": "Hrvatski jezik",
   Informatika: "Informatiku",
   Kemija: "Kemiju",
-  "Latinski jezik": "Latinski jezik",
   "Likovna umjetnost": "Likovnu umjetnost",
   Logika: "Logiku",
-  "Mađarski jezik": "Mađarski jezik",
   Matematika: "Matematiku",
   "Njemački jezik": "Njemački jezik",
   "Politika i gospodarstvo": "Politiku i gospodarstvo",
   Povijest: "Povijest",
   Psihologija: "Psihologiju",
   Sociologija: "Sociologiju",
-  "Srpski jezik": "Srpski jezik",
-  "Španjolski jezik": "Španjolski jezik",
   "Talijanski jezik": "Talijanski jezik",
   Vjeronauk: "Vjeronauk",
 };
@@ -357,6 +328,11 @@ const solverDefinitions = {
     page: "./matematika.html",
     storagePrefix: "math-choice",
   },
+  chemistryChoice: {
+    idForTerm: (exam, term) => `kemija-${exam.year}-${slugPart(term)}`,
+    page: "./kemija.html",
+    storagePrefix: "chemistry-choice",
+  },
   croatianChoice: {
     idForTerm: (exam, term) => prefixedExamIdForTerm("hrvatski", exam, term),
     page: "./hrvatski.html",
@@ -371,6 +347,11 @@ const solverDefinitions = {
     idForTerm: (exam, term) => `geografija-${exam.year}-${slugPart(term)}`,
     page: "./geografija.html",
     storagePrefix: "geography-choice",
+  },
+  psychologyChoice: {
+    idForTerm: (exam, term) => `psihologija-${exam.year}-${slugPart(term)}`,
+    page: "./psihologija.html",
+    storagePrefix: "psychology-choice",
   },
   politicsChoice: {
     idForTerm: (exam, term) => `politika-i-gospodarstvo-${exam.year}-${slugPart(term)}`,
@@ -524,6 +505,10 @@ function mathChoiceIdForTerm(exam, term) {
   return solverIdForTerm("mathChoice", exam, term);
 }
 
+function chemistryChoiceIdForTerm(exam, term) {
+  return solverIdForTerm("chemistryChoice", exam, term);
+}
+
 function croatianChoiceIdForTerm(exam, term) {
   return solverIdForTerm("croatianChoice", exam, term);
 }
@@ -534,6 +519,10 @@ function historyChoiceIdForTerm(exam, term) {
 
 function geographyChoiceIdForTerm(exam, term) {
   return solverIdForTerm("geographyChoice", exam, term);
+}
+
+function psychologyChoiceIdForTerm(exam, term) {
+  return solverIdForTerm("psychologyChoice", exam, term);
 }
 
 function politicsChoiceIdForTerm(exam, term) {
@@ -552,14 +541,6 @@ function englishListeningStorageKeys(listeningExam) {
   return solverStorageKeys("englishListening", listeningExam);
 }
 
-function englishEssayStorageKeys(essayExam) {
-  return solverStorageKeys("englishEssay", essayExam);
-}
-
-function croatianWritingStorageKeys(writingExam) {
-  return solverStorageKeys("croatianWriting", writingExam);
-}
-
 function physicsChoiceStorageKeys(choiceExam) {
   return solverStorageKeys("physicsChoice", choiceExam);
 }
@@ -576,6 +557,14 @@ function mathOpenScoreStorageKeys(choiceExam) {
   return solverOpenScoreStorageKeys("mathChoice", choiceExam);
 }
 
+function chemistryChoiceStorageKeys(choiceExam) {
+  return solverStorageKeys("chemistryChoice", choiceExam);
+}
+
+function chemistryOpenScoreStorageKeys(choiceExam) {
+  return solverOpenScoreStorageKeys("chemistryChoice", choiceExam);
+}
+
 function croatianChoiceStorageKeys(choiceExam) {
   return solverStorageKeys("croatianChoice", choiceExam);
 }
@@ -586,6 +575,10 @@ function historyChoiceStorageKeys(choiceExam) {
 
 function geographyChoiceStorageKeys(choiceExam) {
   return solverStorageKeys("geographyChoice", choiceExam);
+}
+
+function psychologyChoiceStorageKeys(choiceExam) {
+  return solverStorageKeys("psychologyChoice", choiceExam);
 }
 
 function politicsChoiceStorageKeys(choiceExam) {
@@ -615,8 +608,8 @@ const englishPracticeParts = [
   {
     id: "esej",
     label: "Esej",
-    description: "Pisani sastav iz ispita.",
-    usesAiChecking: true,
+    description: "Pregled pisanoga sastava iz ispita.",
+    checkingSupported: false,
   },
 ];
 function englishPracticePartsForExam(exam) {
@@ -633,17 +626,9 @@ const modernForeignLanguageDurations = {
     B: { citanje: 75, slusanje: 30, pisanje: 75 },
     legacyB: { citanje: 60, slusanje: 25, pisanje: 60 },
   },
-  "Francuski jezik": {
-    A: { citanje: 65, slusanje: 30, pisanje: 55 },
-    B: { citanje: 75, slusanje: 25, pisanje: 75 },
-  },
   "Njemački jezik": {
     A: { citanje: 70, slusanje: 35, pisanje: 75 },
     B: { citanje: 100, slusanje: 30, pisanje: 100 },
-  },
-  "Španjolski jezik": {
-    A: { citanje: 65, slusanje: 30, pisanje: 55 },
-    B: { citanje: 75, slusanje: 25, pisanje: 75 },
   },
   "Talijanski jezik": {
     A: { citanje: 65, slusanje: 30, pisanje: 55 },
@@ -652,9 +637,7 @@ const modernForeignLanguageDurations = {
 };
 const modernForeignLanguageSubjects = new Set([
   "Engleski jezik",
-  "Francuski jezik",
   "Njemački jezik",
-  "Španjolski jezik",
   "Talijanski jezik",
 ]);
 const unavailableForeignLanguageParts = [
@@ -674,32 +657,6 @@ const unavailableForeignLanguageParts = [
     description: "Ispit pisanja.",
   },
 ];
-const literatureLanguageSubjects = new Set([
-  "Mađarski jezik",
-  "Srpski jezik",
-]);
-const literatureLanguageParts = [
-  {
-    id: "knjizevnost-jezik",
-    label: "Književnost i jezik",
-    description: "Zadatci iz književnosti i jezika.",
-  },
-  {
-    id: "skolski-esej",
-    label: "Školski esej",
-    description: "Pisani dio ispita.",
-  },
-];
-const literatureLanguageDurations = {
-  "Mađarski jezik": {
-    "knjizevnost-jezik": 80,
-    "skolski-esej": 180,
-  },
-  "Srpski jezik": {
-    "knjizevnost-jezik": 90,
-    "skolski-esej": 150,
-  },
-};
 const musicPracticeParts = [
   {
     id: "glazba-u-kontekstu",
@@ -721,14 +678,11 @@ const singleExamPart = {
 };
 const singleExamDurations = {
   Biologija: 150,
-  Etika: 150,
   Filozofija: 150,
   Fizika: 180,
   Geografija: 90,
-  "Grčki jezik": 120,
   Informatika: 100,
   Kemija: 180,
-  "Latinski jezik": 120,
   "Likovna umjetnost": 120,
   Logika: 150,
   Matematika: {
@@ -763,9 +717,11 @@ const allSubjects = [...subjectCounts.keys()].sort((a, b) => {
 });
 
 function icon(iconName, className) {
+  if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
+
   return `
     <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="#${iconName}"></use>
+      <use href="./assets/lucide-icons.svg#${iconName}"></use>
     </svg>
   `;
 }
@@ -800,7 +756,7 @@ function formatLevel(level) {
 
 function levelBadge(level) {
   return level
-    ? `<span class="level-badge">${escapeHtml(level)}</span>`
+    ? `<span class="level-badge${level === "A" ? " level-badge--a" : ""}">${escapeHtml(level)}</span>`
     : `<span class="level-badge level-badge--empty">-</span>`;
 }
 
@@ -1090,6 +1046,10 @@ function mathChoiceUrl(choiceExam, simulation = false) {
   return solverUrl("mathChoice", choiceExam, simulation);
 }
 
+function chemistryChoiceUrl(choiceExam, simulation = false) {
+  return solverUrl("chemistryChoice", choiceExam, simulation);
+}
+
 function croatianChoiceUrl(choiceExam, simulation = false) {
   return solverUrl("croatianChoice", choiceExam, simulation);
 }
@@ -1100,6 +1060,10 @@ function historyChoiceUrl(choiceExam, simulation = false) {
 
 function geographyChoiceUrl(choiceExam, simulation = false) {
   return solverUrl("geographyChoice", choiceExam, simulation);
+}
+
+function psychologyChoiceUrl(choiceExam, simulation = false) {
+  return solverUrl("psychologyChoice", choiceExam, simulation);
 }
 
 function politicsChoiceUrl(choiceExam, simulation = false) {
@@ -1134,6 +1098,10 @@ function mathChoiceExamForArchive(exam) {
   return solverExamForArchive("mathChoice", exam);
 }
 
+function chemistryChoiceExamForArchive(exam) {
+  return solverExamForArchive("chemistryChoice", exam);
+}
+
 function croatianChoiceExamForArchive(exam) {
   return solverExamForArchive("croatianChoice", exam);
 }
@@ -1144,6 +1112,10 @@ function historyChoiceExamForArchive(exam) {
 
 function geographyChoiceExamForArchive(exam) {
   return solverExamForArchive("geographyChoice", exam);
+}
+
+function psychologyChoiceExamForArchive(exam) {
+  return solverExamForArchive("psychologyChoice", exam);
 }
 
 function politicsChoiceExamForArchive(exam) {
@@ -1180,10 +1152,6 @@ function modernForeignLanguageDuration(exam, partId) {
   return subjectDurations[exam.level || ""]?.[partId] ?? null;
 }
 
-function literatureLanguageDuration(exam, partId) {
-  return literatureLanguageDurations[exam.subject]?.[partId] ?? null;
-}
-
 function singleExamDuration(exam) {
   const duration = singleExamDurations[exam.subject];
   if (duration && typeof duration === "object") {
@@ -1198,7 +1166,6 @@ function withDurations(exam, parts) {
 
     const durationMinutes =
       modernForeignLanguageDuration(exam, part.id) ??
-      literatureLanguageDuration(exam, part.id) ??
       singleExamDuration(exam);
 
     return {
@@ -1219,6 +1186,10 @@ function linkedPart(exam, part, practiceExam, urlBuilder) {
     href: urlBuilder(practiceExam),
     simulationHref: urlBuilder(practiceExam, true),
   };
+}
+
+function isPreviewOnlyPart(part) {
+  return part?.checkingSupported === false;
 }
 
 function croatianCorePartLabel(exam) {
@@ -1253,9 +1224,9 @@ function croatianPracticeParts(exam) {
         {
           id: "sazetak",
           label: "Sažetak",
-          description: "Pisani sažetak.",
+          description: "Pregled pisanoga sažetka.",
           durationMinutes: 80,
-          usesAiChecking: true,
+          checkingSupported: false,
         },
         croatianWritingExamForArchive(exam, "sazetak"),
         croatianWritingUrl,
@@ -1265,9 +1236,9 @@ function croatianPracticeParts(exam) {
         {
           id: "skolski-esej",
           label: "Školski esej",
-          description: "Pisani dio ispita.",
+          description: "Pregled pisanoga dijela ispita.",
           durationMinutes: 160,
-          usesAiChecking: true,
+          checkingSupported: false,
         },
         croatianWritingExamForArchive(exam, "skolski-esej"),
         croatianWritingUrl,
@@ -1278,17 +1249,22 @@ function croatianPracticeParts(exam) {
   const essayPart = {
     id: "skolski-esej",
     label: "Školski esej",
-    description: "Pisani dio ispita.",
+    description: "Pregled pisanoga dijela ispita.",
     durationMinutes: 160,
-    usesAiChecking: true,
+    checkingSupported: false,
   };
+  const essayExam = croatianWritingExamForArchive(exam, "skolski-esej");
+
+  if (exam.year === 2020 && normalizeTerm(exam.term) === "ljetni rok" && !essayExam) {
+    return [corePart];
+  }
 
   return [
     corePart,
     linkedPart(
       exam,
       essayPart,
-      croatianWritingExamForArchive(exam, "skolski-esej"),
+      essayExam,
       croatianWritingUrl,
     ),
   ];
@@ -1381,6 +1357,24 @@ function interactiveParts(exam) {
     ];
   }
 
+  if (exam.subject === "Kemija") {
+    const choiceExam = chemistryChoiceExamForArchive(exam);
+    return [
+      linkedPart(
+        exam,
+        {
+          id: "kemija",
+          label: "Ispit",
+          description: "ABCD zadatci ocjenjuju se automatski, a ostali zadatci ručno prema službenim rješenjima.",
+          durationMinutes: singleExamDuration(exam),
+          requiresManualChecking: true,
+        },
+        choiceExam,
+        chemistryChoiceUrl,
+      ),
+    ];
+  }
+
   if (exam.subject === "Povijest") {
     const choiceExam = historyChoiceExamForArchive(exam);
     return [
@@ -1417,6 +1411,24 @@ function interactiveParts(exam) {
     ];
   }
 
+  if (exam.subject === "Psihologija") {
+    const choiceExam = psychologyChoiceExamForArchive(exam);
+    return [
+      linkedPart(
+        exam,
+        {
+          id: "psihologija",
+          label: "Ispit",
+          description: "Zadatci zatvorenoga tipa i otvoreni zadatci iz ispitne knjižice.",
+          durationMinutes: singleExamDuration(exam),
+          usesAiChecking: true,
+        },
+        choiceExam,
+        psychologyChoiceUrl,
+      ),
+    ];
+  }
+
   if (exam.subject === "Politika i gospodarstvo") {
     const choiceExam = politicsChoiceExamForArchive(exam);
     return [
@@ -1437,14 +1449,6 @@ function interactiveParts(exam) {
 
   if (modernForeignLanguageSubjects.has(exam.subject)) {
     return unavailableParts(exam, withDurations(exam, unavailableForeignLanguageParts));
-  }
-
-  if (literatureLanguageSubjects.has(exam.subject)) {
-    return withDurations(exam, literatureLanguageParts).map((part) =>
-      part.id === "knjizevnost-jezik"
-        ? genericAbcdPart(exam, part)
-        : unavailablePart(exam, part),
-    );
   }
 
   if (exam.subject === "Glazbena umjetnost") {
@@ -1549,36 +1553,12 @@ function englishListeningProgress(exam) {
   };
 }
 
-function readEnglishEssayDraft(essayExam) {
-  const stored = readFirstStorageObject(englishEssayStorageKeys(essayExam));
-  return typeof stored.essayText === "string" ? stored.essayText : "";
+function englishEssayProgress() {
+  return null;
 }
 
-function englishEssayProgress(exam) {
-  const essayExam = essayExamForArchive(exam);
-  if (!essayExam) return null;
-
-  return {
-    answered: readEnglishEssayDraft(essayExam).trim() ? 1 : 0,
-    id: essayExam.id,
-    total: 1,
-  };
-}
-
-function readCroatianWritingDraft(writingExam) {
-  const stored = readFirstStorageObject(croatianWritingStorageKeys(writingExam));
-  return typeof stored.writingText === "string" ? stored.writingText : "";
-}
-
-function croatianWritingProgress(exam) {
-  return ["sazetak", "skolski-esej"]
-    .map((kind) => croatianWritingExamForArchive(exam, kind))
-    .filter(Boolean)
-    .map((writingExam) => ({
-      answered: readCroatianWritingDraft(writingExam).trim() ? 1 : 0,
-      id: writingExam.id,
-      total: 1,
-    }));
+function croatianWritingProgress() {
+  return [];
 }
 
 function readPhysicsResponses(choiceExam) {
@@ -1666,6 +1646,56 @@ function mathProgress(exam) {
     ]),
   );
   const openScores = readMathOpenScores(choiceExam);
+  const reviewed = Object.entries(openScores).filter(([question, score]) => {
+    const maximum = openQuestions.get(question);
+    return Number.isInteger(maximum)
+      && Number.isInteger(score)
+      && score >= 0
+      && score <= maximum;
+  }).length;
+
+  return {
+    answered: answered + reviewed,
+    id: choiceExam.id,
+    total: knownQuestions.size + openQuestions.size,
+  };
+}
+
+function readChemistryResponses(choiceExam) {
+  return readMergedStorageObjects(chemistryChoiceStorageKeys(choiceExam));
+}
+
+function readChemistryOpenScores(choiceExam) {
+  return readMergedStorageObjects(chemistryOpenScoreStorageKeys(choiceExam));
+}
+
+function chemistryQuestionNumbers(choiceExam) {
+  return (choiceExam.tasks || []).flatMap((task) =>
+    task.questions.map((question) => String(question.number)),
+  );
+}
+
+function chemistryOpenQuestions(choiceExam) {
+  return (choiceExam.openTasks || []).flatMap((task) => task.questions);
+}
+
+function chemistryProgress(exam) {
+  const choiceExam = chemistryChoiceExamForArchive(exam);
+  if (!choiceExam) return null;
+
+  const knownQuestions = new Set(chemistryQuestionNumbers(choiceExam));
+  const responses = readChemistryResponses(choiceExam);
+  const answered = Object.entries(responses).filter(
+    ([question, answer]) =>
+      knownQuestions.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+  const openQuestions = new Map(
+    chemistryOpenQuestions(choiceExam).map((question) => [
+      String(question.number),
+      Number(question.maxPoints),
+    ]),
+  );
+  const openScores = readChemistryOpenScores(choiceExam);
   const reviewed = Object.entries(openScores).filter(([question, score]) => {
     const maximum = openQuestions.get(question);
     return Number.isInteger(maximum)
@@ -1791,6 +1821,37 @@ function geographyProgress(exam) {
   };
 }
 
+function psychologyProgress(exam) {
+  const choiceExam = psychologyChoiceExamForArchive(exam);
+  if (!choiceExam) return null;
+
+  const knownClosed = new Set((choiceExam.questions || []).map(String));
+  const knownOpen = new Set((choiceExam.openQuestions || []).map(String));
+  const stored = readMergedStorageObjects(psychologyChoiceStorageKeys(choiceExam));
+  const closedResponses =
+    stored.closedResponses && typeof stored.closedResponses === "object"
+      ? stored.closedResponses
+      : {};
+  const openResponses =
+    stored.openResponses && typeof stored.openResponses === "object"
+      ? stored.openResponses
+      : {};
+  const answeredClosed = Object.entries(closedResponses).filter(
+    ([question, answer]) =>
+      knownClosed.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+  const answeredOpen = Object.entries(openResponses).filter(
+    ([question, answer]) =>
+      knownOpen.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+
+  return {
+    answered: answeredClosed + answeredOpen,
+    id: choiceExam.id,
+    total: knownClosed.size + knownOpen.size,
+  };
+}
+
 function readPoliticsChoiceResponses(choiceExam) {
   return readMergedStorageObjects(
     politicsChoiceStorageKeys(choiceExam),
@@ -1837,8 +1898,10 @@ function abcdChoiceQuestionNumbers(choiceExam) {
 function abcdChoiceProgress(exam) {
   if (
     exam.subject === "Matematika"
+    || exam.subject === "Kemija"
     || exam.subject === "Povijest"
     || exam.subject === "Geografija"
+    || exam.subject === "Psihologija"
     || exam.subject === "Politika i gospodarstvo"
   ) return null;
 
@@ -1867,9 +1930,11 @@ function examProgress(exam) {
     ...croatianWritingProgress(exam),
     physicsProgress(exam),
     mathProgress(exam),
+    chemistryProgress(exam),
     croatianProgress(exam),
     historyProgress(exam),
     geographyProgress(exam),
+    psychologyProgress(exam),
     politicsProgress(exam),
     abcdChoiceProgress(exam),
   ].filter(Boolean);
@@ -2012,14 +2077,16 @@ function bestSimulationPercentageForPart(exam, part, attempts) {
 }
 
 function bestSimulationPercentages(exam, attempts) {
-  return interactiveParts(exam).map((part) => {
-    const percentage = bestSimulationPercentageForPart(exam, part, attempts);
-    return {
-      hasResult: percentage !== null,
-      label: part.label,
-      percentage: percentage ?? 0,
-    };
-  });
+  return interactiveParts(exam)
+    .filter((part) => part.checkingSupported !== false)
+    .map((part) => {
+      const percentage = bestSimulationPercentageForPart(exam, part, attempts);
+      return {
+        hasResult: percentage !== null,
+        label: part.label,
+        percentage: percentage ?? 0,
+      };
+    });
 }
 
 function percentageTone(percentage) {
@@ -2132,8 +2199,10 @@ function solverKeysForSubject(subject) {
 
   if (subject === "Fizika") return ["physicsChoice"];
   if (subject === "Matematika") return ["mathChoice"];
+  if (subject === "Kemija") return ["chemistryChoice"];
   if (subject === "Povijest") return ["historyChoice"];
   if (subject === "Geografija") return ["geographyChoice"];
+  if (subject === "Psihologija") return ["psychologyChoice"];
   if (subject === "Politika i gospodarstvo") return ["politicsChoice"];
 
   if (modernForeignLanguageSubjects.has(subject) || subject === "Glazbena umjetnost") {
@@ -2561,20 +2630,16 @@ function renderPracticeYearBlock(year, yearExams, simulationAttempts) {
         <p>školska godina ${year - 1}./${year}.</p>
       </div>
       <div class="practice-table-wrap">
-        <table class="practice-exam-table subject-exam-table${
-          hasLevels ? " subject-exam-table--with-levels" : " subject-exam-table--without-levels"
-        }">
+        <table class="practice-exam-table subject-exam-table">
           <colgroup>
             <col class="subject-exam-table__col-term" />
-            ${hasLevels ? '<col class="subject-exam-table__col-level" />' : ""}
             <col class="subject-exam-table__col-progress" />
             <col class="subject-exam-table__col-best" />
             <col class="subject-exam-table__col-actions" />
           </colgroup>
           <thead>
             <tr>
-              <th>Rok</th>
-              ${hasLevels ? "<th>Razina</th>" : ""}
+              <th><span class="visually-hidden">Rok i razina</span></th>
               <th>Napredak</th>
               <th title="Najbolji rezultat virtualne mature">Najbolji rezultat</th>
               <th>Materijali</th>
@@ -2598,9 +2663,11 @@ function renderSubjectExamRow(exam, hasLevels, simulationAttempts) {
   return `
     <tr>
       <td data-label="Rok">
-        <strong>${escapeHtml(formatTerm(exam.term))}</strong>
+        <div class="subject-exam-table__exam-label">
+          <strong>${escapeHtml(formatTerm(exam.term))}</strong>
+          ${hasLevels ? levelBadge(exam.level) : ""}
+        </div>
       </td>
-      ${hasLevels ? `<td data-label="Razina">${levelBadge(exam.level)}</td>` : ""}
       <td class="subject-exam-table__progress-cell" data-label="Napredak">
         <div class="exam-progress">
           <div class="exam-progress__meter-row">
@@ -2718,8 +2785,59 @@ function renderInteractiveArea(exam, selectedPartId) {
       <div class="practice-exam-list">
         ${parts.map((part) => renderPracticeExamRow(part, selectedPartId)).join("")}
       </div>
-      ${parts.some((part) => part.available) ? renderSimulationNote() : ""}
+      ${parts.some((part) => part.available && !isPreviewOnlyPart(part)) ? renderSimulationNote() : ""}
     </section>
+  `;
+}
+
+function renderPreviewPracticeActions(part, active) {
+  if (part.available) {
+    return `
+      <a
+        class="primary-button"
+        href="${escapeHtml(part.href)}"
+        ${active ? 'aria-current="true"' : ""}
+      >
+        Pregledaj
+      </a>
+    `;
+  }
+
+  return `
+    <button class="primary-button" type="button" disabled>
+      Pregledaj
+    </button>
+  `;
+}
+
+function renderSolvablePracticeActions(part, active) {
+  if (part.available) {
+    return `
+      <a
+        class="primary-button"
+        href="${escapeHtml(part.href)}"
+        ${active ? 'aria-current="true"' : ""}
+      >
+        Otvori vježbu
+      </a>
+      <a
+        class="secondary-button"
+        href="${escapeHtml(part.simulationHref)}"
+        data-simulation-start-link
+        data-simulation-duration="${escapeHtml(part.durationMinutes ?? "")}"
+      >
+        Simuliraj maturu
+      </a>
+    `;
+  }
+
+  return `
+    <button class="primary-button" type="button" disabled>
+      Otvori vježbu
+    </button>
+    <button class="secondary-button" type="button" disabled>
+      Simuliraj maturu
+    </button>
   `;
 }
 
@@ -2741,38 +2859,56 @@ function renderPracticeExamRow(part, selectedPartId) {
       </div>
       <div class="practice-exam-row__actions">
         ${
-          part.available
-            ? `
-              <a
-                class="primary-button"
-                href="${escapeHtml(part.href)}"
-                ${active ? 'aria-current="true"' : ""}
-              >
-                Otvori vježbu
-              </a>
-              <a class="secondary-button" href="${escapeHtml(part.simulationHref)}">
-                Simuliraj maturu
-              </a>
-            `
-            : `
-              <button class="primary-button" type="button" disabled>
-                Otvori vježbu
-              </button>
-              <button class="secondary-button" type="button" disabled>
-                Simuliraj maturu
-              </button>
-            `
+          isPreviewOnlyPart(part)
+            ? renderPreviewPracticeActions(part, active)
+            : renderSolvablePracticeActions(part, active)
         }
       </div>
     </article>
   `;
 }
 
+function browserShouldHandleNavigation(event, link) {
+  return (
+    event.defaultPrevented ||
+    event.button !== 0 ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey ||
+    (link.target && link.target !== "_self") ||
+    link.hasAttribute("download")
+  );
+}
+
+function handleSimulationStartLinkClick(event) {
+  const link = event.target instanceof Element
+    ? event.target.closest("[data-simulation-start-link]")
+    : null;
+  if (!link || !appRoot.contains(link)) return;
+  if (browserShouldHandleNavigation(event, link)) return;
+  if (!window.openExamSimulationStartDialog) return;
+
+  event.preventDefault();
+
+  window.openExamSimulationStartDialog({
+    durationMinutes: link.dataset.simulationDuration,
+    onCancel: () => window.AsistentAnalytics?.track?.("simulation_cancel"),
+    onConfirm: ({ confirmedAt }) => {
+      window.rememberExamSimulationStart?.({
+        confirmedAt,
+        targetUrl: link.href,
+      });
+      window.location.assign(link.href);
+    },
+  });
+}
+
 function renderSimulationNote() {
   return `
     <p class="simulation-note">
       <strong>Simulacija mature</strong> ima vremensko ograničenje prema trajanju
-      odabranog ispita. Odgovori i napredak iz simulacije ne spremaju se.
+      odabranog ispita. Odgovori i napredak rješavanja iz simulacije ne spremaju se.
     </p>
   `;
 }
@@ -2789,6 +2925,7 @@ function renderMissing(title, message) {
   `;
 }
 
+appRoot.addEventListener("click", handleSimulationStartLinkClick);
 window.addEventListener("asistent:practice-progress-synced", renderApp);
 window.AsistentProfile?.ready?.then(renderApp).catch(() => {});
 loadServerSimulationAttempts();

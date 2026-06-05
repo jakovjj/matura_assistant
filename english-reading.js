@@ -65,11 +65,19 @@ function checkButtonClass() {
     : "primary-button";
 }
 
+function icon(iconName, className) {
+  if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
+
+  return `
+    <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+      <use href="./assets/lucide-icons.svg#${iconName}"></use>
+    </svg>
+  `;
+}
+
 function renderCheckButtonContent() {
   return `
-    <svg class="solver-sticky-footer__action-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="#${checkButtonIcon()}"></use>
-    </svg>
+    ${icon(checkButtonIcon(), "solver-sticky-footer__action-icon")}
     ${checkButtonLabel()}
   `;
 }
@@ -786,9 +794,7 @@ function renderSolver(exam) {
         ></nav>
         <div class="solver-sticky-footer__controls">
           <div class="solver-sticky-footer__status">
-            <svg class="solver-sticky-footer__status-icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-              <use href="#list-checks"></use>
-            </svg>
+            ${icon("list-checks", "solver-sticky-footer__status-icon")}
             <div class="solver-sticky-footer__status-copy">
               <strong id="footer-answer-progress"></strong>
               <span id="footer-score-summary"></span>

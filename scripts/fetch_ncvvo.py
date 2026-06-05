@@ -50,23 +50,15 @@ SUBJECTS = (
     "Psihologija",
     "Sociologija",
     "Filozofija",
-    "Etika",
     "Logika",
     "Likovna umjetnost",
     "Glazbena umjetnost",
     "Vjeronauk",
     "Njemački jezik",
     "Talijanski jezik",
-    "Francuski jezik",
-    "Španjolski jezik",
-    "Latinski jezik",
-    "Grčki jezik",
-    "Srpski jezik",
-    "Mađarski jezik",
 )
 
 EXCLUDED_SUBJECTS = {
-    "Mađarski jezik i književnost",
     "Talijanski jezik i književnost",
 }
 
@@ -163,10 +155,6 @@ def parse_subject(label: str) -> str | None:
             return subject
 
     # Older posts use "materinski" wording for minority-language exams.
-    if lower_label.startswith("srpski materinski"):
-        return "Srpski jezik"
-    if lower_label.startswith("mađarski materinski"):
-        return "Mađarski jezik"
     if lower_label.startswith("talijanski materinski"):
         return "Talijanski jezik"
 

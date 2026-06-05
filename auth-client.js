@@ -3,7 +3,9 @@
   const authPage = document.querySelector("[data-auth-page]");
   if (!widgets.length && !authPage) return;
 
-  const cookieNoticeName = "azm_cookie_notice";
+  const analyticsConsentCookieName = "azm_analytics_consent";
+  const analyticsConsentMaxAgeSeconds = 180 * 24 * 60 * 60;
+  const validAnalyticsConsentChoices = new Set(["granted", "denied"]);
   const oauthErrors = {
     oauth_code: "Prijava nije uspjela. Pokušaj ponovno.",
     oauth_denied: "Prijava je otkazana.",
@@ -26,24 +28,22 @@
       .replaceAll("'", "&#039;");
   }
 
-  function icon(iconName, className) {
-    return `
-      <svg class="${className}" aria-hidden="true">
-        <use href="#${iconName}"></use>
-      </svg>
-    `;
-  }
-
   function readCookie(name) {
-    return document.cookie
+    const rawValue = document.cookie
       .split(";")
       .map((part) => part.trim())
       .find((part) => part.startsWith(`${name}=`))
-      ?.slice(name.length + 1);
+      ?.slice(name.length + 1) || "";
+
+    try {
+      return decodeURIComponent(rawValue);
+    } catch {
+      return rawValue;
+    }
   }
 
   function writeCookie(name, value, maxAgeSeconds) {
-    const secure = window.location.protocol === "https:" ? "; Secure" : "";
+    const secure = window.location.protocol === "https:" ? "Secure" : "";
     document.cookie = [
       `${name}=${encodeURIComponent(value)}`,
       "Path=/",
@@ -53,6 +53,24 @@
     ]
       .filter(Boolean)
       .join("; ");
+  }
+
+  function storedAnalyticsConsent() {
+    const activeChoice = window.AsistentAnalytics?.getConsent?.();
+    if (validAnalyticsConsentChoices.has(activeChoice)) return activeChoice;
+
+    const cookieChoice = readCookie(analyticsConsentCookieName);
+    return validAnalyticsConsentChoices.has(cookieChoice) ? cookieChoice : "";
+  }
+
+  function icon(iconName, className) {
+    if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
+
+    return `
+      <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+        <use href="./assets/lucide-icons.svg#${iconName}"></use>
+      </svg>
+    `;
   }
 
   async function api(path, options = {}) {
@@ -202,7 +220,10 @@
     try {
       const session = await api("/api/auth/me");
       state.user = session.authenticated ? session.user : null;
-      if (state.user) window.AsistentProfile?.syncPracticeProgress?.();
+      if (state.user) {
+        window.AsistentAnalytics?.completeLogin?.();
+        window.AsistentProfile?.syncPracticeProgress?.();
+      }
     } catch {
       state.user = null;
     } finally {
@@ -225,9 +246,8 @@
     }
   }
 
-  function renderCookieNotice() {
-    if (authPage) return;
-    if (readCookie(cookieNoticeName) === "accepted") return;
+  function renderCookieNotice({ force = false } = {}) {
+    if (!force && storedAnalyticsConsent()) return;
     if (document.querySelector("[data-cookie-notice]")) return;
 
     const notice = document.createElement("aside");
@@ -241,20 +261,27 @@
       <div class="cookie-notice__content">
         <strong>Kolačići</strong>
         <p>
-          Koristimo kolačiće za prijavu i pamćenje ove obavijesti. Odgovori iz vježbi
-          mogu se spremati lokalno u ovom pregledniku.
+          Želiš li dopustiti analitičke kolačiće za poboljšanje stranice?
         </p>
       </div>
-      <button class="primary-button cookie-notice__button" type="button" data-cookie-accept>
-        U redu
-      </button>
+      <div class="cookie-notice__actions">
+        <button class="secondary-button cookie-notice__button" type="button" data-cookie-reject>
+          Samo nužni
+        </button>
+        <button class="primary-button cookie-notice__button" type="button" data-cookie-accept>
+          Dopusti
+        </button>
+      </div>
     `;
 
     document.body.append(notice);
   }
 
-  function acceptCookieNotice() {
-    writeCookie(cookieNoticeName, "accepted", 180 * 24 * 60 * 60);
+  function chooseAnalyticsConsent(choice) {
+    if (!validAnalyticsConsentChoices.has(choice)) return;
+
+    writeCookie(analyticsConsentCookieName, choice, analyticsConsentMaxAgeSeconds);
+    window.AsistentAnalytics?.setConsent?.(choice);
     document.querySelector("[data-cookie-notice]")?.remove();
   }
 
@@ -264,7 +291,17 @@
       return;
     }
 
-    if (event.target.closest("[data-cookie-accept]")) acceptCookieNotice();
+    if (event.target.closest("[data-cookie-accept]")) {
+      chooseAnalyticsConsent("granted");
+      return;
+    }
+
+    if (event.target.closest("[data-cookie-reject]")) {
+      chooseAnalyticsConsent("denied");
+      return;
+    }
+
+    if (event.target.closest("[data-analytics-settings]")) renderCookieNotice({ force: true });
   });
 
   renderWidgets();

@@ -5,8 +5,6 @@
   const practiceStoragePrefixes = [
     "asistent-za-mature:english-reading:",
     "asistent-za-mature:english-listening:",
-    "asistent-za-mature:english-essay:",
-    "asistent-za-mature:croatian-writing:",
     "asistent-za-mature:physics-choice:",
     "asistent-za-mature:math-choice:",
     "asistent-za-mature:croatian-choice:",

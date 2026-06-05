@@ -60,9 +60,11 @@ function escapeHtml(value) {
 }
 
 function icon(iconName, className) {
+  if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
+
   return `
     <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="#${iconName}"></use>
+      <use href="./assets/lucide-icons.svg#${iconName}"></use>
     </svg>
   `;
 }
@@ -600,6 +602,8 @@ function renderTaskTypeContent() {
     return;
   }
 
+  const jumpLabel = activeTaskTypeId === taskTypes.open ? "Zadatak" : "Pitanje";
+
   document.querySelector("#section-content").innerHTML = `
     <div class="solver-question-layout">
       <div class="solver-question-main">
@@ -612,16 +616,24 @@ function renderTaskTypeContent() {
           <small>Pitanja</small>
         </div>
         <nav class="question-quickselect__list" id="question-quickselect"></nav>
-        <a
-          class="question-quickselect__action"
-          href="${formulaSheetUrl}"
-          target="_blank"
-          rel="noreferrer"
-          data-physics-formulas-link
-        >
-          ${icon("book-open-text", "question-quickselect__action-icon")}
-          <span>Vidi formule</span>
-        </a>
+        <div class="question-quickselect__tools">
+          <label class="question-jump" for="question-jump-select">
+            <span>${jumpLabel}</span>
+            <select id="question-jump-select" aria-label="Odaberi ${jumpLabel.toLocaleLowerCase("hr")}"></select>
+          </label>
+          <a
+            class="question-quickselect__action"
+            href="${formulaSheetUrl}"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Otvori knjižicu formula"
+            title="Otvori knjižicu formula"
+            data-physics-formulas-link
+          >
+            ${icon("book-open-text", "question-quickselect__action-icon")}
+            <span>Formule</span>
+          </a>
+        </div>
       </aside>
     </div>
   `;
@@ -811,6 +823,7 @@ function renderQuickSelect() {
   if (!quickSelect) return;
 
   const questions = questionsForTaskType(activeTaskTypeId);
+  const jumpSelect = document.querySelector("#question-jump-select");
   const quickSelectPanel = quickSelect.closest(".question-quickselect");
   if (quickSelectPanel) {
     quickSelectPanel.hidden =
@@ -849,6 +862,23 @@ function renderQuickSelect() {
       `;
     })
     .join("");
+
+  if (jumpSelect) {
+    jumpSelect.innerHTML = questions
+      .map((question) => `
+        <option value="${question}">${question}</option>
+      `)
+      .join("");
+
+    jumpSelect.addEventListener("change", () => {
+      const questionNumber = Number(jumpSelect.value);
+      const target = document.getElementById(`pitanje-${questionNumber}`);
+      activeQuestionNumber = questionNumber;
+      updateQuickSelectActiveState();
+      target?.scrollIntoView({ block: "start", behavior: "auto" });
+      if (target) history.replaceState(null, "", `#pitanje-${questionNumber}`);
+    });
+  }
 
   quickSelect.querySelectorAll("[data-quick-question]").forEach((link) => {
     link.addEventListener("click", (event) => {
@@ -900,6 +930,9 @@ function updateQuickSelectActiveState() {
     if (isActive) link.setAttribute("aria-current", "true");
     else link.removeAttribute("aria-current");
   });
+
+  const jumpSelect = document.querySelector("#question-jump-select");
+  if (jumpSelect) jumpSelect.value = String(activeQuestionNumber);
 }
 
 function renderQuestionResponse(question) {

@@ -23,7 +23,9 @@
     <header class="site-header">
       <div class="topbar">
         <div class="container topbar__inner">
-          <span>Neslužbeni projekt za pripremu mature</span>
+          <span class="topbar__label">
+            Neslužbeni projekt<span class="topbar__label-extra"> za pripremu mature</span>
+          </span>
           <div class="topbar__actions">
             <a href="https://www.ncvvo.hr/" target="_blank" rel="noreferrer">
               ncvvo.hr

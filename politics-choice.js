@@ -36,12 +36,16 @@ const taskTypeAliases = {
 let solverExam;
 let questionByNumber = new Map();
 let closedResponses = {};
-let openScores = {};
+let openResponses = {};
+let openGrades = {};
 let activeTaskTypeId = "visestruki-izbor";
 let activeQuestionNumber;
 let checked = false;
+let gradingPending = false;
+let gradingError = "";
 let quickSelectFrame;
 let simulationRecorded = false;
+let finishingSimulationByCheck = false;
 const simulation = window.createExamSimulation({ onFinish: finishSimulation });
 const selfCheck = window.createTaskSelfCheck();
 
@@ -59,14 +63,17 @@ function escapeHtml(value) {
 }
 
 function icon(iconName, className) {
+  if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
+
   return `
     <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="#${iconName}"></use>
+      <use href="./assets/lucide-icons.svg#${iconName}"></use>
     </svg>
   `;
 }
 
 function checkButtonLabel() {
+  if (gradingPending) return "Ocjenjivanje...";
   if (simulation.active && !simulation.finished) return "Predaj simulaciju";
   return checked ? "Sakrij rješenja" : "Provjeri rješenja";
 }
@@ -125,10 +132,6 @@ function politicsStorageKeys(exam) {
   ];
 
   return [...new Set(ids)].map(politicsStorageKeyForId);
-}
-
-function openScoreStorageKeys(exam) {
-  return politicsStorageKeys(exam).map((key) => `${key}:open-scores`);
 }
 
 function buildExamMap(items) {
@@ -255,85 +258,83 @@ function maxPointsForOpenQuestion(question) {
   return Number.isInteger(configured) && configured >= 0 ? configured : 1;
 }
 
-function loadClosedResponses(exam) {
-  const storedResponses = {};
+function loadState(exam) {
+  const knownClosed = new Set(closedQuestionNumbers(exam));
+  const knownOpen = new Set(openQuestionNumbers(exam));
+  const state = {
+    closedResponses: {},
+    openResponses: {},
+    openGrades: {},
+  };
+
   try {
-    const knownClosed = new Set(closedQuestionNumbers(exam));
     for (const key of politicsStorageKeys(exam).reverse()) {
       const stored = JSON.parse(localStorage.getItem(key) || "{}");
-      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-        Object.assign(storedResponses, stored.closedResponses || stored);
-      }
-    }
-    return Object.fromEntries(
-      Object.entries(storedResponses).filter(([question, answer]) => {
-        if (!knownClosed.has(question) || typeof answer !== "string") return false;
-        return questionOptions(question).includes(answer);
-      }),
-    );
-  } catch {
-    return {};
-  }
-}
+      if (!stored || typeof stored !== "object" || Array.isArray(stored)) continue;
 
-function loadOpenScores(exam) {
-  const storedScores = {};
-  try {
-    for (const key of openScoreStorageKeys(exam).reverse()) {
-      const stored = JSON.parse(localStorage.getItem(key) || "{}");
-      if (stored && typeof stored === "object" && !Array.isArray(stored)) {
-        Object.assign(storedScores, stored);
-      }
+      Object.assign(state.closedResponses, stored.closedResponses || stored);
+      Object.assign(state.openResponses, stored.openResponses || {});
+      Object.assign(state.openGrades, stored.openGrades || {});
     }
   } catch {
-    return {};
+    return state;
   }
 
-  return Object.fromEntries(
-    Object.entries(storedScores).filter(([question, score]) => {
-      if (!openQuestionNumbers(exam).includes(question)) return false;
-      const maximum = Number(exam.openAnswers?.[question]?.maxPoints || 1);
-      return Number.isInteger(score) && score >= 0 && score <= maximum;
+  state.closedResponses = Object.fromEntries(
+    Object.entries(state.closedResponses).filter(([question, answer]) => {
+      if (!knownClosed.has(question) || typeof answer !== "string") return false;
+      return questionOptions(question).includes(answer);
     }),
   );
+  state.openResponses = Object.fromEntries(
+    Object.entries(state.openResponses).filter(
+      ([question, answer]) => knownOpen.has(question) && typeof answer === "string" && answer.trim(),
+    ),
+  );
+  state.openGrades = Object.fromEntries(
+    Object.entries(state.openGrades).filter(([question, grade]) => {
+      const response = state.openResponses[question];
+      return (
+        knownOpen.has(question) &&
+        grade &&
+        typeof grade === "object" &&
+        !Array.isArray(grade) &&
+        typeof grade.answer === "string" &&
+        grade.answer === response &&
+        Number.isFinite(Number(grade.points))
+      );
+    }),
+  );
+
+  return state;
 }
 
-function saveClosedResponses() {
-  if (simulation.active) return;
-
-  try {
-    localStorage.setItem(politicsStorageKeyForId(solverExam.id), JSON.stringify(closedResponses));
-  } catch {
-    // Solving still works if storage is unavailable.
-  }
-}
-
-function saveOpenScores() {
+function saveState() {
   if (simulation.active) return;
 
   try {
     localStorage.setItem(
-      `${politicsStorageKeyForId(solverExam.id)}:open-scores`,
-      JSON.stringify(openScores),
+      politicsStorageKeyForId(solverExam.id),
+      JSON.stringify({
+        closedResponses,
+        openResponses,
+        openGrades,
+      }),
     );
   } catch {
     // Solving still works if storage is unavailable.
   }
 }
 
-function hasOpenScore(question) {
-  return Number.isInteger(openScores[String(question)]);
-}
-
 function answeredCount(exam = solverExam) {
   const closed = closedQuestionNumbers(exam).filter((question) => closedResponses[question]?.trim()).length;
-  const open = openQuestionNumbers(exam).filter((question) => hasOpenScore(question)).length;
+  const open = openQuestionNumbers(exam).filter((question) => openResponses[question]?.trim()).length;
   return closed + open;
 }
 
 function taskAnsweredCount(task) {
   return taskQuestions(task).filter((question) =>
-    isOpenQuestion(question) ? hasOpenScore(question) : closedResponses[question]?.trim(),
+    isOpenQuestion(question) ? openResponses[question]?.trim() : closedResponses[question]?.trim(),
   ).length;
 }
 
@@ -346,9 +347,9 @@ function maxScore() {
 
 function openScore() {
   return openQuestionNumbers().reduce((sum, question) => {
-    if (!hasOpenScore(question)) return sum;
-    const maximum = maxPointsForOpenQuestion(question);
-    return sum + Math.max(0, Math.min(maximum, Number(openScores[question]) || 0));
+    const grade = openGrades[question];
+    if (!grade) return sum;
+    return sum + Math.max(0, Math.min(maxPointsForOpenQuestion(question), Number(grade.points) || 0));
   }, 0);
 }
 
@@ -369,7 +370,7 @@ function resolvedScore() {
 
 function resolvedMaximum() {
   const closedMaximum = closedQuestionNumbers().filter((question) => isChecked(question)).length;
-  const openMaximum = (checked ? openQuestionNumbers() : openQuestionNumbers().filter(hasOpenScore))
+  const openMaximum = (checked ? openQuestionNumbers() : openQuestionNumbers().filter((question) => openGrades[question]))
     .reduce((sum, question) => sum + maxPointsForOpenQuestion(question), 0);
   return closedMaximum + openMaximum;
 }
@@ -396,13 +397,18 @@ function renderSolver(exam, taskTypeId) {
   app.classList.add("history-solver-active");
   solverExam = exam;
   questionByNumber = buildQuestionMap(exam);
-  closedResponses = simulation.active ? {} : loadClosedResponses(exam);
-  openScores = simulation.active ? {} : loadOpenScores(exam);
+  const state = simulation.active ? { closedResponses: {}, openResponses: {}, openGrades: {} } : loadState(exam);
+  closedResponses = state.closedResponses;
+  openResponses = state.openResponses;
+  openGrades = state.openGrades;
   activeTaskTypeId = normalizeTaskTypeId(taskTypeId, exam);
   activeQuestionNumber = questionsForTaskType(activeTaskTypeId, exam)[0] || allQuestions(exam)[0];
   checked = false;
-  simulationRecorded = false;
   selfCheck.reset();
+  gradingPending = false;
+  gradingError = "";
+  simulationRecorded = false;
+  finishingSimulationByCheck = false;
 
   app.innerHTML = `
     ${renderSolverHeader({
@@ -427,6 +433,8 @@ function renderSolver(exam, taskTypeId) {
     })}
 
     ${simulation.renderNotice()}
+
+    <div id="history-grading-status" aria-live="polite"></div>
 
     <div id="section-content"></div>
 
@@ -477,8 +485,8 @@ function renderSolver(exam, taskTypeId) {
           </div>
         </div>
         <p>
-          Rezultat obuhvaća zatvorene zadatke i bodove unesene nakon pregleda
-          službenih rješenja otvorenih zadataka.
+          Rezultat obuhvaća zatvorene zadatke i otvorene zadatke koji su AI ocijenjeni.
+          Zatvori prozor i pregledaj označene odgovore u ispitu.
         </p>
       </section>
     </div>
@@ -491,6 +499,7 @@ function renderSolver(exam, taskTypeId) {
 
   renderTaskTypeNavigation();
   renderSolverSummary();
+  renderGradingStatus();
   renderTaskTypeContent();
   simulation.start(exam.durationMinutes);
 }
@@ -589,7 +598,7 @@ function renderSolverSummary() {
   document.querySelector("#answer-progress").textContent = `${complete}/${total} odgovora`;
   document.querySelector("#footer-answer-progress").textContent = `${complete}/${total} odgovora`;
   const checkButton = document.querySelector("#check-answers");
-  checkButton.disabled = complete === 0 && !checked && !simulation.finished;
+  checkButton.disabled = gradingPending || (complete === 0 && !checked && !simulation.finished);
   checkButton.className = checkButtonClass();
   checkButton.innerHTML = renderCheckButtonContent();
 
@@ -598,6 +607,23 @@ function renderSolverSummary() {
   document.querySelector("#score-summary").textContent = score;
   document.querySelector("#footer-score-summary").textContent = score;
   updateResultsDialog();
+}
+
+function renderGradingStatus() {
+  const target = document.querySelector("#history-grading-status");
+  if (!target) return;
+
+  if (gradingPending) {
+    target.innerHTML = `<p class="practice-notice">AI ocjenjivanje otvorenih zadataka je u tijeku.</p>`;
+    return;
+  }
+
+  if (gradingError) {
+    target.innerHTML = `<p class="practice-notice practice-notice--error">${escapeHtml(gradingError)}</p>`;
+    return;
+  }
+
+  target.innerHTML = "";
 }
 
 function renderTaskTypeContent() {
@@ -677,12 +703,8 @@ function bindResponseListeners() {
     input.addEventListener("change", () => updateClosedResponse(input.dataset.question, input.value));
   });
 
-  document.querySelectorAll("[data-open-score]").forEach((input) => {
-    input.addEventListener("input", () => updateOpenScore(input.dataset.openScore, input.value, input));
-  });
-
-  document.querySelectorAll("[data-open-solution]").forEach((button) => {
-    button.addEventListener("click", () => toggleOpenSolution(button));
+  document.querySelectorAll("[data-open-question]").forEach((input) => {
+    input.addEventListener("input", () => updateOpenResponse(input.dataset.openQuestion, input.value));
   });
 
   selfCheck.bind(document.querySelector("#task-content-panel"), toggleSelfCheck);
@@ -697,18 +719,19 @@ function toggleSelfCheck(question) {
 }
 
 function quickSelectAnswerState(question) {
-  if (isOpenQuestion(question)) return hasOpenScore(question) ? "bodovano" : "nije bodovano";
+  if (isOpenQuestion(question)) return openResponses[question]?.trim() ? "odgovoreno" : "nije odgovoreno";
   return closedResponses[question] ? "odgovoreno" : "nije odgovoreno";
 }
 
 function quickSelectIsAnswered(question) {
-  return isOpenQuestion(question) ? hasOpenScore(question) : Boolean(closedResponses[question]);
+  return isOpenQuestion(question) ? Boolean(openResponses[question]?.trim()) : Boolean(closedResponses[question]);
 }
 
 function quickSelectResultClass(question) {
   if (isOpenQuestion(question)) {
-    if (!checked || !hasOpenScore(question)) return "";
-    return Number(openScores[question]) >= maxPointsForOpenQuestion(question)
+    const grade = openGrades[question];
+    if (!checked || !grade) return "";
+    return Number(grade.points) >= maxPointsForOpenQuestion(question)
       ? " question-quickselect__link--correct"
       : " question-quickselect__link--wrong";
   }
@@ -859,59 +882,33 @@ function renderClosedFeedback(question, answer) {
 }
 
 function renderOpenQuestionResponse(number) {
+  const answer = openResponses[number] || "";
+  const grade = openGrades[number];
   const maximum = maxPointsForOpenQuestion(number);
-  const score = hasOpenScore(number) ? openScores[number] : "";
-  const resultClass = checked && hasOpenScore(number)
-    ? Number(score) >= maximum
+  const resultClass = checked && grade
+    ? Number(grade.points) >= maximum
       ? " history-open-question--correct"
       : " history-open-question--reviewed"
     : "";
 
   return `
-    <div class="physics-open-solution history-open-question${resultClass}">
-      <div class="physics-open-solution__controls">
-        <button
-          class="physics-open-solution__toggle"
-          type="button"
-          data-open-solution="${escapeHtml(number)}"
-          aria-controls="rjesenje-${escapeHtml(number)}"
-          aria-expanded="false"
-          ${simulation.active && !simulation.finished ? "disabled" : ""}
-        >
-          ${simulation.active && !simulation.finished ? "Rješenje nakon predaje" : "Otvori rješenje"}
-        </button>
-        <label class="physics-open-score">
-          <span>Bodovi</span>
-          <input
-            data-open-score="${escapeHtml(number)}"
-            type="number"
-            min="0"
-            max="${maximum}"
-            step="1"
-            inputmode="numeric"
-            value="${escapeHtml(score)}"
-            aria-label="Dodijeljeni bodovi za ${escapeHtml(number)}. zadatak"
-            ${simulation.active && !simulation.finished ? "disabled" : ""}
-          >
-          <strong>/ ${maximum}</strong>
-        </label>
+    <div class="history-open-question${resultClass}">
+      <div class="history-open-question__heading">
+        <h4>${escapeHtml(number)}.</h4>
+        <span>${maximum} ${maximum === 1 ? "bod" : "bodova"}</span>
       </div>
-      <div class="physics-open-solution__body" id="rjesenje-${escapeHtml(number)}" hidden>
-        ${renderOfficialModelAnswer(solverExam.openAnswers?.[number]?.modelAnswer)}
-      </div>
+      <label class="history-open-question__field">
+        <span>Odgovor</span>
+        <textarea
+          data-open-question="${escapeHtml(number)}"
+          rows="${maximum > 1 ? 8 : 3}"
+          ${simulation.inputDisabledAttribute()}
+          ${gradingPending ? "disabled" : ""}
+        >${escapeHtml(answer)}</textarea>
+      </label>
+      ${renderOpenFeedback(number, grade)}
     </div>
   `;
-}
-
-function toggleOpenSolution(button) {
-  if (button.disabled) return;
-  const body = document.getElementById(button.getAttribute("aria-controls"));
-  if (!body) return;
-
-  const isOpen = button.getAttribute("aria-expanded") === "true";
-  button.setAttribute("aria-expanded", String(!isOpen));
-  button.textContent = isOpen ? "Otvori rješenje" : "Sakrij rješenje";
-  body.hidden = isOpen;
 }
 
 function renderCroppedImage(source, alt) {
@@ -945,6 +942,28 @@ function renderCroppedImage(source, alt) {
         >
       </div>
     </figure>
+  `;
+}
+
+function renderOpenFeedback(question, grade) {
+  if (!checked) return "";
+  if (!openResponses[question]?.trim()) {
+    return `<p class="response-feedback">Nema upisanoga odgovora.</p>`;
+  }
+  if (!grade) {
+    return `<p class="response-feedback">Ovaj otvoreni zadatak još nije AI ocijenjen.</p>`;
+  }
+
+  const maximum = maxPointsForOpenQuestion(question);
+  return `
+    <div class="history-open-feedback">
+      <strong>${escapeHtml(grade.points)}/${maximum} bodova</strong>
+      <p>${escapeHtml(grade.comment || "AI komentar nije dostupan.")}</p>
+      <details>
+        <summary>Službeni model odgovora</summary>
+        ${renderOfficialModelAnswer(solverExam.openAnswers?.[question]?.modelAnswer)}
+      </details>
+    </div>
   `;
 }
 
@@ -1029,48 +1048,38 @@ function updateClosedResponse(question, answer) {
   const normalizedAnswer = String(answer || "").trim();
   if (normalizedAnswer) closedResponses[question] = normalizedAnswer;
   else delete closedResponses[question];
-  saveClosedResponses();
+  saveState();
   renderTaskTypeNavigation();
   renderSolverSummary();
   renderQuickSelect();
   if (wasChecked || wasSelfChecked) renderTaskTypeContent();
 }
 
-function updateOpenScore(question, value, input) {
-  if (simulation.active && !simulation.finished) return;
+function updateOpenResponse(question, answer) {
+  if (simulation.finished) return;
 
-  const maximum = maxPointsForOpenQuestion(question);
-  const normalizedValue = String(value).trim();
-  if (normalizedValue === "") {
-    input.setCustomValidity("");
-    delete openScores[question];
-    saveOpenScores();
-    renderTaskTypeNavigation();
-    renderSolverSummary();
-    renderQuickSelect();
-    return;
-  }
-
-  const parsedScore = Number(normalizedValue);
-  if (!Number.isInteger(parsedScore)) {
-    input.setCustomValidity(`Upiši cijeli broj od 0 do ${maximum}.`);
-    return;
-  }
-
-  const score = Math.min(Math.max(parsedScore, 0), maximum);
-  input.setCustomValidity("");
-  input.value = String(score);
-  openScores[question] = score;
-  saveOpenScores();
+  checked = false;
+  gradingError = "";
+  const normalizedAnswer = String(answer || "").trim();
+  if (normalizedAnswer) openResponses[question] = String(answer);
+  else delete openResponses[question];
+  delete openGrades[question];
+  saveState();
   renderTaskTypeNavigation();
   renderSolverSummary();
+  renderGradingStatus();
   renderQuickSelect();
 }
 
-function checkAnswers() {
+async function checkAnswers() {
+  if (gradingPending) return;
+
   if (simulation.active && !simulation.finished) {
     if (!window.confirm("Predati simulaciju i završiti rješavanje?")) return;
+    finishingSimulationByCheck = true;
     simulation.finish("submitted");
+    await completeCheck("submitted");
+    finishingSimulationByCheck = false;
     return;
   }
 
@@ -1080,35 +1089,111 @@ function checkAnswers() {
     closeResultsDialog();
     renderTaskTypeNavigation();
     renderSolverSummary();
+    renderGradingStatus();
     renderTaskTypeContent();
     return;
   }
 
+  await completeCheck();
+}
+
+async function completeCheck(reason = "") {
+  await gradeOpenAnswersForCheck();
   checked = true;
   selfCheck.reset();
   renderTaskTypeNavigation();
   renderSolverSummary();
+  renderGradingStatus();
   renderTaskTypeContent();
   openResultsDialog();
+  if (reason === "submitted" || reason === "expired") recordSubmittedSimulation();
+}
+
+function openAnswersNeedingGrade() {
+  return Object.fromEntries(
+    openQuestionNumbers()
+      .filter((question) => {
+        const answer = openResponses[question]?.trim();
+        if (!answer) return false;
+        return openGrades[question]?.answer !== openResponses[question];
+      })
+      .map((question) => [question, openResponses[question]]),
+  );
+}
+
+async function gradeOpenAnswersForCheck() {
+  const answers = openAnswersNeedingGrade();
+  if (!Object.keys(answers).length) {
+    gradingError = "";
+    return;
+  }
+
+  gradingPending = true;
+  gradingError = "";
+  renderGradingStatus();
+  renderSolverSummary();
+  renderTaskTypeContent();
+
+  try {
+    const entries = Object.entries(answers);
+    for (let index = 0; index < entries.length; index += 20) {
+      const payload = await requestOpenGrades(Object.fromEntries(entries.slice(index, index + 20)));
+      for (const grade of payload.grades || []) {
+        const question = String(grade.question);
+        if (!openResponses[question]) continue;
+        openGrades[question] = {
+          answer: openResponses[question],
+          points: Math.max(0, Math.min(maxPointsForOpenQuestion(question), Number(grade.points) || 0)),
+          comment: String(grade.comment || "").trim(),
+        };
+      }
+    }
+    saveState();
+  } catch (error) {
+    gradingError = error.message || "AI ocjenjivanje otvorenih zadataka nije uspjelo.";
+  } finally {
+    gradingPending = false;
+  }
+}
+
+async function requestOpenGrades(answers) {
+  const response = await fetch("/api/politics/grade-open", {
+    body: JSON.stringify({
+      examId: solverExam.id,
+      answers,
+    }),
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+  });
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    throw new Error("API za AI ocjenjivanje nije dostupan. Pokreni stranicu preko Node servera.");
+  }
+
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error || "AI ocjenjivanje nije uspjelo.");
+  return payload;
 }
 
 function finishSimulation(reason) {
-  checked = true;
-  selfCheck.reset();
-  renderTaskTypeNavigation();
-  renderSolverSummary();
-  renderTaskTypeContent();
-
-  if (reason === "submitted") recordSubmittedSimulation();
-
   if (reason === "expired") {
     window.alert("Vrijeme za simulaciju je isteklo. Odgovori više nisu promjenjivi.");
+    completeCheck("expired");
+    return;
   }
-  openResultsDialog();
+
+  if (!finishingSimulationByCheck) {
+    completeCheck(reason);
+  }
 }
 
 function recordSubmittedSimulation() {
-  if (!window.AsistentProfile || simulationRecorded) return;
+  if (!simulation.active || !simulation.finished || simulationRecorded || !window.AsistentProfile) {
+    return;
+  }
   simulationRecorded = true;
 
   window.AsistentProfile.recordSimulationAttempt({
@@ -1125,6 +1210,7 @@ function recordSubmittedSimulation() {
     totalQuestions: allQuestions(solverExam).length,
     score: totalScore(),
     maxScore: maxScore(),
+    percentage: scorePercentage(),
     checkingSupported: true,
   });
 }

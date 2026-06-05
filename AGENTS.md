@@ -12,6 +12,9 @@ The current milestone is intentionally narrow:
 - provide a clean archive of downloadable exam packages
 - cover exam years 2013 through 2025
 - prioritize Hrvatski jezik, Engleski jezik, Matematika, Fizika, and Biologija
+- exclude Etika, Francuski jezik, Grčki jezik, Latinski jezik, Mađarski jezik,
+  Srpski jezik, and Španjolski jezik from the scraper, generated indexes,
+  sitemap, UI metadata, and interactive practice outputs
 - do not add parsing, answer checking, accounts, or a backend yet
 
 Keep the interface bare-bones and professional. It is visually inspired by

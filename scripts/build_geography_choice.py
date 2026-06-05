@@ -375,6 +375,9 @@ def question_crop_y_max(marker: QuestionMarker, ordered_markers: list[QuestionMa
     if not relevant_lines:
         return marker.page.height - SOURCE_FOOTER_MARGIN
 
+    if len(relevant_lines) == 1 and geography_question_token(relevant_lines[0]) == marker.number:
+        return marker.page.height - SOURCE_FOOTER_MARGIN - SOURCE_CROP_VERTICAL_PADDING
+
     point_lines = [line for line in relevant_lines if POINTS_RE.search(line.text)]
     final_line = point_lines[0] if point_lines else relevant_lines[-1]
     return min(final_line.y_max + SOURCE_CROP_VERTICAL_PADDING, marker.page.height - SOURCE_FOOTER_MARGIN)
@@ -1067,6 +1070,10 @@ def refine_geography_crop_box(
     refined_y_max = y_max
     visible_lines = crop_text_lines(crop)
     visible_content_lines = [line for line in visible_lines if not is_answer_rule_text(line)]
+    image_only_question = (
+        len(visible_content_lines) == 1
+        and geography_question_token(visible_content_lines[0]) is not None
+    )
     minimum_y_max = y_min + 48
     if visible_content_lines:
         minimum_y_max = max(
@@ -1127,6 +1134,7 @@ def refine_geography_crop_box(
         minimum_y_max=min(minimum_y_max, refined_y_max),
         threshold=SOURCE_BLANK_PIXEL_THRESHOLD,
         min_trim=18,
+        detect_legacy_answer_frame=not image_only_question,
     )
     return x_min, y_min, x_max, max(y_min + 48, refined_y_max)
 

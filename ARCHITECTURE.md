@@ -72,6 +72,7 @@ python3 -m py_compile scripts/fetch_ncvvo.py scripts/build_croatian_writing.py
 | `index.html` | Home/subject/archive shell. Ucitava sve glavne `data/*.js` i `app.js`. |
 | `app.js` | Router bez frameworka, filteri, subject pages, exam detail pages, progress, mapiranje na solvere. |
 | `styles.css` | Sav styling za home, arhivu, solvere, modalne prozore i responsive layout. |
+| `analytics.js` | Zajednicki GA4/Clarity loader, consent signali, kontekst stranice i kljucni dogadjaji. |
 | `server.js` | Opcionalni Node backend za auth, profil sync, AI OCR/ocjenjivanje i staticko serviranje. |
 | `profile-store.js` | Local/profile persistence adapter za pokusaje, vjezbe i kljuceve. |
 | `auth-client.js` | Frontend auth klijent i profile sync hookovi. |
@@ -80,6 +81,39 @@ python3 -m py_compile scripts/fetch_ncvvo.py scripts/build_croatian_writing.py
 | `solver-header.js` | Zajednicki header za standalone solvere. |
 | `site-header.js`, `site-footer.js` | Zajednicki layout chrome. |
 | `scripts/pdf_utils.py` | Zajednicki helperi za `pdftotext`, `pdfinfo`, `pdftocairo`, PNG dimenzije i osnovni slug/term utility. |
+
+## Analitika i consent
+
+`analytics.js` ucitava GA4 measurement ID `G-3W2D6EJZ94` i Clarity projekt
+`x0a1kkmiqz`. Oba sustava dobivaju isti analytics consent signal:
+
+```text
+bez odluke / Samo nuzni -> analytics_storage: denied
+Prihvati analitiku      -> analytics_storage: granted
+```
+
+Oglasni storage, user data i personalizacija uvijek ostaju `denied`. Odluka se
+sprema u first-party cookie `azm_analytics_consent`, a footer nudi ponovno
+otvaranje postavki. Ne slati odgovore, uneseni tekst, email adresu ni drugi PII
+preko `window.AsistentAnalytics.track()`.
+
+GA4 i Clarity dobivaju isti kontekst kroz `azm_page_type`, `azm_subject`,
+`azm_exam_id`, `azm_exam_part` i `azm_mode`. Za prikaz tih parametara u GA4
+izvjestajima treba ih registrirati kao event-scoped custom dimensions.
+
+U GA4 Web Stream postavkama ukljuci Enhanced Measurement po potrebi, ali
+iskljuci `Page changes based on browser history events`. Solveri koriste
+`history.replaceState()` za task-type i question navigaciju pa bi ta opcija
+napuhala broj pageviewa.
+
+Nativno povezivanje Clarity snimki s GA4 izvjestajima konfigurira se u Clarity
+dashboardu pod `Settings -> Setup -> Google Analytics`. Uz measurement ID trazi
+i GA Account ID i Property ID; te vrijednosti se ne spremaju u repozitorij.
+
+Microsoftova Clarity dokumentacija upozorava da se Clarity ne bi trebao
+koristiti na stranicama usmjerenima korisnicima mladjima od 18 godina. Buduci
+da projekt koriste i maturanti mladji od 18, tu odluku treba posebno provjeriti
+prije produkcijskog koristenja Clarityja.
 
 ## Generirani podaci
 
@@ -100,6 +134,7 @@ Ne editirati rucno osim kao privremeni debug.
 | `data/math-choice.js` | `scripts/build_math_choice.py` | `files/ncvvo/` | `matematika.html`, `app.js` |
 | `data/history-choice.js` | `scripts/build_history_choice.py` | `files/ncvvo/` | `povijest.html`, `app.js` |
 | `data/geography-choice.js` | `scripts/build_geography_choice.py` | `files/ncvvo/` | `geografija.html`, `app.js` |
+| `data/psychology-choice.js` | `scripts/build_psychology_choice.py` | `files/ncvvo/` | `psihologija.html`, `app.js` |
 | `data/politics-choice.js` | `scripts/build_politics_choice.py` | `files/ncvvo/` | `politika.html`, `app.js` |
 | `data/abcd-choice.js` | `scripts/build_abcd_choice.py` | `files/ncvvo/` | `abcd.html`, `app.js` |
 
@@ -169,6 +204,7 @@ razine i vrste dijela. Najvaznije funkcije su u `app.js`.
 | Hrvatski knjizevnost/jezik | `hrvatski[-<a|b>]-<year>-<term-slug>` |
 | Povijest | `povijest-<year>-<term-slug>` |
 | Geografija | `geografija-<year>-<term-slug>` |
+| Psihologija | `psihologija-<year>-<term-slug>` |
 | Politika i gospodarstvo | `politika-i-gospodarstvo-<year>-<term-slug>` |
 
 Rokovi imaju alias mapiranje:
@@ -195,6 +231,7 @@ Zbog toga storage i mapiranje cesto pokusavaju i legacy ID i normalizirani ID.
 | Matematika | `matematika.html` | `math-choice.js` | `data/math-choice.js` | `files/interactive/math-choice/` |
 | Povijest | `povijest.html` | `history-choice.js` | `data/history-choice.js` | `files/interactive/history-choice/` |
 | Geografija | `geografija.html` | `geography-choice.js` | `data/geography-choice.js` | `files/interactive/geography-choice/` |
+| Psihologija | `psihologija.html` | `psychology-choice.js` | `data/psychology-choice.js` | `files/interactive/psychology-choice/` |
 | Politika i gospodarstvo | `politika.html` | `politics-choice.js` | `data/politics-choice.js` | `files/interactive/politics-choice/` |
 | Genericki ABCD | `abcd.html` | `abcd-choice.js` | `data/abcd-choice.js` | `files/interactive/abcd-choice/` |
 
@@ -251,15 +288,20 @@ archiveUrl + "|skolski-esej"
 2020 ljetni A/B ostaje bez starog eseja ako lokalni NCVVO ZIP nema `IK-2` ni
 zasebni esejski zadatak.
 
-Stari A/B eseji imaju staru 40-bodovnu rubriku:
+Svaki zapis upucuje na verzioniranu rubriku preko `rubricId`. Rubrike u
+`data/croatian-writing.js` sadrze NCVVO izvor, kriterije, razine ili podstavke i
+posebna pravila. Stari A/B eseji imaju tri sastavnice s podstavkama
+`A1-A5`, `B1-B3` i `C1-C4`:
 
 ```text
-contentArgumentation: 20
-composition: 6
-languageStyle: 14
+A: Poznavanje i razumijevanje knjizevnoga teksta: 20
+B: Povezanost teksta: 6
+C: Upotreba standardnoga hrvatskog jezika: 14
 ```
 
-Novi eseji imaju 30 bodova preko 5 kriterija po 0-3, uz `scoreMultiplier: 2`.
+Stari eseji iz 2016.-2018. mnoze sirovi zbroj od 40 bodova s 2. Ostali
+podrzani stari eseji trenutacno koriste sirovi maksimum 40. Novi eseji imaju
+30 bodova preko 5 kriterija po 0-3, uz `scoreMultiplier: 2`.
 
 ## LocalStorage i profil
 
@@ -293,12 +335,11 @@ podataka preko `server.js`.
 | `/api/profile/simulations` | Spremanje/citanje simulacija. |
 | `/api/profile/practice` | Spremanje/citanje practice progressa. |
 | `/api/profile/agent-key` | Korisnicki API key helper. |
-| `/api/english-essay/grade` | AI ocjenjivanje engleskog eseja. |
-| `/api/english-essay/ocr` | OCR fotografije engleskog eseja. |
-| `/api/croatian-writing/grade` | AI ocjenjivanje hrvatskog pisanog zadatka. |
-| `/api/croatian-writing/ocr` | OCR fotografije hrvatskog pisanog zadatka. |
+| `/api/english-essay/grade`, `/api/english-essay/ocr` | Legacy rute koje vracaju 410 jer je engleski esej samo pregled. |
+| `/api/croatian-writing/grade`, `/api/croatian-writing/ocr` | Legacy rute koje vracaju 410 jer su sazetak i skolski esej samo pregled. |
 | `/api/history/grade-open` | AI ocjenjivanje otvorenih zadataka iz povijesti. |
 | `/api/geography/grade-open` | AI ocjenjivanje otvorenih zadataka iz geografije. |
+| `/api/psychology/grade-open` | AI ocjenjivanje otvorenih zadataka iz psihologije. |
 
 ## Kako dodati ili popraviti interaktivni ispit
 
@@ -385,7 +426,7 @@ Hrvatski ima dva odvojena solvera:
    - `sazetak` i `skolski-esej`
    - data: `data/croatian-writing.js`
    - builder: `scripts/build_croatian_writing.py`
-   - AI endpoints: `/api/croatian-writing/grade`, `/api/croatian-writing/ocr`
+   - samo pregled zadatka i sluzbenih kriterija; nema unosa, OCR-a ni ocjenjivanja
 
 Na exam detail pageu `app.js` prikazuje oba kao zasebne ispitne cjeline.
 
@@ -403,7 +444,7 @@ Sva tri se mapiraju preko istog `archiveUrl`, ali u zasebne data fajlove.
 
 ## Brza orijentacija za otvorene zadatke
 
-Fizika, matematika, povijest, geografija i politika mogu imati kombinaciju:
+Fizika, matematika, povijest, geografija, psihologija i politika mogu imati kombinaciju:
 
 ```text
 tasks / questions        # auto-checkable dio
@@ -412,5 +453,5 @@ answers                  # sluzbeni odgovori za auto-check
 solutions/sourceImages   # za prikaz zadataka i rjesenja
 ```
 
-Self-review otvoreni zadaci koriste bodovni input i rjesenje. Povijest i
-geografija imaju i AI endpoint za otvorene zadatke.
+Self-review otvoreni zadaci koriste bodovni input i rjesenje. Povijest,
+geografija i psihologija imaju i AI endpoint za otvorene zadatke.

@@ -47,6 +47,13 @@ ANSWER_PAIR_RE = re.compile(
     r"(?P<answer>[A-Da-d])"
     r"(?=\s|$)"
 )
+ANSWER_ENTRY_RE = re.compile(
+    r"(?<![\w.])"
+    r"(?P<token>58\s+[1-5]|\d{1,2}(?:\s*[\.,]\s*\d+)?|[JjIiOo])"
+    r"[\.,]?\s+"
+    r"(?P<answer>[A-Da-d]|[-_]{2,}|;)"
+    r"(?=\s|$)"
+)
 POINT_VALUE_RE = re.compile(r"\(\s*\d+\s+bod(?:a|ova)?\s*\)", flags=re.IGNORECASE)
 
 
@@ -800,6 +807,10 @@ def question_sort_key(question: str) -> tuple[int, int]:
 
 
 def parse_answer_token(token: str, previous_question: str | None) -> str | None:
+    spaced_decimal = re.fullmatch(r"\s*(\d{1,2})\s+(\d+)\s*", token)
+    if spaced_decimal:
+        return f"{int(spaced_decimal.group(1))}.{int(spaced_decimal.group(2))}"
+
     cleaned = re.sub(r"\s+", "", token).replace(",", ".").strip(".")
     if re.fullmatch(r"\d{1,2}\.\d+", cleaned):
         whole, decimal = cleaned.split(".", 1)
@@ -813,10 +824,21 @@ def parse_answer_token(token: str, previous_question: str | None) -> str | None:
     return None
 
 
-def validate_answer_sequence(answers: dict[str, list[str]]) -> list[str]:
+def validate_answer_sequence(
+    answers: dict[str, list[str]],
+    blank_questions: set[str] | None = None,
+) -> list[str]:
     questions = sorted(answers, key=question_sort_key)
-    integer_questions = [int(question) for question in questions if "." not in question]
-    decimal_questions = [question for question in questions if "." in question]
+    all_detected_questions = sorted(
+        set(questions) | (blank_questions or set()),
+        key=question_sort_key,
+    )
+    integer_questions = [
+        int(question) for question in all_detected_questions if "." not in question
+    ]
+    decimal_questions = [
+        question for question in all_detected_questions if "." in question
+    ]
 
     if not integer_questions:
         raise ValueError("No regular Croatian answer numbers found")
@@ -843,22 +865,27 @@ def validate_answer_sequence(answers: dict[str, list[str]]) -> list[str]:
 
 def parse_choice_answers(text: str) -> tuple[list[str], dict[str, list[str]]]:
     answers: dict[str, list[str]] = {}
+    blank_questions: set[str] = set()
     previous_question: str | None = None
 
-    for match in ANSWER_PAIR_RE.finditer(text):
+    for match in ANSWER_ENTRY_RE.finditer(text):
         question = parse_answer_token(match.group("token"), previous_question)
         if question is None:
             continue
-        if question == "1" and "1" in answers and len(answers) >= 30:
+        if question == "1" and ("1" in answers or "1" in blank_questions) and len(answers) >= 30:
             break
-        if question in answers:
+        if question in answers or question in blank_questions:
             continue
 
         answer = match.group("answer").upper()
-        answers[question] = [answer]
+        if re.fullmatch(r"[-_]{2,}|;", answer):
+            blank_questions.add(question)
+            answers[question] = ["A", "B", "C", "D"]
+        else:
+            answers[question] = [answer]
         previous_question = question
 
-    questions = validate_answer_sequence(answers)
+    questions = validate_answer_sequence(answers, blank_questions)
     return questions, {question: answers[question] for question in questions}
 
 

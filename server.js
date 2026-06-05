@@ -23,6 +23,10 @@ const config = {
     process.env.OPENAI_HISTORY_MODEL || process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
   geographyModel:
     process.env.OPENAI_GEOGRAPHY_MODEL || process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
+  psychologyModel:
+    process.env.OPENAI_PSYCHOLOGY_MODEL || process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
+  politicsModel:
+    process.env.OPENAI_POLITICS_MODEL || process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
   host: process.env.HOST || "0.0.0.0",
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
@@ -58,11 +62,15 @@ const geographyChoiceIndex = {
   file: path.join(rootDir, "data", "geography-choice.js"),
   prefix: "window.ASISTENT_ZA_MATURE_GEOGRAPHY_CHOICE=",
 };
-const writingSystemPrompts = {
-  englishEssay: loadSystemPrompt("english-essay-system.txt"),
-  croatianSummary: loadSystemPrompt("croatian-summary-system.txt"),
-  croatianSchoolEssay: loadSystemPrompt("croatian-school-essay-system.txt"),
+const psychologyChoiceIndex = {
+  file: path.join(rootDir, "data", "psychology-choice.js"),
+  prefix: "window.ASISTENT_ZA_MATURE_PSYCHOLOGY_CHOICE=",
 };
+const politicsChoiceIndex = {
+  file: path.join(rootDir, "data", "politics-choice.js"),
+  prefix: "window.ASISTENT_ZA_MATURE_POLITICS_CHOICE=",
+};
+const generalGradingSystemPrompt = loadPromptFile("general-grading-system.txt");
 const essayScoreSchema = {
   type: "object",
   additionalProperties: false,
@@ -353,23 +361,13 @@ async function handleRequest(request, response) {
     return;
   }
 
-  if (url.pathname === "/api/english-essay/grade") {
-    await handleEnglishEssayGrade(request, response);
-    return;
-  }
-
-  if (url.pathname === "/api/english-essay/ocr") {
-    await handleEnglishEssayOcr(request, response);
-    return;
-  }
-
-  if (url.pathname === "/api/croatian-writing/grade") {
-    await handleCroatianWritingGrade(request, response);
-    return;
-  }
-
-  if (url.pathname === "/api/croatian-writing/ocr") {
-    await handleCroatianWritingOcr(request, response);
+  if (
+    url.pathname === "/api/english-essay/grade" ||
+    url.pathname === "/api/english-essay/ocr" ||
+    url.pathname === "/api/croatian-writing/grade" ||
+    url.pathname === "/api/croatian-writing/ocr"
+  ) {
+    handleWritingPreviewOnlyApi(response);
     return;
   }
 
@@ -380,6 +378,16 @@ async function handleRequest(request, response) {
 
   if (url.pathname === "/api/geography/grade-open") {
     await handleGeographyOpenGrade(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/psychology/grade-open") {
+    await handlePsychologyOpenGrade(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/politics/grade-open") {
+    await handlePoliticsOpenGrade(request, response);
     return;
   }
 
@@ -396,6 +404,12 @@ function handleAuthConfig(request, response) {
     google: {
       enabled: googleAuthEnabled(),
     },
+  });
+}
+
+function handleWritingPreviewOnlyApi(response) {
+  sendJson(response, 410, {
+    error: "Eseji i sažetci dostupni su samo za pregled. Unos, OCR i ocjenjivanje nisu uključeni.",
   });
 }
 
@@ -1086,6 +1100,161 @@ async function handleGeographyOpenGrade(request, response) {
   }
 }
 
+async function handlePsychologyOpenGrade(request, response) {
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
+    return;
+  }
+
+  const ipAddress = clientIp(request);
+  if (!rateLimit.ip.check(ipAddress)) {
+    sendJson(response, 429, {
+      error: "Poslano je previše zahtjeva. Pričekaj nekoliko minuta i pokušaj ponovno.",
+    });
+    return;
+  }
+
+  const session = currentSession(request);
+  const user = session ? store.users[session.userId] : null;
+  let apiKey = config.openAiApiKey;
+
+  if (user?.agentKey) {
+    try {
+      apiKey = decryptAgentKey(user.agentKey);
+    } catch (error) {
+      console.error("OpenAI API ključ nije moguće pročitati:", error.message);
+      sendJson(response, 400, { error: "Spremljeni OpenAI API ključ nije moguće pročitati." });
+      return;
+    }
+  }
+
+  if (!apiKey) {
+    sendJson(response, user ? 400 : 401, {
+      error: user
+        ? "Spremi OpenAI API ključ u profilu prije AI ocjenjivanja."
+        : "Prijava i spremljeni OpenAI API ključ potrebni su za AI ocjenjivanje.",
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request, 96 * 1024);
+  } catch {
+    sendJson(response, 400, { error: "Zahtjev nema ispravan JSON zapis." });
+    return;
+  }
+
+  const examId = stringOrEmpty(body?.examId);
+  const psychologyExam = loadPsychologyChoiceExam(examId);
+  if (!psychologyExam) {
+    sendJson(response, 404, { error: "Odabrani ispit iz Psihologije nije dostupan." });
+    return;
+  }
+
+  const answers = normalizeHistoryOpenAnswers(body?.answers, psychologyExam);
+  if (!Object.keys(answers).length) {
+    sendJson(response, 400, { error: "Pošalji barem jedan otvoreni odgovor za ocjenjivanje." });
+    return;
+  }
+
+  try {
+    const grades = await gradePsychologyOpenAnswersWithOpenAI({
+      apiKey,
+      psychologyExam,
+      answers,
+    });
+    sendJson(response, 200, {
+      grades,
+      model: config.psychologyModel,
+    });
+  } catch (error) {
+    console.error("Ocjenjivanje otvorenih zadataka iz Psihologije nije uspjelo:", error.message);
+    sendJson(response, 502, {
+      error: "OpenAI ocjenjivanje nije uspjelo. Provjeri API ključ i pokušaj ponovno.",
+    });
+  }
+}
+
+async function handlePoliticsOpenGrade(request, response) {
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
+    return;
+  }
+
+  const ipAddress = clientIp(request);
+  if (!rateLimit.ip.check(ipAddress)) {
+    sendJson(response, 429, {
+      error: "Poslano je previše zahtjeva. Pričekaj nekoliko minuta i pokušaj ponovno.",
+    });
+    return;
+  }
+
+  const session = currentSession(request);
+  const user = session ? store.users[session.userId] : null;
+  let apiKey = config.openAiApiKey;
+
+  if (user?.agentKey) {
+    try {
+      apiKey = decryptAgentKey(user.agentKey);
+    } catch (error) {
+      console.error("OpenAI API ključ nije moguće pročitati:", error.message);
+      sendJson(response, 400, { error: "Spremljeni OpenAI API ključ nije moguće pročitati." });
+      return;
+    }
+  }
+
+  if (!apiKey) {
+    sendJson(response, user ? 400 : 401, {
+      error: user
+        ? "Spremi OpenAI API ključ u profilu prije AI ocjenjivanja."
+        : "Prijava i spremljeni OpenAI API ključ potrebni su za AI ocjenjivanje.",
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request, 96 * 1024);
+  } catch {
+    sendJson(response, 400, { error: "Zahtjev nema ispravan JSON zapis." });
+    return;
+  }
+
+  const examId = stringOrEmpty(body?.examId);
+  const politicsExam = loadPoliticsChoiceExam(examId);
+  if (!politicsExam) {
+    sendJson(response, 404, { error: "Odabrani ispit iz Politike i gospodarstva nije dostupan." });
+    return;
+  }
+
+  const answers = normalizeHistoryOpenAnswers(body?.answers, politicsExam);
+  if (!Object.keys(answers).length) {
+    sendJson(response, 400, { error: "Pošalji barem jedan otvoreni odgovor za ocjenjivanje." });
+    return;
+  }
+
+  try {
+    const grades = await gradePoliticsOpenAnswersWithOpenAI({
+      apiKey,
+      politicsExam,
+      answers,
+    });
+    sendJson(response, 200, {
+      grades,
+      model: config.politicsModel,
+    });
+  } catch (error) {
+    console.error(
+      "Ocjenjivanje otvorenih zadataka iz Politike i gospodarstva nije uspjelo:",
+      error.message,
+    );
+    sendJson(response, 502, {
+      error: "OpenAI ocjenjivanje nije uspjelo. Provjeri API ključ i pokušaj ponovno.",
+    });
+  }
+}
+
 function upsertGoogleUser(profile) {
   const now = new Date().toISOString();
   let user =
@@ -1335,13 +1504,12 @@ function isPracticeStorageKey(key) {
   return [
     "asistent-za-mature:english-reading:",
     "asistent-za-mature:english-listening:",
-    "asistent-za-mature:english-essay:",
-    "asistent-za-mature:croatian-writing:",
     "asistent-za-mature:physics-choice:",
     "asistent-za-mature:math-choice:",
     "asistent-za-mature:croatian-choice:",
     "asistent-za-mature:history-choice:",
     "asistent-za-mature:geography-choice:",
+    "asistent-za-mature:politics-choice:",
     "asistent-za-mature:abcd-choice:",
   ].some((prefix) => key.startsWith(prefix));
 }
@@ -1414,7 +1582,19 @@ function loadCroatianWritingExam(examId) {
 
   const payload = JSON.parse(source.slice(croatianWritingIndex.prefix.length, -1));
   const exams = Array.isArray(payload.exams) ? payload.exams : [];
-  return exams.find((exam) => exam && exam.id === examId) || null;
+  const exam = exams.find((item) => item && item.id === examId);
+  if (!exam) return null;
+
+  const rubrics =
+    payload.rubrics && typeof payload.rubrics === "object" && !Array.isArray(payload.rubrics)
+      ? payload.rubrics
+      : {};
+  const rubric = rubrics[exam.rubricId];
+  return {
+    ...exam,
+    rubric,
+    criteria: Array.isArray(rubric?.criteria) ? rubric.criteria : exam.criteria || [],
+  };
 }
 
 function loadHistoryChoiceExam(examId) {
@@ -1439,6 +1619,32 @@ function loadGeographyChoiceExam(examId) {
   }
 
   const payload = JSON.parse(source.slice(geographyChoiceIndex.prefix.length, -1));
+  const exams = Array.isArray(payload.exams) ? payload.exams : [];
+  return exams.find((exam) => exam && exam.id === examId) || null;
+}
+
+function loadPsychologyChoiceExam(examId) {
+  if (!examId) return null;
+
+  const source = fs.readFileSync(psychologyChoiceIndex.file, "utf8").trim();
+  if (!source.startsWith(psychologyChoiceIndex.prefix) || !source.endsWith(";")) {
+    throw new Error("Psychology choice index has an unsupported format.");
+  }
+
+  const payload = JSON.parse(source.slice(psychologyChoiceIndex.prefix.length, -1));
+  const exams = Array.isArray(payload.exams) ? payload.exams : [];
+  return exams.find((exam) => exam && exam.id === examId) || null;
+}
+
+function loadPoliticsChoiceExam(examId) {
+  if (!examId) return null;
+
+  const source = fs.readFileSync(politicsChoiceIndex.file, "utf8").trim();
+  if (!source.startsWith(politicsChoiceIndex.prefix) || !source.endsWith(";")) {
+    throw new Error("Politics choice index has an unsupported format.");
+  }
+
+  const payload = JSON.parse(source.slice(politicsChoiceIndex.prefix.length, -1));
   const exams = Array.isArray(payload.exams) ? payload.exams : [];
   return exams.find((exam) => exam && exam.id === examId) || null;
 }
@@ -1486,7 +1692,7 @@ async function gradeEnglishEssayWithOpenAI({ apiKey, essayExam, essayText, image
           content: [
             {
               type: "input_text",
-              text: writingSystemPrompts.englishEssay,
+              text: buildOpenAnswerGradingSystemPrompt("Engleski jezik"),
             },
           ],
         },
@@ -1539,9 +1745,7 @@ async function gradeCroatianWritingWithOpenAI({ apiKey, writingExam, writingText
           content: [
             {
               type: "input_text",
-              text: isSummary
-                ? writingSystemPrompts.croatianSummary
-                : writingSystemPrompts.croatianSchoolEssay,
+              text: buildOpenAnswerGradingSystemPrompt("Hrvatski jezik"),
             },
           ],
         },
@@ -1600,26 +1804,52 @@ ${writingText}
 
 function croatianWritingRubricInstructions(writingExam) {
   const criteria = Array.isArray(writingExam.criteria) ? writingExam.criteria : [];
-  const criterionLines = criteria.map((criterion) => {
+  const criterionLines = criteria.flatMap((criterion) => {
     const id = String(criterion?.id || "").trim();
     const label = String(criterion?.label || id).trim();
     const maxScore = numberOrNull(criterion?.maxScore) ?? 3;
     const description = String(criterion?.description || "").trim();
-    return `- ${id}: ${label}, 0-${maxScore} bodova.${description ? ` ${description}` : ""}`;
+    const levels = Array.isArray(criterion?.levels) ? criterion.levels : [];
+    const items = Array.isArray(criterion?.items) ? criterion.items : [];
+    return [
+      `- ${id}: ${label}, 0-${maxScore} bodova.${description ? ` ${description}` : ""}`,
+      ...levels.map((level) => {
+        const score = numberOrNull(level?.score) ?? 0;
+        return `  - ${score} bodova: ${String(level?.description || "").trim()}`;
+      }),
+      ...items.map((item) => {
+        const itemId = String(item?.id || "").trim();
+        const itemLabel = String(item?.label || itemId).trim();
+        const itemMaxScore = numberOrNull(item?.maxScore) ?? 0;
+        return `  - ${itemId}: ${itemLabel}, 0-${itemMaxScore} bodova`;
+      }),
+    ];
   });
   const range = croatianWritingWordRangeInstructions(writingExam.wordRange);
   const scoreMultiplier = numberOrNull(writingExam.scoreMultiplier) ?? 1;
+  const specialRules = Array.isArray(writingExam.rubric?.specialRules)
+    ? writingExam.rubric.specialRules.map((rule) => String(rule || "").trim()).filter(Boolean)
+    : [];
+  const source = writingExam.rubric?.source;
+  const sourceLine = source?.title
+    ? `Izvor rubrike: ${source.title}${source.url ? ` (${source.url})` : ""}.`
+    : "";
 
   return [
     `Vrsta zadatka: ${writingExam.partLabel || "Pisani zadatak"}.`,
+    sourceLine,
     range,
     `Maksimalan rezultat: ${numberOrNull(writingExam.maxScore) ?? "nije naveden"} bodova.`,
     scoreMultiplier === 1
       ? "Ukupni rezultat računa se kao zbroj bodova po sastavnicama."
       : `Ukupni rezultat računa se kao zbroj bodova po sastavnicama pomnožen s ${scoreMultiplier}.`,
+    "Ako sastavnica ima podstavke, prvo boduj svaku podstavku pa vrati njihov zbroj za sastavnicu.",
     "Sastavnice:",
     ...criterionLines,
-  ].join("\n");
+    ...(specialRules.length ? ["Posebna pravila:", ...specialRules.map((rule) => `- ${rule}`)] : []),
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function croatianWritingWordRangeInstructions(wordRange) {
@@ -1910,61 +2140,69 @@ function countTextWords(value) {
 }
 
 async function gradeHistoryOpenAnswersWithOpenAI({ apiKey, historyExam, answers }) {
-  const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
-    body: JSON.stringify({
-      model: config.historyModel,
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: buildHistoryGradingPrompt({ historyExam, answers }),
-            },
-          ],
-        },
-      ],
-      max_output_tokens: 3500,
-      text: {
-        format: {
-          type: "json_schema",
-          name: "history_open_answer_scores",
-          strict: true,
-          schema: historyGradeSchema,
-        },
-      },
-      temperature: 0,
-    }),
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    method: "POST",
-    signal: AbortSignal.timeout(45_000),
+  return gradeOpenAnswersWithOpenAI({
+    apiKey,
+    answers,
+    exam: historyExam,
+    model: config.historyModel,
+    schemaName: "history_open_answer_scores",
+    subject: "Povijest",
   });
-
-  const payload = await openAiResponse.json().catch(() => ({}));
-  if (!openAiResponse.ok) {
-    const message = payload?.error?.message || `HTTP ${openAiResponse.status}`;
-    throw new Error(`OpenAI response error: ${message}`);
-  }
-
-  const responseText = extractOpenAiOutputText(payload);
-  if (!responseText) throw new Error("OpenAI response did not contain output text.");
-  return normalizeHistoryGrades(JSON.parse(responseText), historyExam, answers);
 }
 
 async function gradeGeographyOpenAnswersWithOpenAI({ apiKey, geographyExam, answers }) {
+  return gradeOpenAnswersWithOpenAI({
+    apiKey,
+    answers,
+    exam: geographyExam,
+    model: config.geographyModel,
+    schemaName: "geography_open_answer_scores",
+    subject: "Geografija",
+  });
+}
+
+async function gradePsychologyOpenAnswersWithOpenAI({ apiKey, psychologyExam, answers }) {
+  return gradeOpenAnswersWithOpenAI({
+    apiKey,
+    answers,
+    exam: psychologyExam,
+    model: config.psychologyModel,
+    schemaName: "psychology_open_answer_scores",
+    subject: "Psihologija",
+  });
+}
+
+async function gradePoliticsOpenAnswersWithOpenAI({ apiKey, politicsExam, answers }) {
+  return gradeOpenAnswersWithOpenAI({
+    apiKey,
+    answers,
+    exam: politicsExam,
+    model: config.politicsModel,
+    schemaName: "politics_open_answer_scores",
+    subject: "Politika i gospodarstvo",
+  });
+}
+
+async function gradeOpenAnswersWithOpenAI({ apiKey, exam, answers, model, schemaName, subject }) {
   const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
     body: JSON.stringify({
-      model: config.geographyModel,
+      model,
       input: [
+        {
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text: buildOpenAnswerGradingSystemPrompt(subject),
+            },
+          ],
+        },
         {
           role: "user",
           content: [
             {
               type: "input_text",
-              text: buildGeographyGradingPrompt({ geographyExam, answers }),
+              text: buildOpenAnswerGradingPrompt({ exam, answers, subject }),
             },
           ],
         },
@@ -1973,7 +2211,7 @@ async function gradeGeographyOpenAnswersWithOpenAI({ apiKey, geographyExam, answ
       text: {
         format: {
           type: "json_schema",
-          name: "geography_open_answer_scores",
+          name: schemaName,
           strict: true,
           schema: historyGradeSchema,
         },
@@ -1996,13 +2234,54 @@ async function gradeGeographyOpenAnswersWithOpenAI({ apiKey, geographyExam, answ
 
   const responseText = extractOpenAiOutputText(payload);
   if (!responseText) throw new Error("OpenAI response did not contain output text.");
-  return normalizeHistoryGrades(JSON.parse(responseText), geographyExam, answers);
+  return normalizeHistoryGrades(JSON.parse(responseText), exam, answers);
 }
 
-function buildHistoryGradingPrompt({ historyExam, answers }) {
+function buildOpenAnswerGradingSystemPrompt(subject) {
+  return generalGradingSystemPrompt
+    .replaceAll("{{subject}}", subject)
+    .replaceAll("{{subjectRules}}", subjectSpecificOpenGradingRules(subject))
+    .trim();
+}
+
+function subjectSpecificOpenGradingRules(subject) {
+  if (subject === "Povijest") {
+    return [
+      "- Za povijesne pojmove, osobe, događaje i države traži činjenično točan naziv ili jasno jednakovrijedan naziv.",
+      "- Kod produženoga odgovora svaki bod zahtijeva konkretnu povijesnu tvrdnju, objašnjenje ili vezu.",
+    ].join("\n");
+  }
+
+  if (subject === "Geografija") {
+    return [
+      "- Priznaj geografski jednakovrijedne nazive, točne standardne varijante naziva, ispravan izračun i obrazloženje ako ga zadatak traži.",
+      "- Kod kombiniranih odgovora traži sve elemente navedene u službenome ključu za puni broj bodova.",
+    ].join("\n");
+  }
+
+  if (subject === "Psihologija") {
+    return [
+      "- Priznaj psihološki jednakovrijedan pojam samo ako je potpun i ne mijenja konstrukt.",
+      "- Skraćeni oblici psiholoških pojmova ne donose bodove ako nisu službeno navedeni.",
+      "- Kod zadataka s primjerom iz teksta traži i naziv pojma i ispravnu vezu s primjerom kad rubrika to traži.",
+    ].join("\n");
+  }
+
+  if (subject === "Politika i gospodarstvo") {
+    return [
+      "- Priznaj ustavno-političke i ekonomske pojmove samo ako su terminološki precizni.",
+      "- Kod zadataka koji traže instituciju, pravo, načelo ili ekonomski pojam, djelomičan naziv ne donosi bod.",
+      "- Kod produženoga odgovora odvojeno boduj imenovanje traženog pojma i objašnjenje učinka ili važnosti.",
+    ].join("\n");
+  }
+
+  return "- Ocjenjuj strogo prema službenome modelu odgovora.";
+}
+
+function buildOpenAnswerGradingPrompt({ exam, answers, subject }) {
   const answerItems = Object.entries(answers).map(([question, studentAnswer]) => {
-    const model = historyExam.openAnswers?.[question] || {};
-    const prompt = questionPrompt(historyExam, question);
+    const model = exam.openAnswers?.[question] || {};
+    const prompt = questionPrompt(exam, question);
     return {
       question,
       maxPoints: Number(model.maxPoints || 1),
@@ -2013,54 +2292,7 @@ function buildHistoryGradingPrompt({ historyExam, answers }) {
   });
 
   return `
-Ocjenjuješ otvorene zadatke iz Povijesti na hrvatskoj državnoj maturi.
-Vrati samo JSON prema zadanoj shemi. Ne vraćaj tekst izvan JSON-a.
-
-Ispit: Povijest, ${historyExam.year}. godina, ${historyExam.term}.
-
-Pravila ocjenjivanja:
-- Za svaki zadatak dodijeli cijeli broj bodova od 0 do maxPoints.
-- Koristi službeni model odgovora kao kriterij, ali nemoj zahtijevati doslovnu formulaciju.
-- Za kratki odgovor s 1 bodom dodijeli 1 samo ako je odgovor povijesno jednak prihvatljivom službenom odgovoru.
-- Za produženi odgovor boduj razmjerno pokrivenosti traženih pojmova, točnosti, povijesnom kontekstu i objašnjenju.
-- Ako odgovor samo prepisuje tekst zadatka, popisuje zadane pojmove ili ih gramatički povezuje bez novih povijesnih tvrdnji, dodijeli 0 bodova.
-- Kod produženoga odgovora svaki bod zahtijeva konkretnu povijesnu tvrdnju, objašnjenje ili vezu koja nije već dana u samome zadatku.
-- Netočne, izmišljene ili proturječne tvrdnje ne smiju donositi bodove.
-- Comment napiši na hrvatskom u jednoj kratkoj rečenici; navedi glavni razlog bodovanja.
-
-Zadatci za ocjenjivanje:
-${JSON.stringify(answerItems, null, 2)}
-  `.trim();
-}
-
-function buildGeographyGradingPrompt({ geographyExam, answers }) {
-  const answerItems = Object.entries(answers).map(([question, studentAnswer]) => {
-    const model = geographyExam.openAnswers?.[question] || {};
-    const prompt = questionPrompt(geographyExam, question);
-    return {
-      question,
-      maxPoints: Number(model.maxPoints || 1),
-      officialTask: prompt || `Zadatak ${question} iz službene ispitne knjižice.`,
-      officialModelAnswer: String(model.modelAnswer || ""),
-      studentAnswer,
-    };
-  });
-
-  return `
-Ocjenjuješ otvorene zadatke iz Geografije na hrvatskoj državnoj maturi.
-Vrati samo JSON prema zadanoj shemi. Ne vraćaj tekst izvan JSON-a.
-
-Ispit: Geografija, ${geographyExam.year}. godina, ${geographyExam.term}.
-
-Pravila ocjenjivanja:
-- Za svaki zadatak dodijeli cijeli broj bodova od 0 do maxPoints.
-- Koristi službeni model odgovora kao kriterij, ali nemoj zahtijevati doslovnu formulaciju.
-- Priznaj zemljopisno jednakovrijedne nazive, dopuštene sinonime, ispravan izračun i smisleno objašnjenje.
-- Za kratki odgovor s 1 bodom dodijeli 1 samo ako je odgovor geografski i činjenično točan.
-- Za zadatak višestrukih kombinacija traži sve odgovore navedene u službenome ključu.
-- Za produženi odgovor boduj razmjerno broju točnih traženih elemenata, usporedbi, izračunu i objašnjenju.
-- Netočne, izmišljene ili proturječne tvrdnje ne smiju donositi bodove.
-- Comment napiši na hrvatskom u jednoj kratkoj rečenici; navedi glavni razlog bodovanja.
+Ispit: ${subject}, ${exam.year}. godina, ${exam.term}.
 
 Zadatci za ocjenjivanje:
 ${JSON.stringify(answerItems, null, 2)}
@@ -2103,6 +2335,16 @@ function normalizeHistoryGrades(rawGrade, historyExam, answers) {
 
     const grade = gradeByQuestion.get(question);
     const points = clampInteger(grade?.points, 0, maximum);
+    const strictFeedback = strictOpenGradeFeedback(historyExam, question, answers[question], maximum, points);
+    if (strictFeedback) {
+      return {
+        question,
+        points: 0,
+        maxPoints: maximum,
+        comment: strictFeedback,
+      };
+    }
+
     return {
       question,
       points,
@@ -2110,6 +2352,126 @@ function normalizeHistoryGrades(rawGrade, historyExam, answers) {
       comment: normalizeHistoryComment(grade?.comment),
     };
   });
+}
+
+function strictOpenGradeFeedback(historyExam, question, answer, maximum, points) {
+  if (points <= 0) return "";
+  const modelAnswer = String(historyExam.openAnswers?.[question]?.modelAnswer || "");
+  if (!modelAnswer.trim()) return "";
+
+  if (hasUnlistedOfficialAbbreviation(answer, modelAnswer)) {
+    return "Odgovor ne donosi bodove jer sadrži nedopuštenu kraticu ili nedovršen naziv.";
+  }
+
+  if (maximum === 1 && isLeadingPartialOfficialAnswer(answer, modelAnswer)) {
+    return "Odgovor ne donosi bodove jer navodi samo dio traženoga službenog odgovora.";
+  }
+
+  return "";
+}
+
+function hasUnlistedOfficialAbbreviation(answer, modelAnswer) {
+  const officialTokens = strictAnswerTokens(primaryOfficialAnswerText(modelAnswer));
+  if (!officialTokens.length) return false;
+  const officialTokenSet = new Set(officialTokens);
+
+  return strictAnswerTokens(answer).some((studentToken) => {
+    if (officialTokenSet.has(studentToken)) return false;
+    if (!/^[a-z]+$/i.test(studentToken)) return false;
+    if (studentToken.length < 2 || studentToken.length > 4) return false;
+    return officialTokens.some(
+      (officialToken) =>
+        officialToken.length >= studentToken.length + 3 && officialToken.startsWith(studentToken),
+    );
+  });
+}
+
+function isLeadingPartialOfficialAnswer(answer, modelAnswer) {
+  const studentTokens = strictAnswerTokens(answer);
+  if (!studentTokens.length || studentTokens.some((token) => /\d/.test(token))) return false;
+
+  const variantTokenSets = officialAnswerVariants(modelAnswer)
+    .map(strictAnswerTokens)
+    .filter((variantTokens) => variantTokens.length > 0);
+  const exactOfficialVariant = variantTokenSets.some(
+    (variantTokens) =>
+      variantTokens.length === studentTokens.length &&
+      studentTokens.every((studentToken, index) =>
+        officialTokenMatchesStudentToken(variantTokens[index], studentToken),
+      ),
+  );
+  if (exactOfficialVariant) return false;
+
+  return variantTokenSets
+    .filter((variantTokens) => variantTokens.length > 1)
+    .some((variantTokens) => {
+      if (studentTokens.length >= variantTokens.length) return false;
+      const leadingFragment = studentTokens.every((studentToken, index) =>
+        officialTokenMatchesStudentToken(variantTokens[index], studentToken),
+      );
+      const shortNameFragment =
+        variantTokens.length <= 3 &&
+        studentTokens.every((studentToken) =>
+          variantTokens.some((officialToken) =>
+            officialTokenMatchesStudentToken(officialToken, studentToken),
+          ),
+        );
+      return leadingFragment || shortNameFragment;
+    });
+}
+
+function officialTokenMatchesStudentToken(officialToken, studentToken) {
+  if (officialToken === studentToken) return true;
+  return studentToken.length >= 4 && officialToken.startsWith(studentToken);
+}
+
+function officialAnswerVariants(modelAnswer) {
+  const primary = primaryOfficialAnswerText(modelAnswer);
+  const pieces = primary
+    .split(/(?:;|\n|\/|\bILI\b)/i)
+    .map((piece) => piece.trim())
+    .filter(Boolean);
+  const variants = [];
+
+  for (const piece of pieces.length ? pieces : [primary]) {
+    const full = piece.replace(/\s+/g, " ").trim();
+    const withoutParentheses = full.replace(/\([^)]*\)/g, " ").replace(/\s+/g, " ").trim();
+    if (full) variants.push(full);
+    if (withoutParentheses && withoutParentheses !== full) variants.push(withoutParentheses);
+  }
+
+  return [...new Set(variants)];
+}
+
+function primaryOfficialAnswerText(modelAnswer) {
+  const lines = String(modelAnswer || "")
+    .replace(/\r\n?/g, "\n")
+    .split("\n")
+    .map((line) => line.trim());
+  const primaryLines = [];
+
+  for (const line of lines) {
+    if (!line) continue;
+    if (/^MODEL (?:MOGU[ĆC]EGA )?TO[ČC]NOG[ A]* ODGOVORA:?$/i.test(line)) continue;
+    if (/^(?:Bodovanje|Izvor):/i.test(line)) break;
+    if (/^\d+\s*bod(?:a|ova)?\b/i.test(line) && primaryLines.length) break;
+    if (/^\d+\s*bod(?:a|ova)?\b/i.test(line) && !primaryLines.length) continue;
+    primaryLines.push(line);
+  }
+
+  return (primaryLines.join("\n").trim() || String(modelAnswer || "").trim()).slice(0, 3000);
+}
+
+function strictAnswerTokens(value) {
+  return String(value || "")
+    .toLocaleLowerCase("hr")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replaceAll("đ", "d")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter((token) => token.length > 1 && !historyEchoStopwords.has(token));
 }
 
 function normalizeHistoryComment(value) {
@@ -2951,6 +3313,8 @@ function isPublicPath(pathname) {
     "/profil.html",
     "/profile-page.js",
     "/profile-store.js",
+    "/psychology-choice.js",
+    "/psihologija.html",
     "/robots.txt",
     "/sitemap.xml",
     "/site-footer.js",
@@ -3007,9 +3371,9 @@ function loadEnvFile(filePath) {
   }
 }
 
-function loadSystemPrompt(filename) {
-  const promptPath = path.join(rootDir, "prompts", "writing", filename);
+function loadPromptFile(filename) {
+  const promptPath = path.join(rootDir, "prompts", filename);
   const prompt = fs.readFileSync(promptPath, "utf8").trim();
-  if (!prompt) throw new Error(`System prompt is empty: ${promptPath}`);
+  if (!prompt) throw new Error(`Prompt file is empty: ${promptPath}`);
   return prompt;
 }

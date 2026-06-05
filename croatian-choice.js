@@ -57,9 +57,11 @@ function escapeHtml(value) {
 }
 
 function icon(iconName, className) {
+  if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
+
   return `
     <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="#${iconName}"></use>
+      <use href="./assets/lucide-icons.svg#${iconName}"></use>
     </svg>
   `;
 }

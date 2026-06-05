@@ -41,40 +41,369 @@ class WritingPart:
     duration_minutes: int
     max_score: int
     word_range: dict[str, int | None]
-    criteria: list[dict[str, Any]]
+    rubric_id: str
     score_multiplier: int = 1
     source_format: str = "new"
 
 
-SCHOOL_ESSAY_CRITERIA = [
-    {"id": "centralThesis", "label": "Središnja tvrdnja", "maxScore": 3},
-    {"id": "argumentation", "label": "Argumentacija", "maxScore": 3},
-    {"id": "coherence", "label": "Povezanost teksta", "maxScore": 3},
-    {"id": "vocabulary", "label": "Upotreba rječnika", "maxScore": 3},
-    {
-        "id": "languageAccuracy",
-        "label": "Pravopisna i gramatička točnost",
-        "maxScore": 3,
-    },
-]
+CURRENT_CATALOG_SOURCE = {
+    "title": "NCVVO Ispitni katalog za državnu maturu 2022./2023. - Hrvatski jezik",
+    "url": "https://www.ncvvo.hr/wp-content/uploads/2022/09/HRV-2023a.pdf",
+}
+LEGACY_2022_CATALOG_SOURCE = {
+    "title": "NCVVO Ispitni katalog za državnu maturu 2021./2022. - Hrvatski jezik",
+    "url": "https://www.ncvvo.hr/wp-content/uploads/2021/09/HRV2022a.pdf",
+}
+LEGACY_CATALOG_SOURCE = {
+    "title": "NCVVO Ispitni katalog za državnu maturu 2018./2019. - Hrvatski jezik",
+    "url": "https://www.ncvvo.hr/wp-content/uploads/2018/10/HRVATSKI-2019.pdf",
+}
 
-OLD_SCHOOL_ESSAY_CRITERIA = [
-    {
-        "id": "contentArgumentation",
-        "label": "A: Sadržaj i argumentacija",
-        "maxScore": 20,
+SUMMARY_RUBRIC_ID = "summary-2023"
+SCHOOL_ESSAY_RUBRIC_ID = "school-essay-2023"
+LEGACY_ESSAY_RUBRIC_ID = "school-essay-legacy"
+LEGACY_ESSAY_2022_RUBRIC_ID = "school-essay-2022"
+
+RUBRICS: dict[str, dict[str, Any]] = {
+    SUMMARY_RUBRIC_ID: {
+        "id": SUMMARY_RUBRIC_ID,
+        "label": "Službena rubrika za sažetak",
+        "source": CURRENT_CATALOG_SOURCE,
+        "criteria": [
+            {
+                "id": "content",
+                "label": "Sadržaj",
+                "maxScore": 3,
+                "levels": [
+                    {
+                        "score": 3,
+                        "description": (
+                            "Navodi autora i naslov, temu, namjenu, autorov stav, osnovne "
+                            "misli i važne pojedinosti; nema suvišnih detalja i uglavnom "
+                            "se služi vlastitim riječima."
+                        ),
+                    },
+                    {
+                        "score": 2,
+                        "description": (
+                            "Sadržaj je djelomično potpun ili općenit, uz poneke suvišne "
+                            "pojedinosti ili dijelove prenesene iz polaznoga teksta."
+                        ),
+                    },
+                    {
+                        "score": 1,
+                        "description": (
+                            "Tekst uglavnom prepričava, izdvaja samo jednu osnovnu misao "
+                            "ili navodi slabije povezane pojedinosti."
+                        ),
+                    },
+                    {
+                        "score": 0,
+                        "description": (
+                            "Ne određuje temu, namjenu i autorov stav, ne izdvaja osnovne "
+                            "misli ili je većinom prepisan."
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": "organizationStyle",
+                "label": "Organizacija teksta i stil",
+                "maxScore": 3,
+                "levels": [
+                    {
+                        "score": 3,
+                        "description": (
+                            "Ima jasan uvod, razradu i zaključak, logičan slijed, povezane "
+                            "misli te objektivan, jasan i primjeren stil."
+                        ),
+                    },
+                    {
+                        "score": 2,
+                        "description": (
+                            "Trodijelna struktura postoji, ali slijed i veze među mislima "
+                            "nisu potpuno jasni."
+                        ),
+                    },
+                    {
+                        "score": 1,
+                        "description": (
+                            "Nedostaje uvod ili zaključak, a slijed i povezanost misli slabi su."
+                        ),
+                    },
+                    {
+                        "score": 0,
+                        "description": (
+                            "Nema trodijelnu strukturu ni povezane osnovne misli i stil "
+                            "nije primjeren sažetku."
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": "languageAccuracy",
+                "label": "Jezična točnost",
+                "maxScore": 3,
+                "levels": [
+                    {"score": 3, "description": "Pravopisno, gramatički i leksički točno."},
+                    {
+                        "score": 2,
+                        "description": "Uglavnom pravopisno, gramatički i leksički točno.",
+                    },
+                    {
+                        "score": 1,
+                        "description": "Djelomično pravopisno, gramatički i leksički točno.",
+                    },
+                    {"score": 0, "description": "Pravopisno, gramatički i leksički netočno."},
+                ],
+            },
+        ],
+        "specialRules": [
+            "Očekivani opseg je 200-250 riječi; za vrednovanje je dopušteno 180-275 riječi.",
+            "Sažetak se ne vrednuje ako ne ostvari barem 1 bod u sastavnici Sadržaj.",
+            "Sažetak se ne vrednuje ako tekst nije čitljiv ili je pisan samo velikim tiskanim slovima.",
+        ],
     },
-    {
-        "id": "composition",
-        "label": "B: Struktura i povezanost",
-        "maxScore": 6,
+    SCHOOL_ESSAY_RUBRIC_ID: {
+        "id": SCHOOL_ESSAY_RUBRIC_ID,
+        "label": "Službena rubrika za interpretacijski školski esej",
+        "source": CURRENT_CATALOG_SOURCE,
+        "criteria": [
+            {
+                "id": "centralThesis",
+                "label": "Središnja tvrdnja",
+                "maxScore": 3,
+                "levels": [
+                    {
+                        "score": 3,
+                        "description": (
+                            "Tvrdnja je jasna i točna, pokazuje temeljito razumijevanje "
+                            "djela i uključuje relevantna književna obilježja."
+                        ),
+                    },
+                    {
+                        "score": 2,
+                        "description": (
+                            "Tvrdnja je točna, ali općenita; razumijevanje i izdvojena "
+                            "književna obilježja djelomični su."
+                        ),
+                    },
+                    {
+                        "score": 1,
+                        "description": (
+                            "Tvrdnja je vrlo općenita, razumijevanje površno, moguće su "
+                            "činjenične pogreške i izostaju važna književna obilježja."
+                        ),
+                    },
+                    {"score": 0, "description": "Nema razvijenu središnju tvrdnju."},
+                ],
+            },
+            {
+                "id": "argumentation",
+                "label": "Argumentacija",
+                "maxScore": 3,
+                "levels": [
+                    {
+                        "score": 3,
+                        "description": (
+                            "Dva ili tri jasna argumenta temeljito objašnjavaju tvrdnju, "
+                            "potkrijepljeni su djelom i cjelovitom analizom ulomka."
+                        ),
+                    },
+                    {
+                        "score": 2,
+                        "description": (
+                            "Dva ili tri općenita argumenta djelomično objašnjavaju i "
+                            "potkrepljuju tvrdnju te daju djelomičnu analizu ulomka."
+                        ),
+                    },
+                    {
+                        "score": 1,
+                        "description": (
+                            "Jedan razvijen ili više slabih argumenata površno podupiru "
+                            "tvrdnju, uz vrlo površnu analizu."
+                        ),
+                    },
+                    {"score": 0, "description": "Argumentacija izostaje."},
+                ],
+            },
+            {
+                "id": "coherence",
+                "label": "Povezanost teksta",
+                "maxScore": 3,
+                "levels": [
+                    {
+                        "score": 3,
+                        "description": (
+                            "Uvod, razrada i zaključak povezani su; odlomci su jasni i "
+                            "logični, a kohezivna sredstva gotovo potpuno uporabljena."
+                        ),
+                    },
+                    {
+                        "score": 2,
+                        "description": (
+                            "Tekst ima tri dijela, ali oni nisu posve povezani; odlomci i "
+                            "kohezivna sredstva djelomično su uspješni."
+                        ),
+                    },
+                    {
+                        "score": 1,
+                        "description": (
+                            "Tekst ima tri dijela, ali uvod ili zaključak vrlo su općeniti, "
+                            "odlomci nejasni, a povezanost površna."
+                        ),
+                    },
+                    {
+                        "score": 0,
+                        "description": (
+                            "Tekst nema trodijelnu strukturu; razrada nije organizirana i "
+                            "rečenice su nepovezane."
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": "vocabulary",
+                "label": "Upotreba rječnika",
+                "maxScore": 3,
+                "levels": [
+                    {
+                        "score": 3,
+                        "description": (
+                            "Rječnik je širok i primjeren; književni pojmovi rabe se "
+                            "dosljedno i točno, a opće riječi precizno."
+                        ),
+                    },
+                    {
+                        "score": 2,
+                        "description": (
+                            "Rječnik je zadovoljavajući i uglavnom primjeren; književni "
+                            "pojmovi rabe se djelomično, a opće riječi uglavnom točno."
+                        ),
+                    },
+                    {
+                        "score": 1,
+                        "description": (
+                            "Rječnik je ograničen i često neprimjeren; književni pojmovi "
+                            "rijetki su, a opće riječi samo djelomično točne."
+                        ),
+                    },
+                    {
+                        "score": 0,
+                        "description": (
+                            "Rječnik je nezadovoljavajući i neprimjeren; književni pojmovi "
+                            "izostaju, a opće riječi rabe se netočno."
+                        ),
+                    },
+                ],
+            },
+            {
+                "id": "languageAccuracy",
+                "label": "Pravopisna i gramatička točnost",
+                "maxScore": 3,
+                "levels": [
+                    {"score": 3, "description": "Pravopisno i gramatički točno."},
+                    {"score": 2, "description": "Uglavnom pravopisno i gramatički točno."},
+                    {"score": 1, "description": "Djelomično pravopisno i gramatički točno."},
+                    {"score": 0, "description": "Pravopisno i gramatički netočno."},
+                ],
+            },
+        ],
+        "specialRules": [
+            "Očekuje se najmanje 440 riječi; za vrednovanje je dopušteno najmanje 396 riječi.",
+            "Esej se ne vrednuje ako ne ostvari barem 1 bod u sastavnici Središnja tvrdnja.",
+            "Esej se ne vrednuje ako tekst nije čitljiv ili je pisan samo velikim tiskanim slovima.",
+        ],
     },
-    {
-        "id": "languageStyle",
-        "label": "C: Jezik i stil",
-        "maxScore": 14,
+    LEGACY_ESSAY_RUBRIC_ID: {
+        "id": LEGACY_ESSAY_RUBRIC_ID,
+        "label": "Službena rubrika za školski esej starog formata",
+        "source": LEGACY_CATALOG_SOURCE,
+        "criteria": [
+            {
+                "id": "contentArgumentation",
+                "label": "A: Poznavanje i razumijevanje književnoga teksta",
+                "maxScore": 20,
+                "items": [
+                    {"id": "A1", "label": "Prepoznaje obilježja polaznoga teksta ili tekstova", "maxScore": 2},
+                    {"id": "A2", "label": "Navodi ključne sadržajne podatke i strukturu djela", "maxScore": 4},
+                    {"id": "A3", "label": "Razumije i problematizira polazni tekst i djelo u cjelini", "maxScore": 6},
+                    {"id": "A4", "label": "Tvrdnje potkrepljuje primjerima i citatima", "maxScore": 4},
+                    {"id": "A5", "label": "Sintetizira argumente, stavove i čitateljsko iskustvo", "maxScore": 4},
+                ],
+            },
+            {
+                "id": "composition",
+                "label": "B: Povezanost teksta",
+                "maxScore": 6,
+                "items": [
+                    {"id": "B1", "label": "Sadržajno oblikuje uvod, razradu i zaključak", "maxScore": 1},
+                    {"id": "B2", "label": "Povezuje tvrdnje smisleno i logično", "maxScore": 4},
+                    {"id": "B3", "label": "Upotrebljava prikladan stil", "maxScore": 1},
+                ],
+            },
+            {
+                "id": "languageStyle",
+                "label": "C: Upotreba standardnoga hrvatskog jezika",
+                "maxScore": 14,
+                "items": [
+                    {"id": "C1", "label": "Sintaktička točnost", "maxScore": 4},
+                    {"id": "C2", "label": "Pravopisna točnost", "maxScore": 6},
+                    {"id": "C3", "label": "Morfološka točnost", "maxScore": 2},
+                    {"id": "C4", "label": "Leksička točnost", "maxScore": 2},
+                ],
+            },
+        ],
+        "specialRules": [
+            "Dopušteno je odstupanje do 10 % ispod zadanoga najmanjeg broja riječi.",
+            "Esej se ne vrednuje ako zadatak nije ispunjen, tekst nije u obliku eseja, sadrži nepristojno izražavanje ili crteže, nije čitljiv ili je pisan samo velikim tiskanim slovima.",
+        ],
     },
-]
+    LEGACY_ESSAY_2022_RUBRIC_ID: {
+        "id": LEGACY_ESSAY_2022_RUBRIC_ID,
+        "label": "Službena rubrika za školski esej 2021./2022.",
+        "source": LEGACY_2022_CATALOG_SOURCE,
+        "criteria": [
+            {
+                "id": "contentArgumentation",
+                "label": "A: Poznavanje i razumijevanje književnoga teksta",
+                "maxScore": 20,
+                "items": [
+                    {"id": "A1", "label": "Prepoznaje obilježja polaznoga teksta ili tekstova", "maxScore": 2},
+                    {"id": "A2", "label": "Navodi ključne sadržajne podatke i strukturu djela u cjelini", "maxScore": 4},
+                    {"id": "A3", "label": "Analizira polazni tekst i povezuje ga s djelom u cjelini", "maxScore": 6},
+                    {"id": "A4", "label": "Tvrdnje potkrepljuje primjerima i citatima", "maxScore": 4},
+                    {"id": "A5", "label": "Obrazlaže stavove, izvodi zaključak i pokazuje ukupno čitateljsko iskustvo", "maxScore": 4},
+                ],
+            },
+            {
+                "id": "composition",
+                "label": "B: Povezanost teksta",
+                "maxScore": 6,
+                "items": [
+                    {"id": "B1", "label": "Sadržajno oblikuje uvod, razradu i zaključak", "maxScore": 1},
+                    {"id": "B2", "label": "Povezuje tvrdnje smisleno i logično", "maxScore": 4},
+                    {"id": "B3", "label": "Upotrebljava prikladan stil", "maxScore": 1},
+                ],
+            },
+            {
+                "id": "languageStyle",
+                "label": "C: Upotreba standardnoga hrvatskog jezika",
+                "maxScore": 14,
+                "items": [
+                    {"id": "C1", "label": "Sintaktička točnost", "maxScore": 4},
+                    {"id": "C2", "label": "Pravopisna točnost", "maxScore": 6},
+                    {"id": "C3", "label": "Morfološka točnost", "maxScore": 2},
+                    {"id": "C4", "label": "Leksička točnost", "maxScore": 2},
+                ],
+            },
+        ],
+        "specialRules": [
+            "Dopušteno je odstupanje do 10 % ispod zadanoga najmanjeg broja riječi.",
+            "Esej se ne vrednuje ako zadatak nije ispunjen, tekst nije u obliku eseja, sadrži nepristojno izražavanje ili crteže, nije čitljiv, pisan je samo velikim tiskanim slovima ili je potpisan.",
+        ],
+    },
+}
 
 NEW_WRITING_PARTS = (
     WritingPart(
@@ -83,11 +412,7 @@ NEW_WRITING_PARTS = (
         duration_minutes=80,
         max_score=18,
         word_range={"min": 200, "max": 250, "acceptedMin": 180, "acceptedMax": 275},
-        criteria=[
-            {"id": "content", "label": "Sadržaj", "maxScore": 3},
-            {"id": "organizationStyle", "label": "Organizacija teksta i stil", "maxScore": 3},
-            {"id": "languageAccuracy", "label": "Jezična točnost", "maxScore": 3},
-        ],
+        rubric_id=SUMMARY_RUBRIC_ID,
         score_multiplier=2,
     ),
     WritingPart(
@@ -96,7 +421,7 @@ NEW_WRITING_PARTS = (
         duration_minutes=160,
         max_score=30,
         word_range={"min": 440, "max": None, "acceptedMin": 396, "acceptedMax": None},
-        criteria=SCHOOL_ESSAY_CRITERIA,
+        rubric_id=SCHOOL_ESSAY_RUBRIC_ID,
         score_multiplier=2,
     ),
 )
@@ -380,19 +705,25 @@ def old_essay_word_range(exam: dict[str, Any]) -> dict[str, int | None]:
     return {
         "min": minimum,
         "max": maximum,
-        "acceptedMin": minimum,
-        "acceptedMax": maximum,
+        "acceptedMin": round(minimum * 0.9),
+        "acceptedMax": None,
     }
 
 
 def old_school_essay_part(exam: dict[str, Any]) -> WritingPart:
+    score_multiplier = 2 if 2016 <= exam["year"] <= 2018 else 1
     return WritingPart(
         kind="skolski-esej",
         label="Školski esej",
         duration_minutes=160,
-        max_score=40,
+        max_score=40 * score_multiplier,
         word_range=old_essay_word_range(exam),
-        criteria=OLD_SCHOOL_ESSAY_CRITERIA,
+        rubric_id=(
+            LEGACY_ESSAY_2022_RUBRIC_ID
+            if exam["year"] == 2022
+            else LEGACY_ESSAY_RUBRIC_ID
+        ),
+        score_multiplier=score_multiplier,
         source_format="old",
     )
 
@@ -457,7 +788,7 @@ def build_part(
         "wordRange": part.word_range,
         "maxScore": part.max_score,
         "scoreMultiplier": part.score_multiplier,
-        "criteria": part.criteria,
+        "rubricId": part.rubric_id,
         "taskText": clean_task_text(pdf_text(contents, pages[0], pages[-1]), part),
         "sourceImages": render_source_pages(paper_path, identifier, pages),
     }
@@ -492,11 +823,8 @@ def main() -> None:
 
     exams = [part for exam in croatian_exams for part in build_exam(exam)]
     payload = {
-        "version": 1,
-        "rubricSource": {
-            "title": "NCVVO Ispitni katalog za državnu maturu 2025./2026. - Hrvatski jezik",
-            "url": "https://www.ncvvo.hr/wp-content/uploads/2025/09/HRV-2026.pdf",
-        },
+        "version": 2,
+        "rubrics": RUBRICS,
         "exams": exams,
     }
     OUTPUT.write_text(

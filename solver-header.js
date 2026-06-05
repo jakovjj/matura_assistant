@@ -15,23 +15,18 @@
     Biologija: "#2f5d50",
     Engleski: "#36517c",
     "Engleski jezik": "#36517c",
-    Etika: "#5b4b63",
     Fizika: "#225b67",
     Filozofija: "#574d3f",
     Geografija: "#3f5f3b",
-    "Grčki jezik": "#4d5370",
     "Hrvatski jezik": "#7a3f4a",
     Informatika: "#2e5c72",
     Kemija: "#315f69",
-    "Latinski jezik": "#5b5140",
     "Likovna umjetnost": "#6a4f3d",
     Matematika: "#4f4b78",
-    "Mađarski jezik": "#4e5d47",
     "Politika i gospodarstvo": "#5c4a42",
     Povijest: "#6a4b3d",
     Psihologija: "#5a4968",
     Sociologija: "#4e5960",
-    "Srpski jezik": "#574a70",
     Vjeronauk: "#4f5943",
   };
 
@@ -39,23 +34,18 @@
     Biologija: "dna",
     Engleski: "book-open-text",
     "Engleski jezik": "book-open-text",
-    Etika: "scale",
     Fizika: "atom",
     Filozofija: "lightbulb",
     Geografija: "earth",
-    "Grčki jezik": "omega",
     "Hrvatski jezik": "book-open-text",
     Informatika: "binary",
     Kemija: "flask-conical",
-    "Latinski jezik": "amphora",
     "Likovna umjetnost": "palette",
     Matematika: "sigma",
-    "Mađarski jezik": "languages",
     "Politika i gospodarstvo": "landmark",
     Povijest: "history",
     Psihologija: "brain",
     Sociologija: "users-round",
-    "Srpski jezik": "languages",
     Vjeronauk: "church",
   };
 
@@ -134,10 +124,11 @@
 
   function icon(iconName, className) {
     if (!iconName) return "";
+    if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
 
     return `
       <svg class="${escapeHtml(className)}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-        <use href="#${escapeHtml(iconName)}"></use>
+        <use href="./assets/lucide-icons.svg#${escapeHtml(iconName)}"></use>
       </svg>
     `;
   }

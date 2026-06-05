@@ -194,7 +194,7 @@
         <div>
           <h2>OpenAI API ključ</h2>
           <p>
-            Koristit će se za provjeru točnosti otvorenih pitanja i ocjenjivanje pisanih zadataka.
+            Koristit će se za provjeru točnosti otvorenih pitanja koja imaju AI provjeru.
           </p>
         </div>
       </div>
