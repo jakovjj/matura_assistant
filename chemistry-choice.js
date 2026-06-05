@@ -112,7 +112,7 @@ function formatTerm(term) {
 
 function choiceExamIdForTerm(exam, term) {
   const level = exam.level ? `-${exam.level.toLocaleLowerCase("hr")}` : "";
-  return `matematika${level}-${exam.year}-${slugPart(term)}`;
+  return `kemija${level}-${exam.year}-${slugPart(term)}`;
 }
 
 function choiceStorageKeyForId(id) {

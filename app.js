@@ -31,7 +31,7 @@ const solverDataSources = {
   },
   chemistryChoice: {
     globalName: "ASISTENT_ZA_MATURE_CHEMISTRY_CHOICE",
-    src: "./data/chemistry-choice.js?v=20260605-chemistry-choice",
+    src: "./data/chemistry-choice.js?v=20260605-chemistry-table-crops",
   },
   croatianChoice: {
     globalName: "ASISTENT_ZA_MATURE_CROATIAN_CHOICE",

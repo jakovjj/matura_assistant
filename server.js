@@ -1005,6 +1005,7 @@ async function handleHistoryOpenGrade(request, response) {
     sendJson(response, 400, { error: "Pošalji barem jedan otvoreni odgovor za ocjenjivanje." });
     return;
   }
+  if (rejectUnreliableOfficialAnswers(response, historyExam, answers)) return;
 
   try {
     const grades = await gradeHistoryOpenAnswersWithOpenAI({
@@ -1081,6 +1082,7 @@ async function handleGeographyOpenGrade(request, response) {
     sendJson(response, 400, { error: "Pošalji barem jedan otvoreni odgovor za ocjenjivanje." });
     return;
   }
+  if (rejectUnreliableOfficialAnswers(response, geographyExam, answers)) return;
 
   try {
     const grades = await gradeGeographyOpenAnswersWithOpenAI({
@@ -1157,6 +1159,7 @@ async function handlePsychologyOpenGrade(request, response) {
     sendJson(response, 400, { error: "Pošalji barem jedan otvoreni odgovor za ocjenjivanje." });
     return;
   }
+  if (rejectUnreliableOfficialAnswers(response, psychologyExam, answers)) return;
 
   try {
     const grades = await gradePsychologyOpenAnswersWithOpenAI({
@@ -1233,6 +1236,7 @@ async function handlePoliticsOpenGrade(request, response) {
     sendJson(response, 400, { error: "Pošalji barem jedan otvoreni odgovor za ocjenjivanje." });
     return;
   }
+  if (rejectUnreliableOfficialAnswers(response, politicsExam, answers)) return;
 
   try {
     const grades = await gradePoliticsOpenAnswersWithOpenAI({
@@ -1506,6 +1510,7 @@ function isPracticeStorageKey(key) {
     "asistent-za-mature:english-listening:",
     "asistent-za-mature:physics-choice:",
     "asistent-za-mature:math-choice:",
+    "asistent-za-mature:chemistry-choice:",
     "asistent-za-mature:croatian-choice:",
     "asistent-za-mature:history-choice:",
     "asistent-za-mature:geography-choice:",
@@ -1666,6 +1671,193 @@ function normalizeHistoryOpenAnswers(rawAnswers, historyExam) {
   }
 
   return normalized;
+}
+
+function rejectUnreliableOfficialAnswers(response, exam, answers) {
+  for (const question of Object.keys(answers)) {
+    const issue = officialModelAnswerIssue(exam, question);
+    if (!issue) continue;
+    sendJson(response, 422, {
+      error:
+        `Službeno rješenje za zadatak ${question} nije pouzdano izdvojeno ` +
+        "i zato nije poslano AI ocjenjivaču.",
+      detail: issue,
+    });
+    return true;
+  }
+  return false;
+}
+
+function officialModelAnswerIssue(exam, question) {
+  const model = exam.openAnswers?.[question];
+  const text = String(model?.modelAnswer || "").trim();
+  if (!text) return "Nedostaje službeni model odgovora.";
+
+  const taskItem = (exam.tasks || [])
+    .flatMap((task) => task.questions || [])
+    .find((item) => String(item.number) === question);
+  const modelMaximum = positiveInteger(model?.maxPoints);
+  const taskMaximum = positiveInteger(taskItem?.maxPoints);
+  const promptMaximum = promptMaxPoints(taskItem?.prompt);
+  const maximum = taskMaximum || modelMaximum || 1;
+  if (modelMaximum && taskMaximum && modelMaximum !== taskMaximum) {
+    return "Broj bodova u zadatku i službenome rješenju nije usklađen.";
+  }
+  if (promptMaximum && promptMaximum !== maximum) {
+    return "Broj bodova u tekstu zadatka i izdvojenoj rubrici nije usklađen.";
+  }
+
+  const rubricPoints = text
+    .split(/\r?\n/)
+    .map((line) => line.match(/^\s*(\d+)\s+bod(?:a|ova)?(?:\s+|$)/i))
+    .filter(Boolean)
+    .map((match) => Number(match[1]));
+  if (maximum === 1 && rubricPoints.some((points) => points > 1)) {
+    return "Jednobodovni odgovor sadrži višebodovnu rubriku.";
+  }
+  if (rubricPoints.length && Math.max(...rubricPoints) !== maximum) {
+    const additiveOnePointRubric =
+      rubricPoints.every((points) => points === 1) &&
+      rubricPoints.reduce((sum, points) => sum + points, 0) >= maximum;
+    const inferredFullCreditBlock =
+      model?.boundaryInferred === true && hasUnlabelledFullCreditBlock(text);
+    if (
+      !additiveOnePointRubric &&
+      !declaresMaximumPoints(text, maximum) &&
+      !inferredFullCreditBlock
+    ) {
+      return "Najveći broj bodova u rubrici nije usklađen sa zadatkom.";
+    }
+  }
+  if (hasMultipleRubricCycles(text)) {
+    return "Službeni odgovor sadrži završetak jedne i početak druge bodovne rubrike.";
+  }
+
+  const openQuestions = [...new Set(exam.openQuestions || Object.keys(exam.openAnswers || {}))]
+    .map(String)
+    .sort(compareQuestionNumbers);
+  for (const otherQuestion of openQuestions) {
+    if (otherQuestion === question) continue;
+    const marker = new RegExp(`^\\s*${escapeRegExp(otherQuestion)}\\s*[.)]\\s*$`, "m");
+    if (marker.test(text)) {
+      return `Službeni odgovor sadrži oznaku susjednoga zadatka ${otherQuestion}.`;
+    }
+  }
+  const adjacentMarker = adjacentForeignQuestionMarker(text, question);
+  if (adjacentMarker) {
+    return `Službeni odgovor sadrži oznaku susjednoga zadatka ${adjacentMarker}.`;
+  }
+
+  const taskHeading =
+    /^\s*(?:[IVX]+\.\s*)?ZADAT(?:AK|CI)\s+(?:KRATK|PRODU[ŽZ]EN|VI[ŠS]ESTRUK|ALTERNATIV|DOPUNJAV|OTVOREN|POVEZIV|KRONOLOG)/im;
+  if (taskHeading.test(text)) return "Službeni odgovor sadrži naslov druge sekcije zadataka.";
+
+  const questionIndex = openQuestions.indexOf(question);
+  const nextQuestion = openQuestions[questionIndex + 1];
+  if (nextQuestion) {
+    const nextText = String(exam.openAnswers?.[nextQuestion]?.modelAnswer || "").trim();
+    if (looksLikeSplitOfficialSentence(text, nextText, maximum)) {
+      return `Granica prema zadatku ${nextQuestion} prekida rečenicu službenoga rješenja.`;
+    }
+  }
+
+  return "";
+}
+
+function declaresMaximumPoints(text, maximum) {
+  const pointWords = new Map([
+    ["jedan", 1],
+    ["jednim", 1],
+    ["jednoga", 1],
+    ["dva", 2],
+    ["dvama", 2],
+    ["dvaju", 2],
+    ["tri", 3],
+    ["trima", 3],
+    ["četiri", 4],
+    ["cetiri", 4],
+  ]);
+  for (const match of text.matchAll(/\b(?:najvi[šs]e|ukupno)\s+(\d+|[\p{L}]+)\s+bod/giu)) {
+    const token = match[1].toLocaleLowerCase("hr");
+    const points = /^\d+$/.test(token) ? Number(token) : pointWords.get(token);
+    if (points === maximum) return true;
+  }
+  return false;
+}
+
+function looksLikeSplitOfficialSentence(previous, following, maximum) {
+  if (previous.length < 140 || !following) return false;
+  if (/[.!?:;…)\]]$/.test(previous)) return false;
+
+  const firstLine = following.split(/\r?\n/, 1)[0].trim();
+  if (!firstLine || /^\s*\d+\s+bod/i.test(firstLine)) return false;
+  if (/^\s*MODEL.*TO[ČC]N.*ODGOVORA/i.test(firstLine)) return false;
+  if (/^(?:[•\-–—]|Izvor:)/i.test(firstLine)) return false;
+  if (!/^[a-zčćžšđ]/.test(firstLine)) return false;
+
+  return maximum > 1 || /^\s*\d+\s+bod(?:a|ova)?/im.test(previous);
+}
+
+function positiveInteger(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function promptMaxPoints(value) {
+  const points = [...String(value || "").matchAll(/\((\d+)\s+bod(?:a|ova)?\)/gi)].map(
+    (match) => Number(match[1]),
+  );
+  return points.length ? Math.max(...points) : 0;
+}
+
+function hasMultipleRubricCycles(text) {
+  let completed = false;
+  for (const line of String(text || "").split(/\r?\n/)) {
+    if (/^\s*0\s+bodova?\b/i.test(line) || /^\s*Svi ostali odgovori\b/i.test(line)) {
+      completed = true;
+      continue;
+    }
+    const match = line.match(/^\s*(\d+)\s+bod(?:a|ova)?(?:\s+|$)/i);
+    if (completed && match && Number(match[1]) > 0) return true;
+  }
+  return false;
+}
+
+function hasUnlabelledFullCreditBlock(text) {
+  const prefix = [];
+  for (const line of String(text || "").split(/\r?\n/)) {
+    if (/^\s*\d+\s+bod(?:a|ova)?(?:\s+|$)/i.test(line)) break;
+    if (/^\s*MODEL.*TO[ČC]N.*ODGOVORA/i.test(line)) continue;
+    prefix.push(line);
+  }
+  return prefix.join(" ").replace(/\s+/g, " ").trim().length >= 120;
+}
+
+function compareQuestionNumbers(left, right) {
+  const [leftWhole, leftDecimal = "0"] = String(left).split(".");
+  const [rightWhole, rightDecimal = "0"] = String(right).split(".");
+  return Number(leftWhole) - Number(rightWhole) || Number(leftDecimal) - Number(rightDecimal);
+}
+
+function adjacentForeignQuestionMarker(text, question) {
+  const [currentWhole, currentDecimal = "0"] = String(question).split(".").map(Number);
+  for (const line of String(text || "").split(/\r?\n/)) {
+    const match = line.match(/^\s*(\d{1,3})(?:\.(\d{1,2}))?\.\s+\S/);
+    if (!match) continue;
+    const candidateWhole = Number(match[1]);
+    const candidateDecimal = Number(match[2] || 0);
+    const followsCurrent =
+      candidateWhole > currentWhole ||
+      (candidateWhole === currentWhole && candidateDecimal > currentDecimal);
+    if (followsCurrent && candidateWhole - currentWhole <= 1) {
+      return match[2] ? `${candidateWhole}.${candidateDecimal}` : String(candidateWhole);
+    }
+  }
+  return "";
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function gradeEnglishEssayWithOpenAI({ apiKey, essayExam, essayText, image, signal }) {
@@ -3285,6 +3477,7 @@ function isPublicPath(pathname) {
     "/app.js",
     "/asistent_za_maturu.png",
     "/auth-client.js",
+    "/chemistry-choice.js",
     "/croatian-choice.js",
     "/croatian-writing.js",
     "/english-reading.html",
@@ -3303,6 +3496,7 @@ function isPublicPath(pathname) {
     "/hrvatski.html",
     "/hrvatski-pisanje.html",
     "/index.html",
+    "/kemija.html",
     "/matematika.html",
     "/math-choice.js",
     "/physics-choice.js",

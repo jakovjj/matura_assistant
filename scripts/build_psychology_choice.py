@@ -25,8 +25,10 @@ from crop_utils import grayscale_image_from_png, trim_crop_bottom_whitespace
 from open_answer_validation import (
     OpenAnswerValidationError,
     OpenQuestionSpec,
+    answer_boundary_penalty,
     assert_valid_exam_open_answers,
     repair_open_answer_boundaries,
+    rubric_heading_points,
 )
 from pdf_utils import pdftotext, png_dimensions, render_pdf_page_to_png
 
@@ -668,7 +670,7 @@ def parse_key_entries(key_texts: list[str], sections: list[PaperSection]) -> lis
             if not line:
                 continue
 
-            heading_task_id = task_id_for_heading(line) if "Zadat" in line else None
+            heading_task_id = task_id_for_heading(line) if "zadat" in line.casefold() else None
             if heading_task_id and heading_task_id != "otvoreni-zadaci":
                 flush()
                 current_task_id = heading_task_id
@@ -725,7 +727,11 @@ def parse_key_entries(key_texts: list[str], sections: list[PaperSection]) -> lis
 
     by_number: dict[str, dict[str, Any]] = {}
     for entry in entries:
-        by_number.setdefault(entry["number"], entry)
+        existing = by_number.get(entry["number"])
+        if existing is None or answer_boundary_penalty(entry["answerText"]) < answer_boundary_penalty(
+            existing["answerText"]
+        ):
+            by_number[entry["number"]] = entry
     return [by_number[number] for number in sorted(by_number, key=question_sort_key)]
 
 
@@ -905,34 +911,133 @@ def extract_question_prompt(paper_text: str, sections: list[PaperSection], quest
 
 
 def max_points_for_open_question(prompt: str, answer_text: str) -> int:
-    matches: list[int] = []
-    for source in (prompt, answer_text):
-        matches.extend(
-            int(match.group(1))
-            for match in re.finditer(
-                r"(?<!\d)(\d+)\s+bod(?:ova|a)?\b",
-                source,
-                flags=re.IGNORECASE,
-            )
+    answer_rubric = rubric_heading_points(answer_text)
+    if answer_rubric:
+        return max(answer_rubric)
+
+    matches = [
+        int(match.group(1))
+        for match in re.finditer(
+            r"(?<!\d)(\d+)\s+bod(?:ova|a)?\b",
+            prompt,
+            flags=re.IGNORECASE,
         )
+    ]
     return max(1, max(matches, default=1))
 
 
 def open_question_specs(
     paper_text: str,
     sections: list[PaperSection],
+    entries: list[dict[str, Any]] | None = None,
 ) -> list[OpenQuestionSpec]:
     specs: list[OpenQuestionSpec] = []
+    previous_section_max = 0
     for section in sections:
-        if section.task_id not in OPEN_TASK_IDS:
+        section_questions = [
+            question
+            for question in sorted(section.numbers, key=question_sort_key)
+            if int(question.split(".", 1)[0]) > previous_section_max
+        ]
+        if section.task_id in OPEN_TASK_IDS:
+            for question in section_questions:
+                prompt = extract_question_prompt(paper_text, sections, question)
+                maximum = max_points_for_open_question(prompt, "")
+                if section.task_id == "produzeni-odgovor":
+                    maximum = max(3, maximum)
+                specs.append(OpenQuestionSpec(question, section.task_id, maximum))
+        if section_questions:
+            previous_section_max = max(
+                previous_section_max,
+                max(int(question.split(".", 1)[0]) for question in section_questions),
+            )
+
+    by_number = {spec.number: spec for spec in specs}
+    open_entries = [
+        entry
+        for entry in entries or []
+        if closed_answer(str(entry.get("answerText") or "")) is None
+    ]
+    for entry in open_entries:
+        question = str(entry["number"])
+        section = section_for_question(sections, question)
+        existing = by_number.get(question)
+        task_id = str(
+            entry.get("taskId")
+            or (section.task_id if section else None)
+            or (existing.task_id if existing else "otvoreni-zadaci")
+        )
+        prompt = extract_question_prompt(paper_text, sections, question)
+        answer_text = str(entry.get("answerText") or "")
+        prompt_points = [
+            int(match.group(1))
+            for match in re.finditer(
+                r"\((\d+)\s+bod(?:a|ova)?\)",
+                prompt,
+                flags=re.IGNORECASE,
+            )
+        ]
+        answer_points = rubric_heading_points(answer_text)
+        if prompt_points:
+            maximum = max(prompt_points)
+        elif answer_points and answer_boundary_penalty(answer_text) == 0:
+            maximum = max(answer_points)
+        elif existing:
+            maximum = existing.max_points
+        else:
+            maximum = max_points_for_open_question(prompt, answer_text)
+        by_number[question] = OpenQuestionSpec(question, task_id, maximum)
+
+    ordered_entries = sorted(open_entries, key=lambda entry: question_sort_key(str(entry["number"])))
+    for previous_entry, next_entry in zip(ordered_entries, ordered_entries[1:]):
+        previous_number = str(previous_entry["number"])
+        next_number = str(next_entry["number"])
+        if "." in previous_number or "." in next_number:
             continue
-        for question in sorted(section.numbers, key=question_sort_key):
-            prompt = extract_question_prompt(paper_text, sections, question)
-            maximum = max_points_for_open_question(prompt, "")
-            if section.task_id == "produzeni-odgovor" and maximum == 1:
-                maximum = 3
-            specs.append(OpenQuestionSpec(question, section.task_id, maximum))
-    return specs
+        if int(next_number) - int(previous_number) != 2:
+            continue
+
+        missing_number = str(int(previous_number) + 1)
+        if missing_number in by_number:
+            continue
+
+        previous_spec = by_number[previous_number]
+        next_spec = by_number[next_number]
+        inferred_maximum = rubric_after_completed_answer(
+            str(previous_entry.get("answerText") or "")
+        )
+        if inferred_maximum is None:
+            inferred_maximum = (
+                previous_spec.max_points
+                if previous_spec.max_points == next_spec.max_points
+                else max(previous_spec.max_points, next_spec.max_points)
+            )
+        task_id = (
+            previous_spec.task_id
+            if previous_spec.task_id == next_spec.task_id
+            else ("produzeni-odgovor" if inferred_maximum >= 3 else next_spec.task_id)
+        )
+        by_number[missing_number] = OpenQuestionSpec(
+            missing_number,
+            task_id,
+            inferred_maximum,
+        )
+
+    return [by_number[number] for number in sorted(by_number, key=question_sort_key)]
+
+
+def rubric_after_completed_answer(answer_text: str) -> int | None:
+    completed = False
+    for line in answer_text.splitlines():
+        if re.match(r"^\s*0\s+bodova?\b", line, flags=re.IGNORECASE):
+            completed = True
+            continue
+        if not completed:
+            continue
+        match = re.match(r"^\s*(\d+)\s+bod(?:a|ova)?\b", line, flags=re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+    return None
 
 
 def build_tasks(entries: list[dict[str, Any]], paper_text: str, sections: list[PaperSection]) -> tuple[list[dict[str, Any]], dict[str, list[str]], dict[str, dict[str, Any]]]:
@@ -959,6 +1064,7 @@ def build_tasks(entries: list[dict[str, Any]], paper_text: str, sections: list[P
                 task_id = "otvoreni-zadaci"
             prompt = extract_question_prompt(paper_text, sections, question)
             max_points = max_points_for_open_question(prompt, answer_text)
+            max_points = max(max_points, int(entry.get("expectedMaxPoints") or 0))
             if task_id == "produzeni-odgovor" and max_points == 1:
                 max_points = 3
             question_item = {
@@ -971,6 +1077,8 @@ def build_tasks(entries: list[dict[str, Any]], paper_text: str, sections: list[P
                 "maxPoints": max_points,
                 "modelAnswer": answer_text,
             }
+            if entry.get("expectedMaxPoints"):
+                open_answers[question]["boundaryInferred"] = True
 
         grouped.setdefault(task_id, []).append(question_item)
 
@@ -1382,7 +1490,7 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     entries = apply_extended_model_blocks(entries, key_texts, sections)
     entries = repair_open_answer_boundaries(
         entries,
-        open_question_specs(paper_text, sections),
+        open_question_specs(paper_text, sections, entries),
     )
     tasks, answers, open_answers = build_tasks(entries, paper_text, sections)
 

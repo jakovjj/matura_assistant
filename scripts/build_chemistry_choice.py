@@ -19,7 +19,11 @@ from xml.etree import ElementTree
 
 from PIL import Image
 
-from crop_utils import grayscale_image_from_png, trim_crop_bottom_whitespace
+from crop_utils import (
+    grayscale_image_from_png,
+    trim_crop_bottom_whitespace,
+    trim_legacy_answer_frame,
+)
 from pdf_utils import pdftotext, png_dimensions, render_pdf_page_to_png
 
 
@@ -36,6 +40,10 @@ SOURCE_RENDER_DPI = 144
 SOURCE_CROP_HORIZONTAL_MARGIN = 48
 SOURCE_CROP_VERTICAL_PADDING = 9
 SOURCE_FOOTER_MARGIN = 65
+SOURCE_TABLE_RULE_MIN_WIDTH_RATIO = 0.45
+SOURCE_TABLE_RULE_MAX_GAP = 180
+SOURCE_TABLE_MARKER_MAX_RULE_DISTANCE = 90
+SOURCE_TABLE_LEGACY_MIN_HEIGHT = 100
 SOLUTION_FOOTER_MARGIN = 36
 SOLUTION_CROP_VERTICAL_PADDING = 8
 SOLUTION_TABLE_RULE_MIN_WIDTH_RATIO = 0.45
@@ -128,6 +136,14 @@ class HorizontalRule:
     y_max: float
 
 
+@dataclass(frozen=True)
+class RasterRule:
+    x_min: int
+    y_min: int
+    x_max: int
+    y_max: int
+
+
 def sorted_page_lines(page: PdfPage) -> list[PdfLine]:
     return sorted(page.lines, key=lambda line: (line.y_min, line.x_min))
 
@@ -163,6 +179,15 @@ def line_starts_with_known_question_token(line: PdfLine, wanted_numbers: set[str
         return None
     number = parse_question_token(match.group(1))
     return number if number in wanted_numbers else None
+
+
+def line_is_question_token_only(line: PdfLine, number: str) -> bool:
+    return bool(
+        re.fullmatch(
+            rf"\s*{re.escape(number).replace(r'\.', r'[\.,]')}\s*\.\s*",
+            line.text,
+        )
+    )
 
 
 def whole_question_number(question: str) -> int:
@@ -726,7 +751,13 @@ def solution_crop_from_marker(
 def find_open_question_crops(
     contents: bytes,
     question_numbers: list[str],
-) -> tuple[dict[str, QuestionCrop], dict[str, QuestionCrop], dict[str, str], dict[str, str]]:
+) -> tuple[
+    dict[str, QuestionCrop],
+    dict[str, QuestionCrop],
+    dict[str, str],
+    dict[str, str],
+    dict[str, float],
+]:
     pages = pdf_bbox_pages(contents)
     markers: list[QuestionMarker] = []
     wanted_numbers = set(question_numbers)
@@ -736,6 +767,7 @@ def find_open_question_crops(
         if "." in number
     }
     parent_markers: dict[str, QuestionMarker] = {}
+    number_only_questions: dict[str, float] = {}
     found_open_section = False
     current_section = "short"
 
@@ -786,6 +818,8 @@ def find_open_question_crops(
                     section=current_section,
                 )
             )
+            if line_is_question_token_only(line, number):
+                number_only_questions[number] = line.x_min
 
     if not markers:
         raise ValueError("Could not locate Chemistry open question crops")
@@ -888,7 +922,7 @@ def find_open_question_crops(
             x_max=marker.page.width - SOURCE_CROP_HORIZONTAL_MARGIN,
             y_max=y_max,
         )
-    return crops, context_crops, points, sections
+    return crops, context_crops, points, sections, number_only_questions
 
 
 def find_open_question_numbers(contents: bytes, choice_answers: dict[str, list[str]]) -> list[str]:
@@ -1228,6 +1262,38 @@ def longest_dark_run(row: bytes, threshold: int = 180) -> tuple[int, int, int]:
     return best_start, best_start + best_length, best_length
 
 
+def detect_raster_horizontal_rules(
+    image: Image.Image,
+    minimum_width_ratio: float,
+) -> list[RasterRule]:
+    width, height = image.size
+    minimum_run = int(width * minimum_width_ratio)
+    data = image.tobytes()
+    candidates: list[tuple[int, int, int]] = []
+    for y in range(height):
+        row = data[y * width : (y + 1) * width]
+        x_min, x_max, run_length = longest_dark_run(row)
+        if run_length >= minimum_run:
+            candidates.append((y, x_min, x_max))
+
+    groups: list[list[tuple[int, int, int]]] = []
+    for candidate in candidates:
+        if groups and candidate[0] <= groups[-1][-1][0] + 1:
+            groups[-1].append(candidate)
+        else:
+            groups.append([candidate])
+
+    return [
+        RasterRule(
+            x_min=min(candidate[1] for candidate in group),
+            y_min=min(candidate[0] for candidate in group),
+            x_max=max(candidate[2] for candidate in group),
+            y_max=max(candidate[0] for candidate in group) + 1,
+        )
+        for group in groups
+    ]
+
+
 def detect_horizontal_rules(contents: bytes, pages: dict[int, PdfPage]) -> dict[int, list[HorizontalRule]]:
     rules_by_page: dict[int, list[HorizontalRule]] = {}
     with tempfile.TemporaryDirectory() as temporary_directory:
@@ -1250,33 +1316,145 @@ def detect_horizontal_rules(contents: bytes, pages: dict[int, PdfPage]) -> dict[
             width, height = image.size
             scale_x = width / page.width
             scale_y = height / page.height
-            minimum_run = int(width * SOLUTION_TABLE_RULE_MIN_WIDTH_RATIO)
-            candidates: list[tuple[int, int, int]] = []
-            pixels = image.load()
-            for y in range(height):
-                row = bytes(pixels[x, y] for x in range(width))
-                x_min, x_max, run_length = longest_dark_run(row)
-                if run_length >= minimum_run:
-                    candidates.append((y, x_min, x_max))
-
-            groups: list[list[tuple[int, int, int]]] = []
-            for candidate in candidates:
-                if groups and candidate[0] <= groups[-1][-1][0] + 1:
-                    groups[-1].append(candidate)
-                else:
-                    groups.append([candidate])
-
             rules_by_page[page_number] = [
                 HorizontalRule(
-                    x_min=min(candidate[1] for candidate in group) / scale_x,
-                    y_min=min(candidate[0] for candidate in group) / scale_y,
-                    x_max=max(candidate[2] for candidate in group) / scale_x,
-                    y_max=(max(candidate[0] for candidate in group) + 1) / scale_y,
+                    x_min=rule.x_min / scale_x,
+                    y_min=rule.y_min / scale_y,
+                    x_max=rule.x_max / scale_x,
+                    y_max=rule.y_max / scale_y,
                 )
-                for group in groups
+                for rule in detect_raster_horizontal_rules(
+                    image,
+                    SOLUTION_TABLE_RULE_MIN_WIDTH_RATIO,
+                )
             ]
 
     return rules_by_page
+
+
+def raster_rules_match(first: RasterRule, second: RasterRule) -> bool:
+    first_width = first.x_max - first.x_min
+    second_width = second.x_max - second.x_min
+    overlap = min(first.x_max, second.x_max) - max(first.x_min, second.x_min)
+    if min(first_width, second_width) <= 0:
+        return False
+    return (
+        overlap / min(first_width, second_width) >= 0.9
+        and max(first_width, second_width) / min(first_width, second_width) <= 1.15
+    )
+
+
+def raster_rule_has_vertical_border_above(
+    image: Image.Image,
+    rule: RasterRule,
+    *,
+    depth: int = 30,
+    threshold: int = 180,
+) -> bool:
+    y_min = max(0, rule.y_min - depth)
+    if rule.y_min - y_min < depth // 2:
+        return False
+
+    pixels = image.load()
+    required_dark_pixels = int((rule.y_min - y_min) * 0.65)
+    for center_x in (rule.x_min, rule.x_max - 1):
+        for x in range(max(0, center_x - 2), min(image.width, center_x + 3)):
+            dark_pixels = sum(
+                pixels[x, y] < threshold
+                for y in range(y_min, rule.y_min)
+            )
+            if dark_pixels >= required_dark_pixels:
+                return True
+    return False
+
+
+def table_start_for_marker(
+    image: Image.Image,
+    rules: list[RasterRule],
+    marker_crop_y: int,
+    marker_x: int,
+) -> int | None:
+    for bottom_rule in rules:
+        distance = bottom_rule.y_min - marker_crop_y
+        if distance < 0:
+            continue
+        if distance > SOURCE_TABLE_MARKER_MAX_RULE_DISTANCE:
+            break
+        if not raster_rule_has_vertical_border_above(image, bottom_rule):
+            continue
+
+        previous_rules = [
+            rule
+            for rule in rules
+            if rule.y_max <= bottom_rule.y_min
+            and raster_rules_match(rule, bottom_rule)
+        ]
+        if len(previous_rules) < 2:
+            continue
+        header_rule, top_rule = previous_rules[-1], previous_rules[-2]
+        body_gap = bottom_rule.y_min - header_rule.y_max
+        header_gap = header_rule.y_min - top_rule.y_max
+        if body_gap > SOURCE_TABLE_RULE_MAX_GAP:
+            continue
+        if header_gap > SOURCE_TABLE_RULE_MAX_GAP:
+            continue
+        if marker_x >= top_rule.x_min - 10:
+            continue
+        if header_gap <= body_gap * 0.85:
+            return top_rule.y_min
+        return header_rule.y_min
+    return None
+
+
+def align_number_only_questions_to_tables(
+    page_image: Image.Image,
+    crop_bounds: dict[str, list[int]],
+    number_only_questions: dict[str, int],
+) -> set[str]:
+    page_questions = [
+        question
+        for question in number_only_questions
+        if question in crop_bounds
+    ]
+    if not page_questions:
+        return set()
+
+    rules = detect_raster_horizontal_rules(
+        page_image,
+        SOURCE_TABLE_RULE_MIN_WIDTH_RATIO,
+    )
+    aligned_questions: set[str] = set()
+    for question in sorted(page_questions, key=lambda item: crop_bounds[item][1]):
+        bounds = crop_bounds[question]
+        original_y_min = bounds[1]
+        table_start = table_start_for_marker(
+            page_image,
+            rules,
+            original_y_min,
+            number_only_questions[question],
+        )
+        if table_start is None or table_start >= original_y_min:
+            continue
+
+        boundary = max(0, table_start - 2)
+        predecessor = min(
+            (
+                item
+                for item in crop_bounds
+                if item != question
+                and crop_bounds[item][1] < original_y_min
+                and abs(crop_bounds[item][3] - original_y_min) <= 3
+            ),
+            key=lambda item: abs(crop_bounds[item][3] - original_y_min),
+            default=None,
+        )
+        if predecessor is not None and boundary <= crop_bounds[predecessor][1]:
+            continue
+        if predecessor is not None:
+            crop_bounds[predecessor][3] = min(crop_bounds[predecessor][3], boundary)
+        bounds[1] = boundary
+        aligned_questions.add(question)
+    return aligned_questions
 
 
 def render_source_pages(
@@ -1285,10 +1463,13 @@ def render_source_pages(
     crops: dict[str, QuestionCrop],
     page_prefix: str = "page",
     expected_assets: set[str] | None = None,
+    number_only_questions: dict[str, float] | None = None,
 ) -> dict[str, dict[str, Any]]:
     destination = PAPER_ROOT / identifier
     if expected_assets is None:
         expected_assets = set()
+    if number_only_questions is None:
+        number_only_questions = {}
     crops_by_page: dict[int, list[tuple[str, QuestionCrop]]] = {}
     for question, crop in crops.items():
         crops_by_page.setdefault(crop.page.number, []).append((question, crop))
@@ -1312,20 +1493,56 @@ def render_source_pages(
             write_if_changed(destination / filename, contents)
             expected_assets.add(filename)
             page_image = grayscale_image_from_png(contents)
+            crop_bounds: dict[str, list[int]] = {}
+            page_number_only_questions: dict[str, int] = {}
 
             for question, crop in page_crops:
                 scale_x = image_width / crop.page.width
                 scale_y = image_height / crop.page.height
-                x_min = max(0, math.floor(crop.x_min * scale_x))
-                y_min = max(0, math.floor(crop.y_min * scale_y))
-                x_max = min(image_width, math.ceil(crop.x_max * scale_x))
-                y_max = min(image_height, math.ceil(crop.y_max * scale_y))
+                crop_bounds[question] = [
+                    max(0, math.floor(crop.x_min * scale_x)),
+                    max(0, math.floor(crop.y_min * scale_y)),
+                    min(image_width, math.ceil(crop.x_max * scale_x)),
+                    min(image_height, math.ceil(crop.y_max * scale_y)),
+                ]
+                if question in number_only_questions:
+                    page_number_only_questions[question] = math.floor(
+                        number_only_questions[question] * scale_x
+                    )
+
+            aligned_questions = align_number_only_questions_to_tables(
+                page_image,
+                crop_bounds,
+                page_number_only_questions,
+            )
+
+            for question, _crop in page_crops:
+                x_min, y_min, x_max, y_max = crop_bounds[question]
+                if question in aligned_questions:
+                    x_min, _legacy_y_min, x_max, legacy_y_max = trim_legacy_answer_frame(
+                        page_image,
+                        x_min,
+                        y_min,
+                        x_max,
+                        y_max,
+                    )
+                    has_adjacent_successor = any(
+                        item != question
+                        and abs(crop_bounds[item][1] - y_max) <= 3
+                        for item in crop_bounds
+                    )
+                    if (
+                        not has_adjacent_successor
+                        or legacy_y_max - y_min >= SOURCE_TABLE_LEGACY_MIN_HEIGHT
+                    ):
+                        y_max = min(y_max, legacy_y_max)
                 x_min, y_min, x_max, y_max = trim_crop_bottom_whitespace(
                     page_image,
                     x_min,
                     y_min,
                     x_max,
                     y_max,
+                    detect_legacy_answer_frame=question not in aligned_questions,
                 )
                 source_images[question] = {
                     "url": f"{PAPER_URL_PREFIX}/{quote(identifier)}/{filename}",
@@ -2043,10 +2260,13 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
         find_question_crops(paper_contents, choice_question_numbers),
         expected_assets=expected_assets,
     )
-    open_question_crops, open_context_crops, open_question_points, open_question_sections = find_open_question_crops(
-        open_paper_contents,
-        open_question_numbers,
-    )
+    (
+        open_question_crops,
+        open_context_crops,
+        open_question_points,
+        open_question_sections,
+        number_only_open_questions,
+    ) = find_open_question_crops(open_paper_contents, open_question_numbers)
     rendered_open_images = render_source_pages(
         open_paper_destination,
         identifier,
@@ -2059,6 +2279,7 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
         },
         page_prefix="open-page",
         expected_assets=expected_assets,
+        number_only_questions=number_only_open_questions,
     )
     open_question_images = {
         number: rendered_open_images[number]

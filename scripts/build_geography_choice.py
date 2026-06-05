@@ -22,6 +22,14 @@ from xml.etree import ElementTree
 from PIL import Image
 
 from crop_utils import grayscale_image_from_png, trim_crop_bottom_whitespace
+from open_answer_validation import (
+    OpenAnswerValidationError,
+    OpenQuestionSpec,
+    answer_boundary_penalty,
+    assert_valid_exam_open_answers,
+    repair_open_answer_boundaries,
+    rubric_heading_points,
+)
 from pdf_utils import pdftotext, png_dimensions, render_pdf_page_to_png
 
 
@@ -75,6 +83,12 @@ TASK_ORDER = [
     "produzeni-odgovor",
     "otvoreni-zadaci",
 ]
+OPEN_TASK_IDS = {
+    "visestruke-kombinacije",
+    "kratki-odgovor",
+    "produzeni-odgovor",
+    "otvoreni-zadaci",
+}
 
 ENTRY_RE = re.compile(
     r"^\s*(?:Geografija\s+)?(?P<number>\d{1,3}(?:[\.,]\d{1,2})?)(?:\.|\s+)(?P<answer>.*)$",
@@ -222,10 +236,10 @@ def normalized_name(name: str) -> str:
     return f"{normalized} {ascii_name}"
 
 
-def pdf_text(contents: bytes) -> str:
+def pdf_text(contents: bytes, *args: str) -> str:
     return pdftotext(
         contents,
-        "-layout",
+        *(args or ("-layout",)),
         required_message="pdftotext is required to build Geography practice data",
     )
 
@@ -596,8 +610,40 @@ def normalize_answer_text(lines: list[str]) -> str:
     return text
 
 
+def embedded_question_parts(
+    raw_line: str,
+    known_questions: set[str],
+) -> tuple[str, str, str] | None:
+    candidates: list[tuple[int, int, str]] = []
+    for question in known_questions:
+        for match in re.finditer(rf"(?<!\d){re.escape(question)}\.(?!\d)", raw_line):
+            if match.start() == 0 or raw_line[: match.start()].endswith("  "):
+                candidates.append((match.start(), match.end(), question))
+    if not candidates:
+        return None
+    start, end, question = min(candidates)
+    return raw_line[:start], question, raw_line[end:]
+
+
+def known_key_questions(
+    key_texts: list[str],
+    sections: list[PaperSection],
+) -> set[str]:
+    known = {question for section in sections for question in section.numbers}
+    for key_text in key_texts:
+        for match in re.finditer(
+            r"(?m)^\s*(?P<number>\d{1,3}(?:[.,]\d{1,2})?)\.\s+",
+            key_text,
+        ):
+            question = parse_question_token(match.group("number"))
+            if section_for_question(sections, question):
+                known.add(question)
+    return known
+
+
 def parse_key_entries(key_texts: list[str], sections: list[PaperSection]) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
+    known_questions = known_key_questions(key_texts, sections)
 
     for key_text in key_texts:
         current: dict[str, Any] | None = None
@@ -640,20 +686,43 @@ def parse_key_entries(key_texts: list[str], sections: list[PaperSection]) -> lis
             if not line:
                 continue
 
-            heading_task_id = task_id_for_heading(line) if "Zadat" in line else None
+            heading_task_id = task_id_for_heading(line) if "zadat" in line.casefold() else None
             if heading_task_id and heading_task_id != "otvoreni-zadaci":
                 flush()
                 current_task_id = heading_task_id
                 continue
 
-            match = ENTRY_RE.match(line)
-            if match:
+            embedded = embedded_question_parts(raw_line, known_questions)
+            if embedded and not ENTRY_RE.match(line):
+                prefix, question, answer_start = embedded
+                prefix = clean_line(prefix)
+                if current and prefix and not should_skip_key_line(prefix):
+                    current["lines"].append(prefix)
                 flush()
-                question = parse_question_token(match.group("number"))
                 section = section_for_question(sections, question)
                 current = {
                     "number": question,
-                    "taskId": current_task_id or section.task_id if section else current_task_id,
+                    "taskId": current_task_id or (section.task_id if section else None),
+                    "lines": [answer_start],
+                }
+                continue
+
+            match = ENTRY_RE.match(line)
+            if match:
+                question = parse_question_token(match.group("number"))
+                answer_start = clean_line(match.group("answer"))
+                if (
+                    question not in known_questions
+                    or re.match(r"bod(?:a|ova)?\b", answer_start, flags=re.IGNORECASE)
+                ):
+                    if current:
+                        current["lines"].append(line)
+                    continue
+                flush()
+                section = section_for_question(sections, question)
+                current = {
+                    "number": question,
+                    "taskId": current_task_id or (section.task_id if section else None),
                     "lines": [match.group("answer")],
                 }
                 continue
@@ -673,7 +742,11 @@ def parse_key_entries(key_texts: list[str], sections: list[PaperSection]) -> lis
 
     by_number: dict[str, dict[str, Any]] = {}
     for entry in entries:
-        by_number.setdefault(entry["number"], entry)
+        existing = by_number.get(entry["number"])
+        if existing is None or answer_boundary_penalty(entry["answerText"]) < answer_boundary_penalty(
+            existing["answerText"]
+        ):
+            by_number[entry["number"]] = entry
     return [by_number[number] for number in sorted(by_number, key=question_sort_key)]
 
 
@@ -853,11 +926,57 @@ def extract_question_prompt(paper_text: str, sections: list[PaperSection], quest
 
 
 def max_points_for_open_question(prompt: str, answer_text: str) -> int:
-    for source in (prompt, answer_text):
-        matches = [int(match.group("points")) for match in POINTS_RE.finditer(source)]
-        if matches:
-            return max(matches)
-    return 1
+    answer_rubric = rubric_heading_points(answer_text)
+    if answer_rubric:
+        return max(answer_rubric)
+    return max(
+        (int(match.group("points")) for match in POINTS_RE.finditer(prompt)),
+        default=1,
+    )
+
+
+def open_question_specs(
+    paper_text: str,
+    sections: list[PaperSection],
+    entries: list[dict[str, Any]] | None = None,
+) -> list[OpenQuestionSpec]:
+    specs: list[OpenQuestionSpec] = []
+    previous_section_max = 0
+    for section in sections:
+        section_questions = [
+            question
+            for question in sorted(section.numbers, key=question_sort_key)
+            if int(question.split(".", 1)[0]) > previous_section_max
+        ]
+        if section.task_id in OPEN_TASK_IDS:
+            for question in section_questions:
+                prompt = extract_question_prompt(paper_text, sections, question)
+                maximum = max_points_for_open_question(prompt, "")
+                if section.task_id == "produzeni-odgovor":
+                    maximum = max(3, maximum)
+                specs.append(OpenQuestionSpec(question, section.task_id, maximum))
+        if section_questions:
+            previous_section_max = max(
+                previous_section_max,
+                max(int(question.split(".", 1)[0]) for question in section_questions),
+            )
+
+    by_number = {spec.number: spec for spec in specs}
+    for entry in entries or []:
+        question = str(entry["number"])
+        section = section_for_question(sections, question)
+        if not section or section.task_id not in OPEN_TASK_IDS:
+            continue
+        answer_text = str(entry.get("answerText") or "")
+        if closed_answer(answer_text):
+            continue
+        prompt = extract_question_prompt(paper_text, sections, question)
+        by_number[question] = OpenQuestionSpec(
+            question,
+            section.task_id,
+            max_points_for_open_question(prompt, answer_text),
+        )
+    return [by_number[number] for number in sorted(by_number, key=question_sort_key)]
 
 
 def build_tasks(entries: list[dict[str, Any]], paper_text: str, sections: list[PaperSection]) -> tuple[list[dict[str, Any]], dict[str, list[str]], dict[str, dict[str, Any]]]:
@@ -1290,7 +1409,14 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
         key_names = find_key_names(names)
         paper_names = find_paper_names(names)
         paper_contents = combine_pdf_contents([archive.read(name) for name in paper_names])
-        key_texts = [pdf_text(archive.read(name)) for name in key_names]
+        key_texts = [
+            extracted
+            for name in key_names
+            for extracted in (
+                pdf_text(archive.read(name), "-raw"),
+                pdf_text(archive.read(name), "-layout"),
+            )
+        ]
 
     paper_text = pdf_text(paper_contents)
     sections = extract_paper_sections(paper_text)
@@ -1298,6 +1424,10 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     entries = apply_simple_answer_overrides(entries, key_texts, sections)
     entries = expand_matching_entries(entries, sections)
     entries = apply_extended_model_blocks(entries, key_texts, sections)
+    entries = repair_open_answer_boundaries(
+        entries,
+        open_question_specs(paper_text, sections, entries),
+    )
     tasks, answers, open_answers = build_tasks(entries, paper_text, sections)
 
     if not answers and not open_answers:
@@ -1311,7 +1441,7 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     closed_questions = sorted(answers, key=question_sort_key)
     open_questions = sorted(open_answers, key=question_sort_key)
 
-    return {
+    result = {
         "id": identifier,
         "subject": SUBJECT,
         "year": exam["year"],
@@ -1328,6 +1458,8 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
         "answers": {question: answers[question] for question in closed_questions},
         "openAnswers": {question: open_answers[question] for question in open_questions},
     }
+    assert_valid_exam_open_answers(result)
+    return result
 
 
 def remove_orphaned_papers(expected_ids: set[str]) -> None:
@@ -1348,6 +1480,8 @@ def main() -> None:
         identifier = exam_id(exam)
         try:
             exams.append(build_exam(exam))
+        except OpenAnswerValidationError:
+            raise
         except Exception as exc:
             skipped.append(identifier)
             print(f"warning: skipped {identifier}: {exc}", file=sys.stderr)

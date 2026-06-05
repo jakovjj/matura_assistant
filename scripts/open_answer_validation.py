@@ -26,8 +26,24 @@ MODEL_HEADING_RE = re.compile(
     r"^\s*MODEL[^\n]*TO[ČC]N[^\n]*ODGOVORA:?\s*$",
     flags=re.IGNORECASE,
 )
+POINT_WORDS = {
+    "jedan": 1,
+    "jednim": 1,
+    "jednoga": 1,
+    "dva": 2,
+    "dvama": 2,
+    "dvaju": 2,
+    "tri": 3,
+    "trima": 3,
+    "četiri": 4,
+    "cetiri": 4,
+}
 TASK_HEADING_RE = re.compile(
-    r"^\s*(?:[IVX]+\.\s*)?ZADAT(?:AK|CI)\b",
+    (
+        r"^\s*(?:[IVX]+\.\s*)?ZADAT(?:AK|CI)\s+"
+        r"(?:KRATK|PRODU[ŽZ]EN|VI[ŠS]ESTRUK|ALTERNATIV|DOPUNJAV|OTVOREN|"
+        r"POVEZIV|KRONOLOG)"
+    ),
     flags=re.IGNORECASE,
 )
 
@@ -72,6 +88,30 @@ def rubric_heading_points(text: str) -> list[int]:
         for line in str(text or "").splitlines()
         if (match := RUBRIC_HEADING_RE.match(line))
     ]
+
+
+def declared_max_points(text: str) -> set[int]:
+    declared: set[int] = set()
+    pattern = re.compile(
+        r"\b(?:najvi[šs]e|ukupno)\s+(?P<points>\d+|[A-Za-zČĆŽŠĐčćžšđ]+)\s+bod",
+        flags=re.IGNORECASE,
+    )
+    for match in pattern.finditer(str(text or "")):
+        token = match.group("points").casefold()
+        if token.isdigit():
+            declared.add(int(token))
+        elif token in POINT_WORDS:
+            declared.add(POINT_WORDS[token])
+    return declared
+
+
+def answer_boundary_penalty(text: str) -> int:
+    penalty = 0
+    if _has_multiple_rubric_cycles(text):
+        penalty += 100
+    if sum(1 for line in str(text or "").splitlines() if MODEL_HEADING_RE.match(line)) > 1:
+        penalty += 50
+    return penalty
 
 
 def merge_answer_text(prefix: str, suffix: str, question: str) -> str:
@@ -124,11 +164,13 @@ def repair_open_answer_boundaries(
                     str(next_entry.get("answerText") or ""),
                     next_spec.number,
                 )
+                next_entry["expectedMaxPoints"] = next_spec.max_points
             else:
                 by_number[next_spec.number] = {
                     "number": next_spec.number,
                     "answerText": merge_answer_text(moved, "", next_spec.number),
                     "taskId": next_spec.task_id,
+                    "expectedMaxPoints": next_spec.max_points,
                 }
             changed = True
 
@@ -151,7 +193,11 @@ def validate_exam_open_answers(exam: dict[str, Any]) -> list[ValidationIssue]:
         if item.get("type") == "open"
     }
     ordered_questions = sorted(
-        {str(question) for question in exam.get("openQuestions") or open_answers},
+        {
+            *(str(question) for question in exam.get("openQuestions") or []),
+            *(str(question) for question in open_answers),
+            *(str(question) for question in task_items),
+        },
         key=question_sort_key,
     )
     issues: list[ValidationIssue] = []
@@ -161,6 +207,7 @@ def validate_exam_open_answers(exam: dict[str, Any]) -> list[ValidationIssue]:
         text = str(model.get("modelAnswer") if isinstance(model, dict) else "").strip()
         model_max = _positive_int(model.get("maxPoints") if isinstance(model, dict) else None)
         task_max = _positive_int(task_items.get(question, {}).get("maxPoints"))
+        prompt_max = _prompt_max_points(task_items.get(question, {}).get("prompt"))
         maximum = task_max or model_max or 1
 
         if not text:
@@ -186,6 +233,20 @@ def validate_exam_open_answers(exam: dict[str, Any]) -> list[ValidationIssue]:
                 )
             )
 
+        if prompt_max and prompt_max != maximum:
+            issues.append(
+                ValidationIssue(
+                    exam_id,
+                    question,
+                    "prompt-max-points-disagree",
+                    (
+                        f"zadatak nosi {prompt_max} bodova, a izdvojena rubrika "
+                        f"postavlja maxPoints na {maximum}"
+                    ),
+                    text,
+                )
+            )
+
         rubric_points = rubric_heading_points(text)
         if maximum == 1 and any(points > 1 for points in rubric_points):
             issues.append(
@@ -197,7 +258,19 @@ def validate_exam_open_answers(exam: dict[str, Any]) -> list[ValidationIssue]:
                     text,
                 )
             )
-        elif rubric_points and max(rubric_points) != maximum:
+        elif (
+            rubric_points
+            and max(rubric_points) != maximum
+            and maximum not in declared_max_points(text)
+            and not (
+                all(points == 1 for points in rubric_points if points > 0)
+                and sum(points for points in rubric_points if points > 0) >= maximum
+            )
+            and not (
+                (prompt_max == maximum or model.get("boundaryInferred") is True)
+                and _has_unlabelled_full_credit_block(text)
+            )
+        ):
             issues.append(
                 ValidationIssue(
                     exam_id,
@@ -211,11 +284,25 @@ def validate_exam_open_answers(exam: dict[str, Any]) -> list[ValidationIssue]:
                 )
             )
 
+        if _has_multiple_rubric_cycles(text):
+            issues.append(
+                ValidationIssue(
+                    exam_id,
+                    question,
+                    "multiple-rubric-cycles",
+                    "odgovor sadrži završetak jedne i početak druge bodovne rubrike",
+                    text,
+                )
+            )
+
         foreign_numbers = [
             candidate
             for candidate in ordered_questions
             if candidate != question and _contains_question_marker(text, candidate)
         ]
+        adjacent_marker = _adjacent_foreign_question_marker(text, question)
+        if adjacent_marker and adjacent_marker not in foreign_numbers:
+            foreign_numbers.append(adjacent_marker)
         if foreign_numbers:
             issues.append(
                 ValidationIssue(
@@ -305,25 +392,56 @@ def _boundary_line_index(
     if len(lines) < 2:
         return None
 
-    seen_top_rubric = False
     seen_completed_rubric = False
     seen_model_heading = False
+    multiline_metadata = False
+    zero_rubric_pending = False
     task_changed = previous.task_id != following.task_id
 
     for index, line in enumerate(lines):
         if index == 0:
-            match = RUBRIC_HEADING_RE.match(line)
-            seen_top_rubric = bool(match and int(match.group("points")) == previous.max_points)
             seen_model_heading = bool(MODEL_HEADING_RE.match(line))
             continue
 
         if _is_question_marker(line, following.number):
             return index
 
+        if zero_rubric_pending:
+            if (
+                re.search(r"\bSvi ostali odgovori\b", line, flags=re.IGNORECASE)
+                or re.search(r"[.!?…]\s*$", line)
+            ):
+                zero_rubric_pending = False
+                seen_completed_rubric = True
+            continue
+
         if re.match(r"^\s*0\s+bodova?\b", line, flags=re.IGNORECASE):
-            seen_completed_rubric = True
+            if (
+                re.search(r"\bSvi ostali odgovori\b", line, flags=re.IGNORECASE)
+                or re.search(r"[.!?…]\s*$", line)
+            ):
+                seen_completed_rubric = True
+            else:
+                zero_rubric_pending = True
+            continue
         elif re.match(r"^\s*Svi ostali odgovori\b", line, flags=re.IGNORECASE):
             seen_completed_rubric = True
+            continue
+
+        if seen_completed_rubric:
+            if re.match(r"^\s*(?:Izvor:|Prilagođeno prema:)", line, flags=re.IGNORECASE):
+                multiline_metadata = True
+                continue
+            if multiline_metadata:
+                if (
+                    RUBRIC_HEADING_RE.match(line)
+                    or MODEL_HEADING_RE.match(line)
+                    or _is_question_marker(line, following.number)
+                ):
+                    return index
+                continue
+            if not _is_trailing_metadata(line):
+                return index
 
         if MODEL_HEADING_RE.match(line):
             if task_changed or seen_model_heading or seen_completed_rubric:
@@ -336,15 +454,13 @@ def _boundary_line_index(
             continue
 
         points = int(rubric_match.group("points"))
+        if seen_completed_rubric and points > 0:
+            return index
         if points != following.max_points:
             continue
 
         if task_changed and following.max_points > previous.max_points:
             return index
-        if seen_completed_rubric or seen_top_rubric:
-            return index
-
-        seen_top_rubric = points == previous.max_points
 
     return None
 
@@ -356,7 +472,7 @@ def _without_question_marker(lines: list[str], question: str) -> list[str]:
 def _is_question_marker(line: str, question: str) -> bool:
     return bool(
         re.fullmatch(
-            rf"\s*{re.escape(question)}\s*[\.)]\s*",
+            rf"\s*{re.escape(question)}\s*(?:[\.)]|[\"”'])\s*",
             line,
         )
     )
@@ -366,12 +482,82 @@ def _contains_question_marker(text: str, question: str) -> bool:
     return any(_is_question_marker(line, question) for line in text.splitlines())
 
 
+def _adjacent_foreign_question_marker(text: str, question: str) -> str | None:
+    current = question_sort_key(question)
+    for line in str(text or "").splitlines():
+        match = re.match(
+            r"^\s*(?P<number>\d{1,3}(?:\.\d{1,2})?)\.\s+\S",
+            line,
+        )
+        if not match:
+            continue
+        candidate = match.group("number")
+        candidate_key = question_sort_key(candidate)
+        if candidate_key <= current:
+            continue
+        if candidate_key[0] - current[0] <= 1:
+            return candidate
+    return None
+
+
 def _positive_int(value: Any) -> int | None:
     try:
         parsed = int(value)
     except (TypeError, ValueError):
         return None
     return parsed if parsed > 0 else None
+
+
+def _is_trailing_metadata(line: str) -> bool:
+    return bool(
+        re.match(
+            (
+                r"^\s*(?:Izvor:|Prilagođeno prema:|https?://|www\.|NCVVO\b|Nacionalni centar\b|"
+                r"OIB:|Mati[čc]ni broj\b|DM\s+\d{4}\b|"
+                r"(?:Psihologija|Geografija|Povijest)\s+\d{4}\b)"
+            ),
+            line,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
+def _prompt_max_points(value: Any) -> int | None:
+    points = [
+        int(match.group(1))
+        for match in re.finditer(
+            r"\((\d+)\s+bod(?:a|ova)?\)",
+            str(value or ""),
+            flags=re.IGNORECASE,
+        )
+    ]
+    return max(points) if points else None
+
+
+def _has_multiple_rubric_cycles(text: str) -> bool:
+    completed = False
+    for line in str(text or "").splitlines():
+        if re.match(r"^\s*0\s+bodova?\b", line, flags=re.IGNORECASE):
+            completed = True
+            continue
+        if re.match(r"^\s*Svi ostali odgovori\b", line, flags=re.IGNORECASE):
+            completed = True
+            continue
+        match = RUBRIC_HEADING_RE.match(line)
+        if completed and match and int(match.group("points")) > 0:
+            return True
+    return False
+
+
+def _has_unlabelled_full_credit_block(text: str) -> bool:
+    prefix_lines: list[str] = []
+    for line in str(text or "").splitlines():
+        if RUBRIC_HEADING_RE.match(line):
+            break
+        if MODEL_HEADING_RE.match(line):
+            continue
+        prefix_lines.append(line)
+    return len(re.sub(r"\s+", " ", "\n".join(prefix_lines)).strip()) >= 120
 
 
 def _looks_like_sentence_continuation(previous: str, following: str, maximum: int) -> bool:
@@ -405,7 +591,14 @@ def _deduplicate_issues(issues: list[ValidationIssue]) -> list[ValidationIssue]:
 def main() -> None:
     issues = validate_generated_indexes()
     if issues:
-        print(f"Pronađeno je {len(issues)} sumnjivih službenih modela odgovora:")
+        suspicious_models = {
+            (issue.exam_id, issue.question)
+            for issue in issues
+        }
+        print(
+            f"Pronađeno je {len(suspicious_models)} sumnjivih službenih modela "
+            f"odgovora ({len(issues)} validacijskih pogrešaka):"
+        )
         for issue in issues:
             print(f"- {issue.format()}")
         raise SystemExit(1)
