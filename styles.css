@@ -3493,14 +3493,18 @@ body.solver-page {
 
 .pdf-source-figure {
   margin: 0;
-  overflow-x: auto;
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
   background: #f8fafc;
   border: 1px solid var(--line);
 }
 
 .pdf-source-crop {
   position: relative;
-  width: min(100%, 900px);
+  width: 100% !important;
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
   background: var(--white);
 }
@@ -4481,12 +4485,16 @@ body.solver-page {
 
 .physics-source-figure {
   margin: 0;
-  overflow-x: auto;
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 .physics-source-crop {
   position: relative;
-  width: min(100%, 820px);
+  width: 100% !important;
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
   background: var(--white);
 }

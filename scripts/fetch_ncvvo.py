@@ -20,6 +20,7 @@ from urllib.parse import quote, unquote, urljoin, urlparse
 from urllib.request import Request, urlopen
 
 from build_sitemap import sitemap_urls, write_sitemap
+from build_seo_pages import build_seo_pages
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -345,6 +346,7 @@ def main() -> None:
     print(f"Wrote {len(index['exams'])} exams to {OUTPUT.relative_to(ROOT)}")
     write_sitemap(sitemap_urls(index))
     print("Updated sitemap.xml")
+    print(f"Updated {build_seo_pages(index)} SEO pages")
 
 
 if __name__ == "__main__":

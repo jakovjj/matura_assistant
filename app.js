@@ -715,6 +715,8 @@ for (const exam of exams) {
 const allSubjects = [...subjectCounts.keys()].sort((a, b) => {
   return a.localeCompare(b, "hr");
 });
+const subjectsBySlug = new Map(allSubjects.map((subject) => [slugPart(subject), subject]));
+const examsByPath = new Map(exams.map((exam) => [examPath(exam), exam]));
 
 function icon(iconName, className) {
   if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
@@ -760,8 +762,18 @@ function levelBadge(level) {
     : `<span class="level-badge level-badge--empty">-</span>`;
 }
 
+function subjectPath(subject) {
+  return `/predmeti/${slugPart(subject)}/`;
+}
+
+function examPath(exam) {
+  const parts = [exam.year, slugPart(normalizeTerm(exam.term))];
+  if (exam.level) parts.push(slugPart(exam.level));
+  return `/ispiti/${slugPart(exam.subject)}/${parts.join("-")}/`;
+}
+
 function subjectUrl(subject) {
-  return `./?predmet=${encodeURIComponent(subject)}`;
+  return subjectPath(subject);
 }
 
 function isSubjectTemporarilyUnavailable(subject) {
@@ -769,16 +781,12 @@ function isSubjectTemporarilyUnavailable(subject) {
 }
 
 function examUrl(exam, practicePart = "") {
-  const params = new URLSearchParams({
-    predmet: exam.subject,
-    ispit: exam.id,
-  });
+  if (!practicePart) return examPath(exam);
 
-  if (practicePart) {
-    params.set("cjelina", practicePart);
-  }
+  const params = new URLSearchParams();
+  params.set("cjelina", practicePart);
 
-  return `./?${params.toString()}#predmeti`;
+  return `${examPath(exam)}?${params.toString()}`;
 }
 
 function sitePageUrl(params = {}) {
@@ -788,14 +796,11 @@ function sitePageUrl(params = {}) {
 }
 
 function subjectCanonicalUrl(subject) {
-  return sitePageUrl({ predmet: subject });
+  return new URL(subjectPath(subject), siteOrigin).toString();
 }
 
 function examCanonicalUrl(exam) {
-  return sitePageUrl({
-    predmet: exam.subject,
-    ispit: exam.id,
-  });
+  return new URL(examPath(exam), siteOrigin).toString();
 }
 
 function setMetaContent(attribute, key, content) {
@@ -2181,10 +2186,41 @@ function gradeThresholdNote(exam) {
 
 function route() {
   const params = new URLSearchParams(window.location.search);
+  if (params.has("ispit") || params.has("predmet")) {
+    return {
+      examId: params.get("ispit"),
+      legacyUrl: true,
+      practicePart: params.get("cjelina"),
+      subject: params.get("predmet"),
+    };
+  }
+
+  const pathname = window.location.pathname;
+  if (pathname.startsWith("/ispiti/")) {
+    const exam = examsByPath.get(pathname.endsWith("/") ? pathname : `${pathname}/`);
+    return {
+      examId: exam?.id || null,
+      legacyUrl: false,
+      practicePart: params.get("cjelina"),
+      subject: exam?.subject || null,
+    };
+  }
+
+  const subjectMatch = pathname.match(/^\/predmeti\/([^/]+)\/?$/);
+  if (subjectMatch) {
+    return {
+      examId: null,
+      legacyUrl: false,
+      practicePart: params.get("cjelina"),
+      subject: subjectsBySlug.get(subjectMatch[1]) || null,
+    };
+  }
+
   return {
-    examId: params.get("ispit"),
+    examId: null,
+    legacyUrl: false,
     practicePart: params.get("cjelina"),
-    subject: params.get("predmet"),
+    subject: null,
   };
 }
 
@@ -2261,6 +2297,9 @@ async function renderApp() {
   if (currentRoute.examId) {
     const exam = examsById.get(currentRoute.examId);
     if (exam) {
+      if (currentRoute.legacyUrl) {
+        history.replaceState(null, "", examUrl(exam, currentRoute.practicePart));
+      }
       renderExamPractice(exam, currentRoute.practicePart);
     } else {
       renderMissing("Matura nije pronađena", "Odabrani ispit nije dostupan.");
@@ -2271,6 +2310,9 @@ async function renderApp() {
   if (currentRoute.subject) {
     const subject = allSubjects.find((candidate) => candidate === currentRoute.subject);
     if (subject) {
+      if (currentRoute.legacyUrl) {
+        history.replaceState(null, "", subjectUrl(subject));
+      }
       renderSubjectPage(subject);
     } else {
       renderMissing("Predmet nije pronađen", "Odabrani predmet nije dostupan u arhivi.");

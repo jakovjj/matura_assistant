@@ -1349,7 +1349,16 @@ async function serveStaticFile(request, response, url) {
     return;
   }
 
-  if (pathname === "/") pathname = "/index.html";
+  if (pathname === "/") {
+    pathname = "/index.html";
+  } else if (isGeneratedSeoDirectoryPath(pathname)) {
+    const redirectLocation = `${pathname}/${url.search}`;
+    response.writeHead(308, { Location: redirectLocation });
+    response.end();
+    return;
+  } else if (pathname.endsWith("/")) {
+    pathname = `${pathname}index.html`;
+  }
 
   if (!isPublicPath(pathname)) {
     response.writeHead(404);
@@ -3523,7 +3532,17 @@ function isPublicPath(pathname) {
     publicFiles.has(pathname) ||
     pathname.startsWith("/assets/") ||
     pathname.startsWith("/data/") ||
-    pathname.startsWith("/files/")
+    pathname.startsWith("/files/") ||
+    pathname.startsWith("/ispiti/") ||
+    pathname.startsWith("/predmeti/")
+  );
+}
+
+function isGeneratedSeoDirectoryPath(pathname) {
+  return (
+    !pathname.endsWith("/") &&
+    !path.extname(pathname) &&
+    (pathname.startsWith("/ispiti/") || pathname.startsWith("/predmeti/"))
   );
 }
 

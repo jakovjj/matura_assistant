@@ -3,89 +3,40 @@
 
 from __future__ import annotations
 
-import json
-import re
-import unicodedata
 import xml.etree.ElementTree as ET
-from pathlib import Path
-from urllib.parse import urlencode
+
+from seo_urls import ROOT, exam_path, load_archive, site_url, subject_path
 
 
-ROOT = Path(__file__).resolve().parents[1]
-DATA_FILE = ROOT / "data" / "exams.js"
 OUTPUT_FILE = ROOT / "sitemap.xml"
-DATA_PREFIX = "window.ASISTENT_ZA_MATURE_DATA="
-SITE_ORIGIN = "https://matura.com.hr"
 SITEMAP_NAMESPACE = "http://www.sitemaps.org/schemas/sitemap/0.9"
-TERM_ALIASES = {
-    "prvi rok": "ljetni rok",
-    "drugi rok": "jesenski rok",
-    "ljetni rok": "ljetni rok",
-    "jesenski rok": "jesenski rok",
-}
 
 
-def load_archive() -> dict:
-    source = DATA_FILE.read_text(encoding="utf-8").strip()
-    if not source.startswith(DATA_PREFIX) or not source.endswith(";"):
-        raise ValueError(f"{DATA_FILE} has an unsupported format")
-    return json.loads(source[len(DATA_PREFIX) : -1])
-
-
-def slug_part(value: object) -> str:
-    normalized = unicodedata.normalize("NFD", str(value).lower()).replace("đ", "d")
-    ascii_value = "".join(
-        character for character in normalized if not unicodedata.combining(character)
-    )
-    return re.sub(r"^-+|-+$", "", re.sub(r"[^a-z0-9]+", "-", ascii_value))
-
-
-def exam_id(exam: dict) -> str:
-    term = TERM_ALIASES.get(exam["term"], exam["term"])
-    return "-".join(
-        (
-            slug_part(exam["subject"]),
-            str(exam["year"]),
-            slug_part(term),
-            slug_part(exam.get("level") or "bez-razine"),
-        )
-    )
-
-
-def page_url(params: dict[str, str] | None = None) -> str:
-    if not params:
-        return f"{SITE_ORIGIN}/"
-    return f"{SITE_ORIGIN}/?{urlencode(params)}"
-
-
-def sitemap_urls(archive: dict) -> list[str]:
+def sitemap_urls(archive: dict) -> list[dict[str, str]]:
     exams = archive.get("exams")
     if not isinstance(exams, list):
-        raise ValueError(f"{DATA_FILE} does not contain an exam list")
+        raise ValueError("data/exams.js does not contain an exam list")
 
-    urls = {page_url()}
+    lastmod = str(archive.get("generatedAt") or "")[:10]
+    urls = {site_url("/")}
     for subject in {exam["subject"] for exam in exams}:
-        urls.add(page_url({"predmet": subject}))
+        urls.add(site_url(subject_path(subject)))
 
     for exam in exams:
-        urls.add(
-            page_url(
-                {
-                    "predmet": exam["subject"],
-                    "ispit": exam_id(exam),
-                }
-            )
-        )
+        urls.add(site_url(exam_path(exam)))
 
-    return sorted(urls)
+    return [{"loc": url, "lastmod": lastmod} for url in sorted(urls)]
 
 
-def write_sitemap(urls: list[str]) -> None:
+def write_sitemap(urls: list[dict[str, str]] | list[str]) -> None:
     ET.register_namespace("", SITEMAP_NAMESPACE)
     root = ET.Element(f"{{{SITEMAP_NAMESPACE}}}urlset")
-    for url in urls:
+    for item in urls:
+        entry_data = {"loc": item} if isinstance(item, str) else item
         entry = ET.SubElement(root, f"{{{SITEMAP_NAMESPACE}}}url")
-        ET.SubElement(entry, f"{{{SITEMAP_NAMESPACE}}}loc").text = url
+        ET.SubElement(entry, f"{{{SITEMAP_NAMESPACE}}}loc").text = entry_data["loc"]
+        if entry_data.get("lastmod"):
+            ET.SubElement(entry, f"{{{SITEMAP_NAMESPACE}}}lastmod").text = entry_data["lastmod"]
 
     tree = ET.ElementTree(root)
     ET.indent(tree, space="  ")

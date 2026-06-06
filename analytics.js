@@ -3,7 +3,7 @@
   const clarityTagId = "x0a1kkmiqz";
   const loginPendingKey = "azm_analytics_login_pending";
   const clarityConsent = {
-    ad_Storage: "denied",
+    ad_Storage: "granted",
     analytics_Storage: "granted",
   };
   const solverContextByPage = {
