@@ -3483,6 +3483,7 @@ function isPublicPath(pathname) {
   const publicFiles = new Set([
     "/abcd-choice.js",
     "/abcd.html",
+    "/analytics.js",
     "/app.js",
     "/asistent_za_maturu.png",
     "/auth-client.js",
