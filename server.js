@@ -19,14 +19,8 @@ const config = {
     process.env.NODE_ENV === "production" ||
     /^https:\/\//i.test(process.env.PUBLIC_BASE_URL || ""),
   essayModel: process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
-  historyModel:
-    process.env.OPENAI_HISTORY_MODEL || process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
   geographyModel:
     process.env.OPENAI_GEOGRAPHY_MODEL || process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
-  psychologyModel:
-    process.env.OPENAI_PSYCHOLOGY_MODEL || process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
-  politicsModel:
-    process.env.OPENAI_POLITICS_MODEL || process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
   host: process.env.HOST || "0.0.0.0",
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
@@ -37,10 +31,16 @@ const config = {
   publicBaseUrl: String(process.env.PUBLIC_BASE_URL || "").replace(/\/+$/, ""),
   sessionTtlMs: readPositiveNumber(process.env.SESSION_TTL_DAYS, 30) * 24 * 60 * 60 * 1000,
   databaseFile: path.resolve(rootDir, process.env.DATABASE_FILE || "var/asistent-za-mature.sqlite"),
+  feedbackFile: path.resolve(rootDir, process.env.FEEDBACK_FILE || "var/feedback/messages.jsonl"),
+  feedbackTextFile: path.resolve(rootDir, process.env.FEEDBACK_TEXT_FILE || "var/feedback/messages.txt"),
   legacyStoreFile: path.resolve(rootDir, process.env.AUTH_STORE_FILE || "var/auth-store.json"),
 };
 
 const rateLimit = {
+  feedback: createRateLimiter({
+    max: Number(process.env.FEEDBACK_IP_LIMIT_PER_HOUR || 20),
+    windowMs: 60 * 60 * 1000,
+  }),
   ip: createRateLimiter({
     max: Number(process.env.AUTH_IP_LIMIT_PER_HOUR || 80),
     windowMs: 60 * 60 * 1000,
@@ -54,21 +54,9 @@ const croatianWritingIndex = {
   file: path.join(rootDir, "data", "croatian-writing.js"),
   prefix: "window.ASISTENT_ZA_MATURE_CROATIAN_WRITING=",
 };
-const historyChoiceIndex = {
-  file: path.join(rootDir, "data", "history-choice.js"),
-  prefix: "window.ASISTENT_ZA_MATURE_HISTORY_CHOICE=",
-};
 const geographyChoiceIndex = {
   file: path.join(rootDir, "data", "geography-choice.js"),
   prefix: "window.ASISTENT_ZA_MATURE_GEOGRAPHY_CHOICE=",
-};
-const psychologyChoiceIndex = {
-  file: path.join(rootDir, "data", "psychology-choice.js"),
-  prefix: "window.ASISTENT_ZA_MATURE_PSYCHOLOGY_CHOICE=",
-};
-const politicsChoiceIndex = {
-  file: path.join(rootDir, "data", "politics-choice.js"),
-  prefix: "window.ASISTENT_ZA_MATURE_POLITICS_CHOICE=",
 };
 const generalGradingSystemPrompt = loadPromptFile("general-grading-system.txt");
 const essayScoreSchema = {
@@ -361,6 +349,11 @@ async function handleRequest(request, response) {
     return;
   }
 
+  if (url.pathname === "/api/feedback") {
+    await handleFeedback(request, response);
+    return;
+  }
+
   if (
     url.pathname === "/api/english-essay/grade" ||
     url.pathname === "/api/english-essay/ocr" ||
@@ -371,23 +364,8 @@ async function handleRequest(request, response) {
     return;
   }
 
-  if (url.pathname === "/api/history/grade-open") {
-    await handleHistoryOpenGrade(request, response);
-    return;
-  }
-
   if (url.pathname === "/api/geography/grade-open") {
     await handleGeographyOpenGrade(request, response);
-    return;
-  }
-
-  if (url.pathname === "/api/psychology/grade-open") {
-    await handlePsychologyOpenGrade(request, response);
-    return;
-  }
-
-  if (url.pathname === "/api/politics/grade-open") {
-    await handlePoliticsOpenGrade(request, response);
     return;
   }
 
@@ -411,6 +389,70 @@ function handleWritingPreviewOnlyApi(response) {
   sendJson(response, 410, {
     error: "Eseji i sažetci dostupni su samo za pregled. Unos, OCR i ocjenjivanje nisu uključeni.",
   });
+}
+
+async function handleFeedback(request, response) {
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
+    return;
+  }
+
+  const ipAddress = clientIp(request) || "unknown";
+  if (!rateLimit.feedback.check(ipAddress)) {
+    sendJson(response, 429, {
+      error: "Poslano je previše poruka. Pričekaj nekoliko minuta i pokušaj ponovno.",
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request, 16 * 1024);
+  } catch {
+    sendJson(response, 400, { error: "Zahtjev nema ispravan JSON zapis." });
+    return;
+  }
+
+  if (normalizeFeedbackLine(body?.website, 200)) {
+    sendJson(response, 201, { ok: true });
+    return;
+  }
+
+  const feedback = normalizeFeedbackPayload(body);
+  if (!feedback) {
+    sendJson(response, 400, { error: "Upiši poruku prije slanja." });
+    return;
+  }
+
+  const record = {
+    id: crypto.randomUUID(),
+    submittedAt: new Date().toISOString(),
+    ...feedback,
+    userAgent: normalizeFeedbackLine(request.headers["user-agent"], 500),
+  };
+
+  try {
+    await Promise.all([
+      fsp.mkdir(path.dirname(config.feedbackFile), { recursive: true }),
+      fsp.mkdir(path.dirname(config.feedbackTextFile), { recursive: true }),
+    ]);
+    await Promise.all([
+      fsp.appendFile(config.feedbackFile, `${JSON.stringify(record)}\n`, {
+        encoding: "utf8",
+        mode: 0o600,
+      }),
+      fsp.appendFile(config.feedbackTextFile, formatFeedbackRecord(record), {
+        encoding: "utf8",
+        mode: 0o600,
+      }),
+    ]);
+  } catch (error) {
+    console.error("Spremanje poruke nije uspjelo:", error);
+    sendJson(response, 500, { error: "Poruku nije moguće spremiti." });
+    return;
+  }
+
+  sendJson(response, 201, { ok: true });
 }
 
 function handleGoogleLogin(request, response, url) {
@@ -701,7 +743,11 @@ async function handleEnglishEssayGrade(request, response) {
   const session = currentSession(request);
   const user = session ? store.users[session.userId] : null;
   if (!session || !user) {
-    sendJson(response, 401, { error: "Prijava je potrebna za ocjenjivanje eseja." });
+    sendJson(response, 401, {
+      authRequired: true,
+      code: "missing_ai_key",
+      error: "Prijava je potrebna za ocjenjivanje eseja.",
+    });
     return;
   }
 
@@ -715,7 +761,11 @@ async function handleEnglishEssayGrade(request, response) {
   }
 
   if (!apiKey) {
-    sendJson(response, 400, { error: "Spremi OpenAI API ključ u profilu prije ocjenjivanja." });
+    sendJson(response, 400, {
+      authRequired: false,
+      code: "missing_ai_key",
+      error: "Spremi OpenAI API ključ u profilu prije ocjenjivanja.",
+    });
     return;
   }
 
@@ -832,7 +882,11 @@ async function handleCroatianWritingGrade(request, response) {
   const session = currentSession(request);
   const user = session ? store.users[session.userId] : null;
   if (!session || !user) {
-    sendJson(response, 401, { error: "Prijava je potrebna za AI ocjenjivanje." });
+    sendJson(response, 401, {
+      authRequired: true,
+      code: "missing_ai_key",
+      error: "Prijava je potrebna za AI ocjenjivanje.",
+    });
     return;
   }
 
@@ -846,7 +900,11 @@ async function handleCroatianWritingGrade(request, response) {
   }
 
   if (!apiKey) {
-    sendJson(response, 400, { error: "Spremi OpenAI API ključ u profilu prije ocjenjivanja." });
+    sendJson(response, 400, {
+      authRequired: false,
+      code: "missing_ai_key",
+      error: "Spremi OpenAI API ključ u profilu prije ocjenjivanja.",
+    });
     return;
   }
 
@@ -948,83 +1006,6 @@ async function handleCroatianWritingOcr(request, response) {
   }
 }
 
-async function handleHistoryOpenGrade(request, response) {
-  if (request.method !== "POST") {
-    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
-    return;
-  }
-
-  const ipAddress = clientIp(request);
-  if (!rateLimit.ip.check(ipAddress)) {
-    sendJson(response, 429, {
-      error: "Poslano je previše zahtjeva. Pričekaj nekoliko minuta i pokušaj ponovno.",
-    });
-    return;
-  }
-
-  const session = currentSession(request);
-  const user = session ? store.users[session.userId] : null;
-  let apiKey = config.openAiApiKey;
-
-  if (user?.agentKey) {
-    try {
-      apiKey = decryptAgentKey(user.agentKey);
-    } catch (error) {
-      console.error("OpenAI API ključ nije moguće pročitati:", error.message);
-      sendJson(response, 400, { error: "Spremljeni OpenAI API ključ nije moguće pročitati." });
-      return;
-    }
-  }
-
-  if (!apiKey) {
-    sendJson(response, user ? 400 : 401, {
-      error: user
-        ? "Spremi OpenAI API ključ u profilu prije AI ocjenjivanja."
-        : "Prijava i spremljeni OpenAI API ključ potrebni su za AI ocjenjivanje.",
-    });
-    return;
-  }
-
-  let body;
-  try {
-    body = await readJsonBody(request, 96 * 1024);
-  } catch {
-    sendJson(response, 400, { error: "Zahtjev nema ispravan JSON zapis." });
-    return;
-  }
-
-  const examId = stringOrEmpty(body?.examId);
-  const historyExam = loadHistoryChoiceExam(examId);
-  if (!historyExam) {
-    sendJson(response, 404, { error: "Odabrani ispit iz Povijesti nije dostupan." });
-    return;
-  }
-
-  const answers = normalizeHistoryOpenAnswers(body?.answers, historyExam);
-  if (!Object.keys(answers).length) {
-    sendJson(response, 400, { error: "Pošalji barem jedan otvoreni odgovor za ocjenjivanje." });
-    return;
-  }
-  if (rejectUnreliableOfficialAnswers(response, historyExam, answers)) return;
-
-  try {
-    const grades = await gradeHistoryOpenAnswersWithOpenAI({
-      apiKey,
-      historyExam,
-      answers,
-    });
-    sendJson(response, 200, {
-      grades,
-      model: config.historyModel,
-    });
-  } catch (error) {
-    console.error("Ocjenjivanje otvorenih zadataka iz Povijesti nije uspjelo:", error.message);
-    sendJson(response, 502, {
-      error: "OpenAI ocjenjivanje nije uspjelo. Provjeri API ključ i pokušaj ponovno.",
-    });
-  }
-}
-
 async function handleGeographyOpenGrade(request, response) {
   if (request.method !== "POST") {
     sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
@@ -1055,6 +1036,8 @@ async function handleGeographyOpenGrade(request, response) {
 
   if (!apiKey) {
     sendJson(response, user ? 400 : 401, {
+      authRequired: !user,
+      code: "missing_ai_key",
       error: user
         ? "Spremi OpenAI API ključ u profilu prije AI ocjenjivanja."
         : "Prijava i spremljeni OpenAI API ključ potrebni su za AI ocjenjivanje.",
@@ -1096,163 +1079,6 @@ async function handleGeographyOpenGrade(request, response) {
     });
   } catch (error) {
     console.error("Ocjenjivanje otvorenih zadataka iz Geografije nije uspjelo:", error.message);
-    sendJson(response, 502, {
-      error: "OpenAI ocjenjivanje nije uspjelo. Provjeri API ključ i pokušaj ponovno.",
-    });
-  }
-}
-
-async function handlePsychologyOpenGrade(request, response) {
-  if (request.method !== "POST") {
-    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
-    return;
-  }
-
-  const ipAddress = clientIp(request);
-  if (!rateLimit.ip.check(ipAddress)) {
-    sendJson(response, 429, {
-      error: "Poslano je previše zahtjeva. Pričekaj nekoliko minuta i pokušaj ponovno.",
-    });
-    return;
-  }
-
-  const session = currentSession(request);
-  const user = session ? store.users[session.userId] : null;
-  let apiKey = config.openAiApiKey;
-
-  if (user?.agentKey) {
-    try {
-      apiKey = decryptAgentKey(user.agentKey);
-    } catch (error) {
-      console.error("OpenAI API ključ nije moguće pročitati:", error.message);
-      sendJson(response, 400, { error: "Spremljeni OpenAI API ključ nije moguće pročitati." });
-      return;
-    }
-  }
-
-  if (!apiKey) {
-    sendJson(response, user ? 400 : 401, {
-      error: user
-        ? "Spremi OpenAI API ključ u profilu prije AI ocjenjivanja."
-        : "Prijava i spremljeni OpenAI API ključ potrebni su za AI ocjenjivanje.",
-    });
-    return;
-  }
-
-  let body;
-  try {
-    body = await readJsonBody(request, 96 * 1024);
-  } catch {
-    sendJson(response, 400, { error: "Zahtjev nema ispravan JSON zapis." });
-    return;
-  }
-
-  const examId = stringOrEmpty(body?.examId);
-  const psychologyExam = loadPsychologyChoiceExam(examId);
-  if (!psychologyExam) {
-    sendJson(response, 404, { error: "Odabrani ispit iz Psihologije nije dostupan." });
-    return;
-  }
-
-  const answers = normalizeHistoryOpenAnswers(body?.answers, psychologyExam);
-  if (!Object.keys(answers).length) {
-    sendJson(response, 400, { error: "Pošalji barem jedan otvoreni odgovor za ocjenjivanje." });
-    return;
-  }
-  if (rejectUnreliableOfficialAnswers(response, psychologyExam, answers)) return;
-
-  try {
-    const grades = await gradePsychologyOpenAnswersWithOpenAI({
-      apiKey,
-      psychologyExam,
-      answers,
-    });
-    sendJson(response, 200, {
-      grades,
-      model: config.psychologyModel,
-    });
-  } catch (error) {
-    console.error("Ocjenjivanje otvorenih zadataka iz Psihologije nije uspjelo:", error.message);
-    sendJson(response, 502, {
-      error: "OpenAI ocjenjivanje nije uspjelo. Provjeri API ključ i pokušaj ponovno.",
-    });
-  }
-}
-
-async function handlePoliticsOpenGrade(request, response) {
-  if (request.method !== "POST") {
-    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
-    return;
-  }
-
-  const ipAddress = clientIp(request);
-  if (!rateLimit.ip.check(ipAddress)) {
-    sendJson(response, 429, {
-      error: "Poslano je previše zahtjeva. Pričekaj nekoliko minuta i pokušaj ponovno.",
-    });
-    return;
-  }
-
-  const session = currentSession(request);
-  const user = session ? store.users[session.userId] : null;
-  let apiKey = config.openAiApiKey;
-
-  if (user?.agentKey) {
-    try {
-      apiKey = decryptAgentKey(user.agentKey);
-    } catch (error) {
-      console.error("OpenAI API ključ nije moguće pročitati:", error.message);
-      sendJson(response, 400, { error: "Spremljeni OpenAI API ključ nije moguće pročitati." });
-      return;
-    }
-  }
-
-  if (!apiKey) {
-    sendJson(response, user ? 400 : 401, {
-      error: user
-        ? "Spremi OpenAI API ključ u profilu prije AI ocjenjivanja."
-        : "Prijava i spremljeni OpenAI API ključ potrebni su za AI ocjenjivanje.",
-    });
-    return;
-  }
-
-  let body;
-  try {
-    body = await readJsonBody(request, 96 * 1024);
-  } catch {
-    sendJson(response, 400, { error: "Zahtjev nema ispravan JSON zapis." });
-    return;
-  }
-
-  const examId = stringOrEmpty(body?.examId);
-  const politicsExam = loadPoliticsChoiceExam(examId);
-  if (!politicsExam) {
-    sendJson(response, 404, { error: "Odabrani ispit iz Politike i gospodarstva nije dostupan." });
-    return;
-  }
-
-  const answers = normalizeHistoryOpenAnswers(body?.answers, politicsExam);
-  if (!Object.keys(answers).length) {
-    sendJson(response, 400, { error: "Pošalji barem jedan otvoreni odgovor za ocjenjivanje." });
-    return;
-  }
-  if (rejectUnreliableOfficialAnswers(response, politicsExam, answers)) return;
-
-  try {
-    const grades = await gradePoliticsOpenAnswersWithOpenAI({
-      apiKey,
-      politicsExam,
-      answers,
-    });
-    sendJson(response, 200, {
-      grades,
-      model: config.politicsModel,
-    });
-  } catch (error) {
-    console.error(
-      "Ocjenjivanje otvorenih zadataka iz Politike i gospodarstva nije uspjelo:",
-      error.message,
-    );
     sendJson(response, 502, {
       error: "OpenAI ocjenjivanje nije uspjelo. Provjeri API ključ i pokušaj ponovno.",
     });
@@ -1451,6 +1277,62 @@ async function readJsonBody(request, maxBytes = 64 * 1024) {
   return raw ? JSON.parse(raw) : {};
 }
 
+function normalizeFeedbackPayload(body) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+
+  const message = normalizeFeedbackText(body.message, 5000);
+  if (!message || message.length < 2) return null;
+
+  return {
+    contact: normalizeFeedbackLine(body.contact, 200),
+    message,
+    page: normalizeFeedbackLine(body.page, 1000),
+    referrer: normalizeFeedbackLine(body.referrer, 1000),
+  };
+}
+
+function normalizeFeedbackText(value, maxLength) {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/\r\n?/g, "\n")
+    .replace(/\u0000/g, "")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function normalizeFeedbackLine(value, maxLength) {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function formatFeedbackRecord(record) {
+  const lines = [
+    "================================================================================",
+    `Poruka: ${formatFeedbackTimestamp(record.submittedAt)}`,
+    `ID: ${record.id || "-"}`,
+    `Kontakt: ${record.contact || "-"}`,
+    `Stranica: ${record.page || "-"}`,
+    `Referrer: ${record.referrer || "-"}`,
+    `User agent: ${record.userAgent || "-"}`,
+    "",
+    "Tekst:",
+    record.message || "",
+    "",
+  ];
+
+  return `${lines.join("\n")}\n`;
+}
+
+function formatFeedbackTimestamp(timestamp) {
+  const date = new Date(timestamp);
+  if (!Number.isFinite(date.getTime())) return timestamp || "-";
+  return date.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
+}
+
 function normalizeSimulationAttempt(attempt) {
   if (!attempt || typeof attempt !== "object" || Array.isArray(attempt)) return null;
 
@@ -1611,19 +1493,6 @@ function loadCroatianWritingExam(examId) {
   };
 }
 
-function loadHistoryChoiceExam(examId) {
-  if (!examId) return null;
-
-  const source = fs.readFileSync(historyChoiceIndex.file, "utf8").trim();
-  if (!source.startsWith(historyChoiceIndex.prefix) || !source.endsWith(";")) {
-    throw new Error("History choice index has an unsupported format.");
-  }
-
-  const payload = JSON.parse(source.slice(historyChoiceIndex.prefix.length, -1));
-  const exams = Array.isArray(payload.exams) ? payload.exams : [];
-  return exams.find((exam) => exam && exam.id === examId) || null;
-}
-
 function loadGeographyChoiceExam(examId) {
   if (!examId) return null;
 
@@ -1633,32 +1502,6 @@ function loadGeographyChoiceExam(examId) {
   }
 
   const payload = JSON.parse(source.slice(geographyChoiceIndex.prefix.length, -1));
-  const exams = Array.isArray(payload.exams) ? payload.exams : [];
-  return exams.find((exam) => exam && exam.id === examId) || null;
-}
-
-function loadPsychologyChoiceExam(examId) {
-  if (!examId) return null;
-
-  const source = fs.readFileSync(psychologyChoiceIndex.file, "utf8").trim();
-  if (!source.startsWith(psychologyChoiceIndex.prefix) || !source.endsWith(";")) {
-    throw new Error("Psychology choice index has an unsupported format.");
-  }
-
-  const payload = JSON.parse(source.slice(psychologyChoiceIndex.prefix.length, -1));
-  const exams = Array.isArray(payload.exams) ? payload.exams : [];
-  return exams.find((exam) => exam && exam.id === examId) || null;
-}
-
-function loadPoliticsChoiceExam(examId) {
-  if (!examId) return null;
-
-  const source = fs.readFileSync(politicsChoiceIndex.file, "utf8").trim();
-  if (!source.startsWith(politicsChoiceIndex.prefix) || !source.endsWith(";")) {
-    throw new Error("Politics choice index has an unsupported format.");
-  }
-
-  const payload = JSON.parse(source.slice(politicsChoiceIndex.prefix.length, -1));
   const exams = Array.isArray(payload.exams) ? payload.exams : [];
   return exams.find((exam) => exam && exam.id === examId) || null;
 }
@@ -2340,17 +2183,6 @@ function countTextWords(value) {
   return String(value || "").match(/[\p{L}\p{N}]+(?:[-'’][\p{L}\p{N}]+)*/gu)?.length || 0;
 }
 
-async function gradeHistoryOpenAnswersWithOpenAI({ apiKey, historyExam, answers }) {
-  return gradeOpenAnswersWithOpenAI({
-    apiKey,
-    answers,
-    exam: historyExam,
-    model: config.historyModel,
-    schemaName: "history_open_answer_scores",
-    subject: "Povijest",
-  });
-}
-
 async function gradeGeographyOpenAnswersWithOpenAI({ apiKey, geographyExam, answers }) {
   return gradeOpenAnswersWithOpenAI({
     apiKey,
@@ -2359,28 +2191,6 @@ async function gradeGeographyOpenAnswersWithOpenAI({ apiKey, geographyExam, answ
     model: config.geographyModel,
     schemaName: "geography_open_answer_scores",
     subject: "Geografija",
-  });
-}
-
-async function gradePsychologyOpenAnswersWithOpenAI({ apiKey, psychologyExam, answers }) {
-  return gradeOpenAnswersWithOpenAI({
-    apiKey,
-    answers,
-    exam: psychologyExam,
-    model: config.psychologyModel,
-    schemaName: "psychology_open_answer_scores",
-    subject: "Psihologija",
-  });
-}
-
-async function gradePoliticsOpenAnswersWithOpenAI({ apiKey, politicsExam, answers }) {
-  return gradeOpenAnswersWithOpenAI({
-    apiKey,
-    answers,
-    exam: politicsExam,
-    model: config.politicsModel,
-    schemaName: "politics_open_answer_scores",
-    subject: "Politika i gospodarstvo",
   });
 }
 
@@ -2446,33 +2256,10 @@ function buildOpenAnswerGradingSystemPrompt(subject) {
 }
 
 function subjectSpecificOpenGradingRules(subject) {
-  if (subject === "Povijest") {
-    return [
-      "- Za povijesne pojmove, osobe, događaje i države traži činjenično točan naziv ili jasno jednakovrijedan naziv.",
-      "- Kod produženoga odgovora svaki bod zahtijeva konkretnu povijesnu tvrdnju, objašnjenje ili vezu.",
-    ].join("\n");
-  }
-
   if (subject === "Geografija") {
     return [
       "- Priznaj geografski jednakovrijedne nazive, točne standardne varijante naziva, ispravan izračun i obrazloženje ako ga zadatak traži.",
       "- Kod kombiniranih odgovora traži sve elemente navedene u službenome ključu za puni broj bodova.",
-    ].join("\n");
-  }
-
-  if (subject === "Psihologija") {
-    return [
-      "- Priznaj psihološki jednakovrijedan pojam samo ako je potpun i ne mijenja konstrukt.",
-      "- Skraćeni oblici psiholoških pojmova ne donose bodove ako nisu službeno navedeni.",
-      "- Kod zadataka s primjerom iz teksta traži i naziv pojma i ispravnu vezu s primjerom kad rubrika to traži.",
-    ].join("\n");
-  }
-
-  if (subject === "Politika i gospodarstvo") {
-    return [
-      "- Priznaj ustavno-političke i ekonomske pojmove samo ako su terminološki precizni.",
-      "- Kod zadataka koji traže instituciju, pravo, načelo ili ekonomski pojam, djelomičan naziv ne donosi bod.",
-      "- Kod produženoga odgovora odvojeno boduj imenovanje traženog pojma i objašnjenje učinka ili važnosti.",
     ].join("\n");
   }
 
@@ -3498,6 +3285,7 @@ function isPublicPath(pathname) {
     "/engleski-esej.html",
     "/engleski-slusanje.html",
     "/exam-simulation.js",
+    "/feedback.js",
     "/fizika-abcd.html",
     "/fizika.html",
     "/geografija.html",
@@ -3507,6 +3295,7 @@ function isPublicPath(pathname) {
     "/hrvatski-pisanje.html",
     "/index.html",
     "/kemija.html",
+    "/lucide-icons.js",
     "/matematika.html",
     "/math-choice.js",
     "/physics-choice.js",

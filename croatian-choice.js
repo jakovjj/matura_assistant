@@ -752,7 +752,7 @@ function bindResponseListeners() {
 
 function toggleSelfCheck(question) {
   if (simulation.active || checked) return;
-  selfCheck.toggle(question, Boolean(responses[question]));
+  selfCheck.toggle(question);
   renderTaskTypeNavigation();
   renderSolverSummary();
   renderTaskTypeContent();
@@ -1012,7 +1012,6 @@ function renderQuestion(question) {
           .join("")}
       </div>
       ${selfCheck.renderButton(question, {
-        answered: Boolean(answer),
         hidden: simulation.active || checked,
       })}
       ${renderFeedback(question, answer)}

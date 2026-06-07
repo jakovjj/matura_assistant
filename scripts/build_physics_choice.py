@@ -127,6 +127,14 @@ class QuestionMarker:
 
 
 @dataclass(frozen=True)
+class OpenQuestionMarker:
+    number: int
+    page: PdfPage
+    y_min: float
+    is_subquestion: bool
+
+
+@dataclass(frozen=True)
 class QuestionCrop:
     page: PdfPage
     x_min: float
@@ -155,6 +163,19 @@ def line_starts_with_question_number(line: PdfLine, minimum: int = 1) -> int | N
     if number < minimum:
         return None
     return number
+
+
+def line_starts_with_open_question_marker(
+    line: PdfLine,
+    minimum: int = 25,
+) -> tuple[int, bool] | None:
+    match = re.match(r"^\s*(\d{1,2})\.(?:(\d+)\.)?", line.text)
+    if not match:
+        return None
+    number = int(match.group(1))
+    if number < minimum:
+        return None
+    return number, match.group(2) is not None
 
 
 def load_archive_index() -> dict[str, Any]:
@@ -336,6 +357,11 @@ def format_point_label(points: int) -> str:
     return f"{points} bodova"
 
 
+def point_value_from_label(label: str) -> int | None:
+    match = POINT_LABEL_RE.search(label)
+    return int(match.group(1)) if match else None
+
+
 def point_label_from_solution_lines(lines: list[PdfLine]) -> str | None:
     point_values = [
         int(match.group(1))
@@ -347,10 +373,11 @@ def point_label_from_solution_lines(lines: list[PdfLine]) -> str | None:
     return point_label_from_lines(lines)
 
 
-def find_open_question_crops(contents: bytes) -> tuple[dict[int, QuestionCrop], dict[int, str]]:
+def find_open_question_crops(contents: bytes) -> tuple[dict[int, list[QuestionCrop]], dict[int, str]]:
     pages = pdf_bbox_pages(contents)
-    markers: list[QuestionMarker] = []
+    markers: list[OpenQuestionMarker] = []
     found_open_section = False
+    current_question_number: int | None = None
 
     for page in pages:
         for line in sorted_page_lines(page):
@@ -364,18 +391,32 @@ def find_open_question_crops(contents: bytes) -> tuple[dict[int, QuestionCrop], 
             if not found_open_section:
                 continue
 
-            number = line_starts_with_question_number(line, minimum=25)
-            if number is None or line.x_min >= 140:
+            marker = line_starts_with_open_question_marker(line, minimum=25)
+            if marker is None or line.x_min >= 140:
                 continue
-            if markers and number <= markers[-1].number:
+            number, is_subquestion = marker
+            if is_subquestion:
+                if number != current_question_number:
+                    continue
+            elif current_question_number is not None and number <= current_question_number:
                 continue
-            markers.append(QuestionMarker(number=number, page=page, y_min=line.y_min))
+
+            if not is_subquestion:
+                current_question_number = number
+            markers.append(
+                OpenQuestionMarker(
+                    number=number,
+                    page=page,
+                    y_min=line.y_min,
+                    is_subquestion=is_subquestion,
+                )
+            )
 
     if not markers:
         raise ValueError("Could not locate Physics extended-response question crops")
 
-    crops: dict[int, QuestionCrop] = {}
-    points: dict[int, str] = {}
+    crops: dict[int, list[QuestionCrop]] = {}
+    point_segments: dict[int, list[tuple[bool, int]]] = {}
     for index, marker in enumerate(markers):
         next_marker = markers[index + 1] if index + 1 < len(markers) else None
         y_min = max(0, marker.y_min - SOURCE_CROP_VERTICAL_PADDING)
@@ -391,7 +432,11 @@ def find_open_question_crops(contents: bytes) -> tuple[dict[int, QuestionCrop], 
 
         point_label = point_label_from_lines(relevant_lines)
         if point_label:
-            points[marker.number] = point_label
+            point_value = point_value_from_label(point_label)
+            if point_value is not None:
+                point_segments.setdefault(marker.number, []).append(
+                    (marker.is_subquestion, point_value)
+                )
 
         postupak_line = next(
             (line for line in relevant_lines if POSTUPAK_RE.match(line.text)),
@@ -409,13 +454,27 @@ def find_open_question_crops(contents: bytes) -> tuple[dict[int, QuestionCrop], 
 
         if y_max <= y_min:
             raise ValueError(f"Open question {marker.number} has an invalid crop")
-        crops[marker.number] = QuestionCrop(
-            page=marker.page,
-            x_min=SOURCE_CROP_HORIZONTAL_MARGIN,
-            y_min=y_min,
-            x_max=marker.page.width - SOURCE_CROP_HORIZONTAL_MARGIN,
-            y_max=y_max,
+        crops.setdefault(marker.number, []).append(
+            QuestionCrop(
+                page=marker.page,
+                x_min=SOURCE_CROP_HORIZONTAL_MARGIN,
+                y_min=y_min,
+                x_max=marker.page.width - SOURCE_CROP_HORIZONTAL_MARGIN,
+                y_max=y_max,
+            )
         )
+
+    points: dict[int, str] = {}
+    for number, values in point_segments.items():
+        subquestion_total = sum(value for is_subquestion, value in values if is_subquestion)
+        main_values = [value for is_subquestion, value in values if not is_subquestion]
+        total = (
+            max(subquestion_total, max(main_values, default=0))
+            if subquestion_total
+            else sum(main_values)
+        )
+        if total:
+            points[number] = format_point_label(total)
     return crops, points
 
 
@@ -732,6 +791,35 @@ def render_source_pages(
     return source_images
 
 
+def render_grouped_source_pages(
+    paper_path: Path,
+    identifier: str,
+    grouped_crops: dict[int, list[QuestionCrop]],
+    page_prefix: str = "page",
+    expected_assets: set[str] | None = None,
+) -> dict[int, list[dict[str, Any]]]:
+    flat_crops: dict[int, QuestionCrop] = {}
+    flat_questions: dict[int, int] = {}
+    next_key = 1
+    for question_number, crops in grouped_crops.items():
+        for crop in crops:
+            flat_crops[next_key] = crop
+            flat_questions[next_key] = question_number
+            next_key += 1
+
+    flat_images = render_source_pages(
+        paper_path,
+        identifier,
+        flat_crops,
+        page_prefix=page_prefix,
+        expected_assets=expected_assets,
+    )
+    grouped_images: dict[int, list[dict[str, Any]]] = {}
+    for key in sorted(flat_images):
+        grouped_images.setdefault(flat_questions[key], []).append(flat_images[key])
+    return grouped_images
+
+
 def remove_unexpected_assets(identifier: str, expected_assets: set[str]) -> None:
     destination = PAPER_ROOT / identifier
     if not destination.is_dir():
@@ -991,7 +1079,7 @@ def build_tasks(
 
 
 def build_open_tasks(
-    question_images: dict[int, dict[str, Any]],
+    question_images: dict[int, list[dict[str, Any]]],
     solution_images: dict[int, dict[str, Any]],
     points: dict[int, str],
 ) -> list[dict[str, Any]]:
@@ -1007,11 +1095,14 @@ def build_open_tasks(
 
     questions = []
     for number in question_numbers:
+        source_images = question_images[number]
         question = {
             "number": number,
-            "sourceImage": question_images[number],
+            "sourceImage": source_images[0],
             "solutionImage": solution_images[number],
         }
+        if len(source_images) > 1:
+            question["sourceImages"] = source_images
         if number in points:
             question["points"] = points[number]
             question["maxPoints"] = int(points[number].split()[0])
@@ -1087,7 +1178,7 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     )
     open_question_crops, open_question_points = find_open_question_crops(open_paper_contents)
     open_question_numbers = sorted(open_question_crops)
-    open_question_images = render_source_pages(
+    open_question_images = render_grouped_source_pages(
         open_paper_destination,
         identifier,
         open_question_crops,

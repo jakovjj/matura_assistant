@@ -7,7 +7,7 @@
   "scripts": {
     "build:seo": "python3 scripts/build_seo_pages.py && python3 scripts/build_sitemap.py",
     "build:sitemap": "python3 scripts/build_sitemap.py",
-    "check": "node --check analytics.js && node --check app.js && node --check auth-client.js && node --check abcd-choice.js && node --check croatian-choice.js && node --check croatian-writing.js && node --check exam-simulation.js && node --check english-essay.js && node --check english-listening.js && node --check english-reading.js && node --check geography-choice.js && node --check history-choice.js && node --check math-choice.js && node --check physics-choice.js && node --check politics-choice.js && node --check profile-page.js && node --check profile-store.js && node --check psychology-choice.js && node --check server.js && node --check site-footer.js && node --check site-header.js && python3 scripts/open_answer_validation.py",
+    "check": "node --check analytics.js && node --check app.js && node --check auth-client.js && node --check abcd-choice.js && node --check croatian-choice.js && node --check croatian-writing.js && node --check exam-simulation.js && node --check english-essay.js && node --check english-listening.js && node --check english-reading.js && node --check geography-choice.js && node --check history-choice.js && node --check math-choice.js && node --check physics-choice.js && node --check politics-choice.js && node --check profile-page.js && node --check profile-store.js && node --check psychology-choice.js && node --check server.js && node --check site-footer.js && node --check site-header.js && node --check solver-header.js && python3 scripts/open_answer_validation.py",
     "start": "node server.js"
   }
 }

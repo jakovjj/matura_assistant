@@ -46,7 +46,7 @@
     <link rel="canonical" href="https://matura.com.hr/" />
     <link rel="sitemap" type="application/xml" href="https://matura.com.hr/sitemap.xml" />
     <link rel="icon" type="image/webp" href="./assets/asistent_za_maturu.webp" />
-    <link rel="stylesheet" href="./styles.css?v=20260605-source-crop-fit" />
+    <link rel="stylesheet" href="./styles.css?v=20260607-mobile-home-heading" />
     <script id="seo-structured-data" type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -200,10 +200,91 @@
             službena usluga NCVVO-a; izvorni ispitni materijali pripadaju
             njihovim izdavačima.
           </p>
+
+          <div class="home-feedback" aria-labelledby="home-feedback-title">
+            <div>
+              <strong id="home-feedback-title">Imaš prijedlog ili problem?</strong>
+              <p>
+                Pošalji poruku autoru projekta ako nešto ne radi, nedostaje ili
+                bi moglo biti jasnije.
+              </p>
+            </div>
+            <button class="secondary-button" type="button" data-feedback-open>
+              Pošalji poruku
+            </button>
+          </div>
         </div>
       </section>
 
     </main>
+
+    <div class="feedback-dialog" data-feedback-dialog hidden>
+      <div class="feedback-dialog__backdrop" data-feedback-close></div>
+      <section
+        class="feedback-dialog__panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="feedback-dialog-title"
+      >
+        <button
+          class="feedback-dialog__close"
+          type="button"
+          data-feedback-close
+          aria-label="Zatvori"
+        >
+          X
+        </button>
+        <form class="feedback-dialog__form" data-feedback-form>
+          <div>
+            <p class="eyebrow">Poruka autoru</p>
+            <h2 id="feedback-dialog-title">Pošalji poruku</h2>
+            <p>
+              Upiši problem, prijedlog ili bilo što što bi trebalo provjeriti.
+            </p>
+          </div>
+
+          <label for="feedback-message">Poruka</label>
+          <textarea
+            id="feedback-message"
+            name="message"
+            rows="7"
+            maxlength="5000"
+            required
+            data-feedback-message
+          ></textarea>
+
+          <label for="feedback-contact">Kontakt za odgovor, ako želiš</label>
+          <input
+            id="feedback-contact"
+            name="contact"
+            type="text"
+            maxlength="200"
+            autocomplete="email"
+            data-feedback-contact
+          />
+
+          <input
+            class="feedback-dialog__website"
+            name="website"
+            type="text"
+            tabindex="-1"
+            autocomplete="off"
+            data-feedback-website
+          />
+
+          <p class="feedback-dialog__status" aria-live="polite" data-feedback-status></p>
+
+          <div class="feedback-dialog__actions">
+            <button class="secondary-button" type="button" data-feedback-close>
+              Odustani
+            </button>
+            <button class="primary-button" type="submit" data-feedback-submit>
+              Pošalji
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
 
     <div data-site-footer></div>
     <script src="./site-footer.js?v=20260605-footer-cleanup"></script>
@@ -212,6 +293,7 @@
     <script src="./profile-store.js?v=20260603-cross-host-sync"></script>
     <script src="./exam-simulation.js?v=20260605-prestart-modal"></script>
     <script src="./app.js?v=20260605-chemistry-table-crops"></script>
+    <script src="./feedback.js?v=20260606-feedback-modal"></script>
     <script src="./auth-client.js?v=20260605-auth-ui"></script>
     <script>
       (() => {

@@ -31,12 +31,23 @@ const pickerState = {
 
 let solverExam;
 let responses = {};
-let activeTaskNumber;
+let activeTaskTypeId;
 let activeQuestionNumber;
-let activeAudioIndex = 0;
+let activeAudioIndexes = new Map();
 let checked = false;
 const simulation = window.createExamSimulation({ onFinish: finishSimulation });
 const selfCheck = window.createTaskSelfCheck();
+
+const taskTypeDefinitions = {
+  matching: {
+    id: "povezivanje",
+    label: "Zadatci povezivanja",
+  },
+  choice: {
+    id: "visestruki-izbor",
+    label: "Zadatci višestrukoga izbora",
+  },
+};
 
 function isChecked(question) {
   return checked || selfCheck.has(question);
@@ -371,12 +382,63 @@ function taskAnsweredCount(task) {
   return taskQuestions(task).filter((question) => responses[question]?.trim()).length;
 }
 
+function taskTypeDefinition(exam, task) {
+  const matchingTaskNumbers = exam.level === "A" ? new Set([1, 3]) : new Set([1]);
+  return matchingTaskNumbers.has(task.number)
+    ? taskTypeDefinitions.matching
+    : taskTypeDefinitions.choice;
+}
+
+function taskTypes(exam = solverExam) {
+  const groups = new Map();
+
+  for (const task of exam?.tasks || []) {
+    const definition = taskTypeDefinition(exam, task);
+    if (!groups.has(definition.id)) {
+      groups.set(definition.id, { ...definition, tasks: [] });
+    }
+    groups.get(definition.id).tasks.push(task);
+  }
+
+  return [...groups.values()];
+}
+
+function normalizeTaskTypeId(taskTypeId, exam = solverExam) {
+  const types = taskTypes(exam);
+  return types.some((type) => type.id === taskTypeId) ? taskTypeId : types[0]?.id;
+}
+
+function tasksForTaskType(taskTypeId = activeTaskTypeId, exam = solverExam) {
+  const normalizedTaskTypeId = normalizeTaskTypeId(taskTypeId, exam);
+  return taskTypes(exam).find((type) => type.id === normalizedTaskTypeId)?.tasks || [];
+}
+
+function questionsForTaskType(taskTypeId = activeTaskTypeId, exam = solverExam) {
+  return tasksForTaskType(taskTypeId, exam).flatMap((task) => taskQuestions(task));
+}
+
+function taskTypeAnsweredCount(taskType) {
+  return taskType.tasks.reduce((total, task) => total + taskAnsweredCount(task), 0);
+}
+
+function taskTypeQuestionCount(taskType) {
+  return taskType.tasks.reduce((total, task) => total + taskQuestions(task).length, 0);
+}
+
 function selectedExamId() {
   return new URLSearchParams(window.location.search).get("exam");
 }
 
-function examUrl(exam) {
-  return `./engleski-slusanje.html?exam=${encodeURIComponent(exam.id)}`;
+function selectedTaskTypeId(exam) {
+  return normalizeTaskTypeId(new URLSearchParams(window.location.search).get("vrsta"), exam);
+}
+
+function examUrl(exam, taskTypeId = activeTaskTypeId) {
+  const params = new URLSearchParams({ exam: exam.id });
+  const normalizedTaskTypeId = normalizeTaskTypeId(taskTypeId, exam);
+  if (normalizedTaskTypeId) params.set("vrsta", normalizedTaskTypeId);
+  if (simulation.active) params.set("nacin", "simulacija");
+  return `./engleski-slusanje.html?${params.toString()}`;
 }
 
 function certifiedAudioPlan(exam = solverExam) {
@@ -416,10 +478,6 @@ function allAudioEntries() {
       label: audio.label,
     }))
     .filter((entry) => entry.audio);
-}
-
-function firstTaskAudioIndex(taskNumber) {
-  return taskAudioEntries(taskNumber)[0]?.audioIndex;
 }
 
 function renderPicker() {
@@ -548,9 +606,9 @@ function renderSolver(exam) {
   responses = simulation.active ? {} : loadResponses(exam);
   checked = false;
   selfCheck.reset();
-  activeTaskNumber = exam.tasks[0].number;
-  activeQuestionNumber = exam.tasks[0].firstQuestion;
-  activeAudioIndex = 0;
+  activeTaskTypeId = selectedTaskTypeId(exam);
+  activeQuestionNumber = questionsForTaskType(activeTaskTypeId, exam)[0];
+  activeAudioIndexes = new Map();
 
   app.innerHTML = `
     ${renderSolverHeader({
@@ -569,8 +627,8 @@ function renderSolver(exam) {
       navigationHtml: `
         <nav
           class="task-navigation solver-header__task-navigation"
-          data-task-navigation
-          aria-label="Zadatci slušanja u ispitnom zaglavlju"
+          data-task-type-navigation
+          aria-label="Vrste zadataka slušanja u ispitnom zaglavlju"
         ></nav>
       `,
     })}
@@ -590,20 +648,14 @@ function renderSolver(exam) {
           </p>`
     }
 
-    <div class="solver-question-layout solver-question-layout--workspace solver-question-layout--single">
-      <div class="solver-workspace">
-        <section class="task-content-panel" id="task-content-panel"></section>
-
-        <section class="answer-panel" id="answer-panel" aria-live="polite"></section>
-      </div>
-    </div>
+    <div id="section-content"></div>
 
     <footer class="solver-sticky-footer">
       <div class="solver-sticky-footer__inner">
         <nav
           class="task-navigation"
-          data-task-navigation
-          aria-label="Zadatci slušanja"
+          data-task-type-navigation
+          aria-label="Vrste zadataka slušanja"
         ></nav>
         <div class="solver-sticky-footer__controls">
           <div class="solver-sticky-footer__status">
@@ -661,10 +713,9 @@ function renderSolver(exam) {
   document.querySelector(".exam-results-dialog__backdrop")?.addEventListener("click", closeResultsDialog);
   document.addEventListener("keydown", closeResultsDialogOnEscape);
 
-  renderTaskNavigation();
+  renderTaskTypeNavigation();
   renderSolverSummary();
-  renderTaskContent();
-  renderAnswerPanel();
+  renderTaskTypeContent();
   simulation.start(exam.durationMinutes);
 }
 
@@ -691,8 +742,10 @@ function renderTaskAudioBlock(task) {
   const entries = audioEntriesForTask(task);
   if (!entries.length) return "";
 
+  let activeAudioIndex = activeAudioIndexes.get(task.number);
   if (!entries.some((entry) => entry.audioIndex === activeAudioIndex)) {
     activeAudioIndex = entries[0].audioIndex;
+    activeAudioIndexes.set(task.number, activeAudioIndex);
   }
 
   const activeEntry =
@@ -712,7 +765,7 @@ function renderTaskAudioBlock(task) {
       ${
         entries.length > 1
           ? `<div class="audio-track-list audio-track-list--compact" aria-label="Odabir audiosnimke za zadatak">
-              ${entries.map(renderAudioTrackButton).join("")}
+              ${entries.map((entry) => renderAudioTrackButton(entry, task.number)).join("")}
             </div>`
           : ""
       }
@@ -723,18 +776,22 @@ function renderTaskAudioBlock(task) {
 function bindTaskAudioControls() {
   document.querySelectorAll("[data-audio-index]").forEach((button) => {
     button.addEventListener("click", () => {
-      activeAudioIndex = Number(button.dataset.audioIndex);
-      renderTaskContent();
+      activeAudioIndexes.set(
+        Number(button.dataset.audioTask),
+        Number(button.dataset.audioIndex),
+      );
+      renderTaskTypeContent();
     });
   });
 }
 
-function renderAudioTrackButton(entry) {
-  const active = entry.audioIndex === activeAudioIndex;
+function renderAudioTrackButton(entry, taskNumber) {
+  const active = entry.audioIndex === activeAudioIndexes.get(taskNumber);
   return `
     <button
       class="audio-track-button${active ? " audio-track-button--active" : ""}"
       data-audio-index="${entry.audioIndex}"
+      data-audio-task="${taskNumber}"
       type="button"
       ${active ? 'aria-current="true"' : ""}
     >
@@ -743,26 +800,33 @@ function renderAudioTrackButton(entry) {
   `;
 }
 
-function renderTaskNavigation() {
-  const navigationHtml = solverExam.tasks
-    .map((task) => {
-      const total = task.lastQuestion - task.firstQuestion + 1;
-      const activeClass = task.number === activeTaskNumber ? " task-button--active" : "";
+function renderTaskTypeNavigation() {
+  const navigationHtml = taskTypes()
+    .map((taskType) => {
+      const activeClass = taskType.id === activeTaskTypeId ? " task-button--active" : "";
       return `
-        <button class="task-button${activeClass}" data-task="${task.number}" type="button">
-          <strong>Zadatak ${task.number}</strong>
-          <small>${taskAnsweredCount(task)}/${total}</small>
-        </button>
+        <a
+          class="task-button${activeClass}"
+          href="${examUrl(solverExam, taskType.id)}"
+          data-task-type="${taskType.id}"
+          ${taskType.id === activeTaskTypeId ? 'aria-current="true"' : ""}
+        >
+          <strong>${escapeHtml(taskType.label)}</strong>
+          <small>${taskTypeAnsweredCount(taskType)}/${taskTypeQuestionCount(taskType)}</small>
+        </a>
       `;
     })
     .join("");
 
-  document.querySelectorAll("[data-task-navigation]").forEach((navigation) => {
+  document.querySelectorAll("[data-task-type-navigation]").forEach((navigation) => {
     navigation.innerHTML = navigationHtml;
   });
 
-  document.querySelectorAll("[data-task]").forEach((button) => {
-    button.addEventListener("click", () => selectTask(Number(button.dataset.task)));
+  document.querySelectorAll("[data-task-type]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      selectTaskType(link.dataset.taskType);
+    });
   });
 }
 
@@ -791,50 +855,62 @@ function renderSolverSummary() {
   document.querySelector("#footer-score-summary").textContent = score;
 }
 
-function renderTaskContent() {
-  const task = solverExam.tasks.find((candidate) => candidate.number === activeTaskNumber);
-  document.querySelector("#task-content-panel").innerHTML = `
-    <div class="panel-heading">
-      <div>
-        <p class="eyebrow">Pitanja iz knjižice</p>
-        <h3>Zadatak ${task.number}</h3>
-      </div>
-      <small>Pitanja ${task.firstQuestion}–${task.lastQuestion}</small>
-    </div>
-    ${renderTaskAudioBlock(task)}
-    ${renderTaskSourceContent(task)}
-  `;
-  bindTaskAudioControls();
+function shouldRenderTaskAudio(task, taskIndex) {
+  return taskIndex === 0 || (!simulation.active && taskAudioEntries(task.number).length > 0);
 }
 
-function renderAnswerPanel() {
-  const task = solverExam.tasks.find((candidate) => candidate.number === activeTaskNumber);
+function renderTaskTypeContent() {
+  document.querySelector("#section-content").innerHTML = tasksForTaskType()
+    .map(
+      (task, taskIndex) => `
+        <div
+          class="solver-question-layout solver-question-layout--workspace solver-question-layout--single"
+          data-task-number="${task.number}"
+        >
+          <div class="solver-workspace">
+            <section class="task-content-panel">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Pitanja iz knjižice</p>
+                  <h3>Zadatak ${task.number}</h3>
+                </div>
+                <small>Pitanja ${task.firstQuestion}–${task.lastQuestion}</small>
+              </div>
+              ${shouldRenderTaskAudio(task, taskIndex) ? renderTaskAudioBlock(task) : ""}
+              ${renderTaskSourceContent(task)}
+            </section>
 
-  document.querySelector("#answer-panel").innerHTML = `
-    <div class="panel-heading">
-      <div>
-        <p class="eyebrow">Digitalni list za odgovore</p>
-        <h3>Zadatak ${task.number}</h3>
-      </div>
-      <small>Pitanja ${task.firstQuestion}–${task.lastQuestion}</small>
-    </div>
-    <div class="response-list">
-      ${taskQuestions(task).map((question) => renderQuestion(task, question)).join("")}
-    </div>
-  `;
+            <section class="answer-panel" aria-live="polite">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">Digitalni list za odgovore</p>
+                  <h3>Zadatak ${task.number}</h3>
+                </div>
+                <small>Pitanja ${task.firstQuestion}–${task.lastQuestion}</small>
+              </div>
+              <div class="response-list">
+                ${taskQuestions(task).map((question) => renderQuestion(task, question)).join("")}
+              </div>
+            </section>
+          </div>
+        </div>
+      `,
+    )
+    .join("");
 
+  bindTaskAudioControls();
   document.querySelectorAll('input[type="radio"][data-question]').forEach((input) => {
     input.addEventListener("change", () => updateResponse(input.dataset.question, input.value));
   });
-  selfCheck.bind(document.querySelector("#answer-panel"), toggleSelfCheck);
+  selfCheck.bind(document.querySelector("#section-content"), toggleSelfCheck);
 }
 
 function toggleSelfCheck(question) {
   if (simulation.active || checked) return;
-  selfCheck.toggle(question, Boolean(responses[question]));
-  renderTaskNavigation();
+  selfCheck.toggle(question);
+  renderTaskTypeNavigation();
   renderSolverSummary();
-  renderAnswerPanel();
+  renderTaskTypeContent();
 }
 
 function renderQuestion(task, question) {
@@ -853,7 +929,6 @@ function renderQuestion(task, question) {
         ${task.options.map((option) => renderChoice(question, option, answer)).join("")}
       </div>
       ${selfCheck.renderButton(question, {
-        answered: Boolean(answer),
         hidden: simulation.active || checked || !correctAnswer,
       })}
       ${renderFeedback(question, answer)}
@@ -902,22 +977,21 @@ function updateResponse(question, answer) {
   else delete responses[question];
   activeQuestionNumber = Number(question);
   saveResponses();
-  renderTaskNavigation();
+  renderTaskTypeNavigation();
   renderSolverSummary();
-  if (wasChecked || wasSelfChecked) renderAnswerPanel();
+  if (wasChecked || wasSelfChecked) renderTaskTypeContent();
 }
 
-function selectTask(taskNumber) {
-  activeTaskNumber = taskNumber;
-  const task = solverExam.tasks.find((candidate) => candidate.number === activeTaskNumber);
-  activeQuestionNumber = task?.firstQuestion || activeQuestionNumber;
-  if (!simulation.active) {
-    activeAudioIndex = firstTaskAudioIndex(taskNumber) ?? activeAudioIndex;
-  }
-  renderTaskNavigation();
-  renderTaskContent();
-  renderAnswerPanel();
-  document.querySelector("#task-content-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+function selectTaskType(taskTypeId) {
+  const normalizedTaskTypeId = normalizeTaskTypeId(taskTypeId);
+  if (normalizedTaskTypeId === activeTaskTypeId) return;
+
+  activeTaskTypeId = normalizedTaskTypeId;
+  activeQuestionNumber = questionsForTaskType()[0];
+  history.replaceState(null, "", examUrl(solverExam, activeTaskTypeId));
+  renderTaskTypeNavigation();
+  renderTaskTypeContent();
+  document.querySelector("#section-content").scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function checkAnswers() {
@@ -931,25 +1005,25 @@ function checkAnswers() {
     checked = false;
     selfCheck.reset();
     closeResultsDialog();
-    renderTaskNavigation();
+    renderTaskTypeNavigation();
     renderSolverSummary();
-    renderAnswerPanel();
+    renderTaskTypeContent();
     return;
   }
 
   checked = true;
   selfCheck.reset();
-  renderTaskNavigation();
+  renderTaskTypeNavigation();
   renderSolverSummary();
-  renderAnswerPanel();
+  renderTaskTypeContent();
   openResultsDialog();
 }
 
 function finishSimulation(reason) {
   checked = solverExam.checkingSupported;
-  renderTaskNavigation();
+  renderTaskTypeNavigation();
   renderSolverSummary();
-  renderAnswerPanel();
+  renderTaskTypeContent();
 
   if (reason === "submitted") recordSubmittedSimulation();
 

@@ -43,6 +43,7 @@ EXCLUDED_SUBJECTS = {
     "Psihologija",
     "Talijanski jezik",
     "Talijanski jezik i književnost",
+    "Vjeronauk",
 }
 DURATION_FALLBACKS = {
     "Biologija": 150,
@@ -56,7 +57,6 @@ DURATION_FALLBACKS = {
     "Povijest": 135,
     "Psihologija": 90,
     "Sociologija": 90,
-    "Vjeronauk": 70,
 }
 
 SIMPLE_ANSWER_LINE_RE = re.compile(

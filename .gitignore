@@ -1,6 +1,7 @@
 .env
 node_modules/
 var/
+/var/feedback/
 /var/*.sqlite*
 files/ncvvo/
 files/interactive/english-listening/**/audio/

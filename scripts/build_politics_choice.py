@@ -17,12 +17,18 @@ from typing import Any
 from urllib.parse import quote, unquote, urlparse
 from xml.etree import ElementTree
 
+from crop_utils import grayscale_image_from_png, trim_crop_bottom_whitespace
 from open_answer_validation import (
     OpenAnswerValidationError,
     OpenQuestionSpec,
     answer_boundary_penalty,
     assert_valid_exam_open_answers,
+    is_excluded_task_text,
     repair_open_answer_boundaries,
+)
+from manual_solution_images import (
+    attach_manual_solution_images,
+    build_manual_solution_images,
 )
 from pdf_utils import pdftotext, png_dimensions, render_pdf_page_to_png
 
@@ -549,6 +555,14 @@ def build_tasks(
         answer_text = entry["answerText"]
         section = section_for_question(sections, question)
         task_id = section.task_id if section else "otvoreni-zadatci"
+        if is_excluded_task_text(answer_text):
+            grouped.setdefault(task_id, []).append(
+                {
+                    "number": question,
+                    "excluded": True,
+                }
+            )
+            continue
         answer = closed_answer(answer_text)
 
         if answer:
@@ -749,6 +763,7 @@ def render_source_pages(
             )
             write_if_changed(image_path, contents)
             expected_assets.add(filename)
+            page_image = grayscale_image_from_png(contents)
 
             for key, crop in page_crops:
                 scale_x = image_width / crop.page.width
@@ -757,6 +772,13 @@ def render_source_pages(
                 y_min = max(0, math.floor(crop.y_min * scale_y))
                 x_max = min(image_width, math.ceil(crop.x_max * scale_x))
                 y_max = min(image_height, math.ceil(crop.y_max * scale_y))
+                x_min, y_min, x_max, y_max = trim_crop_bottom_whitespace(
+                    page_image,
+                    x_min,
+                    y_min,
+                    x_max,
+                    y_max,
+                )
                 if x_max <= x_min or y_max <= y_min:
                     continue
                 source_images[key] = {
@@ -847,6 +869,19 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     write_if_changed(destination, paper_contents)
     source_images = build_source_images(paper_contents, destination, identifier, tasks)
     attach_source_images(tasks, source_images)
+    solution_images = build_manual_solution_images(
+        [key_contents],
+        destination.parent,
+        identifier,
+        PAPER_URL_PREFIX,
+        open_answers,
+        pdf_bbox_pages=pdf_bbox_pages,
+        parse_question_token=parse_question_token,
+        question_sort_key=question_sort_key,
+        render_dpi=SOURCE_RENDER_DPI,
+        required_message="pdftocairo is required to build Politics solution images",
+    )
+    attach_manual_solution_images(tasks, solution_images)
 
     closed_questions = sorted(answers, key=question_sort_key)
     open_questions = sorted(open_answers, key=question_sort_key)

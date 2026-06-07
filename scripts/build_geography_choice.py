@@ -21,12 +21,17 @@ from xml.etree import ElementTree
 
 from PIL import Image
 
-from crop_utils import grayscale_image_from_png, trim_crop_bottom_whitespace
+from crop_utils import (
+    grayscale_image_from_png,
+    trim_crop_bottom_whitespace,
+    trim_shaded_answer_strip,
+)
 from open_answer_validation import (
     OpenAnswerValidationError,
     OpenQuestionSpec,
     answer_boundary_penalty,
     assert_valid_exam_open_answers,
+    is_excluded_task_text,
     repair_open_answer_boundaries,
     rubric_heading_points,
 )
@@ -989,6 +994,15 @@ def build_tasks(entries: list[dict[str, Any]], paper_text: str, sections: list[P
         answer_text = entry["answerText"]
         section = section_for_question(sections, question)
         task_id = section.task_id if section else entry.get("taskId") or "otvoreni-zadaci"
+        if is_excluded_task_text(answer_text):
+            grouped.setdefault(task_id, []).append(
+                {
+                    "number": question,
+                    "excluded": True,
+                    "prompt": extract_question_prompt(paper_text, sections, question),
+                }
+            )
+            continue
         answer = closed_answer(answer_text)
 
         if answer:
@@ -1243,7 +1257,16 @@ def refine_geography_crop_box(
         refined_y_max = trailing_rule_y_max
         minimum_y_max = max(minimum_y_max, trailing_rule_minimum)
 
-    _, _, _, refined_y_max = trim_crop_bottom_whitespace(
+    if image_only_question:
+        x_min, y_min, x_max, refined_y_max = trim_shaded_answer_strip(
+            image,
+            x_min,
+            y_min,
+            x_max,
+            refined_y_max,
+        )
+
+    x_min, y_min, x_max, refined_y_max = trim_crop_bottom_whitespace(
         image,
         x_min,
         y_min,

@@ -23,6 +23,7 @@
           </div>
         </div>
         <div class="footer-meta">
+          <p><strong>Neslužbeni projekt.</strong> Nije službena usluga NCVVO-a.</p>
           <p>Copyright &copy; 2026 Asistent za Mature. Odgovorna osoba: Jakov Jandrić.</p>
           <p>
             Ispitni materijali:

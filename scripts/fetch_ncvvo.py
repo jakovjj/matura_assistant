@@ -53,14 +53,14 @@ SUBJECTS = (
     "Filozofija",
     "Logika",
     "Likovna umjetnost",
-    "Glazbena umjetnost",
-    "Vjeronauk",
     "Njemački jezik",
     "Talijanski jezik",
 )
 
 EXCLUDED_SUBJECTS = {
+    "Glazbena umjetnost",
     "Talijanski jezik i književnost",
+    "Vjeronauk",
 }
 
 PRIORITY_SUBJECTS = {

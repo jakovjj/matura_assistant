@@ -48,7 +48,7 @@ TERM_ALIASES = {
     "jesenski rok": "jesenski rok",
 }
 QUESTION_RE = re.compile(r"(?m)^\s{0,32}(\d{1,2})(?:\.|\s+(?=[A-ZČĆŽŠĐ]))\s*\S")
-QUESTION_TOKEN_RE = re.compile(r"^\s*(\d{1,2}(?:[\.,]\d{1,2})?)\s*\.")
+QUESTION_TOKEN_RE = re.compile(r"^\s*(\d{1,2}(?:[\.,]\d{1,2})?)\s*\.(?!\d)")
 BLANK_PAGE_PARTS = {"P", "ca", "ni", "ra", "st", "a", "zn", "99", "00", "01", "02"}
 POINT_VALUE_RE = re.compile(r"\s*\(\s*\d+\s+bod(?:a|ova)?\s*\)", flags=re.IGNORECASE)
 POINT_LABEL_RE = re.compile(r"\(?\s*(\d+)\s+(bod(?:a|ova)?)\s*\)?", flags=re.IGNORECASE)

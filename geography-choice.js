@@ -44,6 +44,7 @@ let openGrades = {};
 let activeTaskTypeId = defaultTaskTypeId;
 let activeQuestionNumber;
 let checked = false;
+let aiGradingSkipped = false;
 let gradingPending = false;
 let gradingError = "";
 let quickSelectFrame;
@@ -217,8 +218,21 @@ function taskQuestions(task) {
   return (task?.questions || []).map((question) => String(question.number));
 }
 
+function isExcludedQuestion(question) {
+  const item = typeof question === "object"
+    ? question
+    : questionByNumber.get(String(question));
+  return window.isExcludedExamTask(item);
+}
+
+function scoredTaskQuestions(task) {
+  return (task?.questions || [])
+    .filter((question) => !isExcludedQuestion(question))
+    .map((question) => String(question.number));
+}
+
 function allQuestions(exam = solverExam) {
-  return tasks(exam).flatMap(taskQuestions);
+  return tasks(exam).flatMap(scoredTaskQuestions);
 }
 
 function closedQuestionNumbers(exam = solverExam) {
@@ -367,14 +381,19 @@ function answeredCount(exam = solverExam) {
 }
 
 function taskAnsweredCount(task) {
-  return taskQuestions(task).filter((question) =>
+  return scoredTaskQuestions(task).filter((question) =>
     isOpenQuestion(question) ? openResponses[question]?.trim() : closedResponses[question]?.trim(),
   ).length;
 }
 
+function openQuestionsForScoring() {
+  const questions = openQuestionNumbers();
+  return aiGradingSkipped ? questions.filter((question) => openGrades[question]) : questions;
+}
+
 function maxScore() {
   const closedMaximum = closedQuestionNumbers().length;
-  const openMaximum = openQuestionNumbers().reduce(
+  const openMaximum = openQuestionsForScoring().reduce(
     (sum, question) => sum + maxPointsForOpenQuestion(question),
     0,
   );
@@ -382,9 +401,21 @@ function maxScore() {
 }
 
 function openScore() {
-  return openQuestionNumbers().reduce((sum, question) => {
+  return openQuestionsForScoring().reduce((sum, question) => {
     const grade = openGrades[question];
     if (!grade) return sum;
+    return sum + Math.max(0, Math.min(maxPointsForOpenQuestion(question), Number(grade.points) || 0));
+  }, 0);
+}
+
+function resolvedOpenQuestions() {
+  if (checked) return openQuestionsForScoring();
+  return openQuestionNumbers().filter((question) => selfCheck.has(question) && openGrades[question]);
+}
+
+function resolvedOpenScore() {
+  return resolvedOpenQuestions().reduce((sum, question) => {
+    const grade = openGrades[question];
     return sum + Math.max(0, Math.min(maxPointsForOpenQuestion(question), Number(grade.points) || 0));
   }, 0);
 }
@@ -399,9 +430,8 @@ function totalScore() {
   return closedScore() + openScore();
 }
 
-// Running result over revealed tasks: individually checked closed questions
-// plus any AI-graded open questions (all of them once the whole exam is
-// checked). Matches totalScore()/maxScore() when checked is true.
+// Running result over individually revealed tasks. Once the whole exam is
+// checked, it matches totalScore()/maxScore().
 function resolvedClosedQuestions() {
   return closedQuestionNumbers().filter((question) => isChecked(question));
 }
@@ -410,15 +440,15 @@ function resolvedScore() {
   const closed = resolvedClosedQuestions().filter((question) =>
     isCorrectAnswer(question, closedResponses[question]),
   ).length;
-  return closed + openScore();
+  return closed + resolvedOpenScore();
 }
 
 function resolvedMaximum() {
   const closedMaximum = resolvedClosedQuestions().length;
-  const openMaximum = (checked
-    ? openQuestionNumbers()
-    : openQuestionNumbers().filter((question) => openGrades[question])
-  ).reduce((sum, question) => sum + maxPointsForOpenQuestion(question), 0);
+  const openMaximum = resolvedOpenQuestions().reduce(
+    (sum, question) => sum + maxPointsForOpenQuestion(question),
+    0,
+  );
   return closedMaximum + openMaximum;
 }
 
@@ -452,6 +482,7 @@ function renderSolver(exam, taskTypeId) {
   activeQuestionNumber = questionsForTaskType(activeTaskTypeId, exam)[0] || allQuestions(exam)[0];
   checked = false;
   selfCheck.reset();
+  aiGradingSkipped = false;
   gradingPending = false;
   gradingError = "";
   simulationRecorded = false;
@@ -530,7 +561,7 @@ function renderSolver(exam, taskTypeId) {
             <span>Bodovi</span>
           </div>
         </div>
-        <p>
+        <p id="exam-results-note">
           Rezultat obuhvaća zadatke zatvorenoga tipa i otvorene zadatke koji su AI ocijenjeni.
           Zatvori prozor i pregledaj označene odgovore u svakoj vrsti zadatka.
         </p>
@@ -565,7 +596,7 @@ function renderTaskTypeNavigation() {
           ${isActive ? 'aria-current="true"' : ""}
         >
           <strong>${escapeHtml(task.label)}</strong>
-          <small>${taskAnsweredCount(task)}/${taskQuestions(task).length}</small>
+          <small>${taskAnsweredCount(task)}/${scoredTaskQuestions(task).length}</small>
           ${gradingNote}
         </a>
       `;
@@ -810,17 +841,51 @@ function bindResponseListeners() {
   });
 
   document.querySelectorAll("textarea[data-open-question]").forEach((textarea) => {
-    textarea.addEventListener("input", () => updateOpenResponse(textarea.dataset.openQuestion, textarea.value));
+    textarea.addEventListener("input", () => {
+      updateOpenResponse(textarea.dataset.openQuestion, textarea.value);
+      const button = textarea.closest(".history-open-question")?.querySelector("[data-self-check]");
+      if (button) button.disabled = !textarea.value.trim();
+    });
   });
 
   selfCheck.bind(document.querySelector("#task-content-panel"), toggleSelfCheck);
 }
 
 function toggleSelfCheck(question) {
-  if (simulation.active || checked) return;
-  selfCheck.toggle(question, Boolean(closedResponses[question]));
+  if (simulation.active || checked || gradingPending) return;
+  if (isOpenQuestion(question)) {
+    toggleOpenSelfCheck(question);
+    return;
+  }
+
+  selfCheck.toggle(question);
   renderTaskTypeNavigation();
   renderSolverSummary();
+  renderTaskTypeContent();
+}
+
+async function toggleOpenSelfCheck(question) {
+  if (selfCheck.has(question)) {
+    selfCheck.delete(question);
+    renderTaskTypeNavigation();
+    renderSolverSummary();
+    renderTaskTypeContent();
+    return;
+  }
+
+  if (!openResponses[question]?.trim()) return;
+  const ready = await gradeOpenQuestion(question);
+  if (!ready) {
+    renderSolverSummary();
+    renderGradingStatus();
+    renderTaskTypeContent();
+    return;
+  }
+
+  selfCheck.toggle(question);
+  renderTaskTypeNavigation();
+  renderSolverSummary();
+  renderGradingStatus();
   renderTaskTypeContent();
 }
 
@@ -850,10 +915,12 @@ function quickSelectItems() {
 }
 
 function quickSelectAnswerState(item) {
-  const answeredCountForItem = item.questions.filter((question) =>
+  const scoredQuestions = item.questions.filter((question) => !isExcludedQuestion(question));
+  if (!scoredQuestions.length) return "izuzet iz bodovanja";
+  const answeredCountForItem = scoredQuestions.filter((question) =>
     isOpenQuestion(question) ? openResponses[question]?.trim() : closedResponses[question]?.trim(),
   ).length;
-  if (answeredCountForItem === item.questions.length) return "odgovoreno";
+  if (answeredCountForItem === scoredQuestions.length) return "odgovoreno";
   if (answeredCountForItem > 0) return "djelomično odgovoreno";
   return "nije odgovoreno";
 }
@@ -863,7 +930,7 @@ function activeQuickSelectGroup() {
 }
 
 function quickSelectResultIsCorrect(item) {
-  return item.questions.every((question) => {
+  return item.questions.filter((question) => !isExcludedQuestion(question)).every((question) => {
     if (isOpenQuestion(question)) {
       const grade = openGrades[question];
       return grade && Number(grade.points) >= maxPointsForOpenQuestion(question);
@@ -882,12 +949,20 @@ function renderQuickSelect() {
 
   quickSelect.innerHTML = items
     .map((item) => {
-      const isAnswered = item.questions.every((question) =>
+      const scoredQuestions = item.questions.filter((question) => !isExcludedQuestion(question));
+      const isExcluded = !scoredQuestions.length;
+      const isAnswered = !isExcluded && scoredQuestions.every((question) =>
         isOpenQuestion(question) ? openResponses[question]?.trim() : closedResponses[question]?.trim(),
       );
-      const stateClass = isAnswered ? " question-quickselect__link--answered" : "";
-      const itemResolved = item.questions.every((question) =>
-        isOpenQuestion(question) ? Boolean(openGrades[question]) : isChecked(question),
+      const stateClass = isExcluded
+        ? " question-quickselect__link--excluded"
+        : isAnswered
+          ? " question-quickselect__link--answered"
+          : "";
+      const itemResolved = !isExcluded && scoredQuestions.every((question) =>
+        isOpenQuestion(question)
+          ? isChecked(question) && Boolean(openGrades[question])
+          : isChecked(question),
       );
       const resultClass = itemResolved
         ? quickSelectResultIsCorrect(item)
@@ -967,6 +1042,7 @@ function updateQuickSelectActiveState() {
 }
 
 function renderQuestionResponse(question, number) {
+  if (isExcludedQuestion(question)) return window.renderExcludedExamTaskNotice();
   if (question.type === "open") return renderOpenQuestionResponse(question, number);
   return renderClosedQuestionResponse(number);
 }
@@ -989,7 +1065,6 @@ function renderClosedQuestionResponse(question) {
           .join("")}
       </div>
       ${selfCheck.renderButton(question, {
-        answered: Boolean(answer),
         hidden: simulation.active || checked,
       })}
       ${renderClosedFeedback(question, answer)}
@@ -1031,7 +1106,7 @@ function renderOpenQuestionResponse(question, number) {
   const answer = openResponses[number] || "";
   const grade = openGrades[number];
   const maximum = maxPointsForOpenQuestion(number);
-  const resultClass = checked && grade
+  const resultClass = isChecked(number) && grade
     ? Number(grade.points) >= maximum
       ? " history-open-question--correct"
       : " history-open-question--reviewed"
@@ -1052,6 +1127,10 @@ function renderOpenQuestionResponse(question, number) {
           ${gradingPending ? "disabled" : ""}
         >${escapeHtml(answer)}</textarea>
       </label>
+      ${selfCheck.renderButton(number, {
+        disabled: !answer.trim() || gradingPending,
+        hidden: simulation.active || checked,
+      })}
       ${renderOpenFeedback(number, grade)}
     </div>
   `;
@@ -1110,7 +1189,7 @@ function renderCroppedImage(source, alt, options = {}) {
 }
 
 function renderOpenFeedback(question, grade) {
-  if (!checked) return "";
+  if (!isChecked(question)) return "";
   if (!openResponses[question]?.trim()) {
     return `<p class="response-feedback">Nema upisanoga odgovora.</p>`;
   }
@@ -1208,6 +1287,7 @@ function updateClosedResponse(question, answer) {
   const wasChecked = checked;
   const wasSelfChecked = selfCheck.has(question);
   checked = false;
+  aiGradingSkipped = false;
   selfCheck.delete(question);
   const normalizedAnswer = String(answer || "").trim();
   if (normalizedAnswer) closedResponses[question] = normalizedAnswer;
@@ -1222,8 +1302,11 @@ function updateClosedResponse(question, answer) {
 function updateOpenResponse(question, answer) {
   if (simulation.finished) return;
 
+  const wasSelfChecked = selfCheck.has(question);
   checked = false;
+  aiGradingSkipped = false;
   gradingError = "";
+  selfCheck.delete(question);
   const normalizedAnswer = String(answer || "").trim();
   if (normalizedAnswer) openResponses[question] = String(answer);
   else delete openResponses[question];
@@ -1233,6 +1316,7 @@ function updateOpenResponse(question, answer) {
   renderSolverSummary();
   renderGradingStatus();
   renderQuickSelect();
+  if (wasSelfChecked) renderTaskTypeContent();
 }
 
 async function checkAnswers() {
@@ -1242,13 +1326,17 @@ async function checkAnswers() {
     if (!window.confirm("Predati simulaciju i završiti rješavanje?")) return;
     finishingSimulationByCheck = true;
     simulation.finish("submitted");
-    await completeCheck("submitted");
-    finishingSimulationByCheck = false;
+    try {
+      await completeCheck("submitted");
+    } finally {
+      finishingSimulationByCheck = false;
+    }
     return;
   }
 
   if (checked) {
     checked = false;
+    aiGradingSkipped = false;
     selfCheck.reset();
     closeResultsDialog();
     renderTaskTypeNavigation();
@@ -1261,7 +1349,9 @@ async function checkAnswers() {
 }
 
 async function completeCheck(reason = "") {
-  await gradeOpenAnswersForCheck();
+  const ready = await gradeOpenAnswersForCheck();
+  if (!ready) return false;
+
   checked = true;
   selfCheck.reset();
   renderTaskTypeNavigation();
@@ -1270,6 +1360,7 @@ async function completeCheck(reason = "") {
   renderTaskTypeContent();
   openResultsDialog();
   if (reason === "submitted" || reason === "expired") recordSubmittedSimulation();
+  return true;
 }
 
 function openAnswersNeedingGrade() {
@@ -1284,11 +1375,52 @@ function openAnswersNeedingGrade() {
   );
 }
 
+async function gradeOpenQuestion(question) {
+  const answer = openResponses[question];
+  if (!answer?.trim()) return false;
+  if (openGrades[question]?.answer === answer) return true;
+
+  gradingPending = true;
+  gradingError = "";
+  renderGradingStatus();
+  renderSolverSummary();
+  renderTaskTypeContent();
+
+  try {
+    const payload = await requestOpenGrades({ [question]: answer });
+    const grade = (payload.grades || []).find((item) => String(item.question) === String(question));
+    if (!grade) throw new Error("AI ocjena za ovaj zadatak nije vraćena.");
+    if (openResponses[question] !== answer) return false;
+
+    openGrades[question] = {
+      answer,
+      points: Math.max(0, Math.min(maxPointsForOpenQuestion(question), Number(grade.points) || 0)),
+      comment: String(grade.comment || "").trim(),
+    };
+    saveState();
+    return true;
+  } catch (error) {
+    gradingPending = false;
+    if (isMissingAiKeyError(error)) {
+      renderGradingStatus();
+      renderSolverSummary();
+      renderTaskTypeContent();
+      await promptAiKeyRequired(error);
+      return false;
+    }
+    gradingError = error.message || "AI ocjenjivanje otvorenoga zadatka nije uspjelo.";
+    return false;
+  } finally {
+    gradingPending = false;
+  }
+}
+
 async function gradeOpenAnswersForCheck() {
   const answers = openAnswersNeedingGrade();
   if (!Object.keys(answers).length) {
+    aiGradingSkipped = false;
     gradingError = "";
-    return;
+    return true;
   }
 
   gradingPending = true;
@@ -1311,12 +1443,39 @@ async function gradeOpenAnswersForCheck() {
         };
       }
     }
+    aiGradingSkipped = false;
     saveState();
   } catch (error) {
+    gradingPending = false;
+    if (isMissingAiKeyError(error)) {
+      gradingError = "";
+      renderGradingStatus();
+      renderSolverSummary();
+      renderTaskTypeContent();
+      const action = await promptAiKeyRequired(error);
+      if (action !== "skip-ai") return false;
+      aiGradingSkipped = true;
+      return true;
+    }
     gradingError = error.message || "AI ocjenjivanje otvorenih zadataka nije uspjelo.";
   } finally {
     gradingPending = false;
   }
+
+  return true;
+}
+
+async function promptAiKeyRequired(error) {
+  if (typeof window.openAiKeyRequiredDialog !== "function") return "cancel";
+  return window.openAiKeyRequiredDialog({
+    authRequired: error.authRequired === true || error.status === 401,
+  });
+}
+
+function isMissingAiKeyError(error) {
+  if (error?.code === "missing_ai_key") return true;
+  const message = String(error?.message || "");
+  return /Spremi OpenAI API ključ|Prijava i spremljeni OpenAI API ključ/.test(message);
 }
 
 async function requestOpenGrades(answers) {
@@ -1337,7 +1496,13 @@ async function requestOpenGrades(answers) {
   }
 
   const payload = await response.json();
-  if (!response.ok) throw new Error(payload.error || "AI ocjenjivanje nije uspjelo.");
+  if (!response.ok) {
+    const error = new Error(payload.error || "AI ocjenjivanje nije uspjelo.");
+    error.authRequired = payload.authRequired === true || response.status === 401;
+    error.code = payload.code || "";
+    error.status = response.status;
+    throw error;
+  }
   return payload;
 }
 
@@ -1384,9 +1549,18 @@ function openResultsDialog() {
 
   document.querySelector("#exam-results-percentage").textContent = `${scorePercentage()}%`;
   document.querySelector("#exam-results-score").textContent = `${totalScore()}/${maxScore()}`;
+  document.querySelector("#exam-results-note").textContent = resultsNoteText();
   dialog.hidden = false;
   document.body.classList.add("exam-results-dialog-open");
   document.querySelector("#close-exam-results").focus();
+}
+
+function resultsNoteText() {
+  if (aiGradingSkipped) {
+    return "Rezultat obuhvaća samo zadatke koji se mogu provjeriti bez AI-ja i otvorene zadatke koji su već AI ocijenjeni. Neocijenjena AI pitanja nisu uključena u bodove.";
+  }
+
+  return "Rezultat obuhvaća zadatke zatvorenoga tipa i otvorene zadatke koji su AI ocijenjeni. Zatvori prozor i pregledaj označene odgovore u svakoj vrsti zadatka.";
 }
 
 function closeResultsDialog() {

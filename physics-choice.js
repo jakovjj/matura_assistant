@@ -728,12 +728,22 @@ function renderOpenQuestionMeta(question) {
 
 function renderSourceImage(question) {
   const alt = `Izvorni prikaz ${question.number}. pitanja iz službene PDF knjižice.`;
-  return renderCroppedImage(question.sourceImage, alt);
+  return renderCroppedImages(question.sourceImages || question.sourceImage, alt);
 }
 
 function renderSolutionImage(question) {
   const alt = `Službena stranica rješenja za ${question.number}. pitanje iz ključa za odgovore.`;
-  return renderCroppedImage(question.solutionImage, alt);
+  return renderCroppedImages(question.solutionImages || question.solutionImage, alt);
+}
+
+function renderCroppedImages(sources, alt) {
+  const sourceList = Array.isArray(sources) ? sources : [sources];
+  return sourceList
+    .map((source, index) => {
+      const indexedAlt = sourceList.length > 1 ? `${alt} Dio ${index + 1}.` : alt;
+      return renderCroppedImage(source, indexedAlt);
+    })
+    .join("");
 }
 
 function renderCroppedImage(source, alt) {
@@ -812,7 +822,7 @@ function bindResponseListeners() {
 
 function toggleSelfCheck(question) {
   if (simulation.active || checked) return;
-  selfCheck.toggle(question, Boolean(responses[question]));
+  selfCheck.toggle(question);
   renderTaskTypeNavigation();
   renderSolverSummary();
   renderTaskTypeContent();
@@ -960,7 +970,6 @@ function renderQuestion(question) {
           .join("")}
       </div>
       ${selfCheck.renderButton(question, {
-        answered: Boolean(answer),
         hidden: simulation.active || checked,
       })}
       ${renderFeedback(question, answer)}

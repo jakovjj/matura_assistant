@@ -46,7 +46,7 @@ maintenance steps, see `ARCHITECTURE.md`.
 - `hrvatski.html`: standalone interactive Croatian page
 - `croatian-choice.js`: Croatian solver UI and local answer storage
 - `exam-simulation.js`: shared timed simulation mode without persistent answers
-- `solver-self-check.js`: shared per-task self-check (`Provjeri zadatak` button)
+- `solver-self-check.js`: shared per-task self-check (`Provjeri` button)
   used by every solver outside simulation mode
 - `data/exams.js`: generated archive index; do not edit manually
 - `data/english-reading.js`: generated English reading index; do not edit manually
@@ -109,6 +109,8 @@ verified archive case requires a change.
 - On smaller screens the sidebar becomes a normal content block without an
   internal scroll area.
 - Use Croatian for user-facing copy.
+- Label every per-task auto-check button exactly `Provjeri`; never use
+  `Provjeri zadatak`.
 - Do not introduce ad hoc result, feedback, or confirmation panels when a
   solver already has an established modal or control pattern for that workflow.
   Reuse the existing pattern and keep any new text compact.
@@ -139,6 +141,13 @@ verified archive case requires a change.
 - Opening `Vježbaj` for an archive package must not create progress, mark the
   exam as started, or show a placeholder percentage. Progress is derived from
   saved answers in defined interactive exams.
+- Never retype official exam questions, prompts, answer options, or source text
+  as standalone HTML text in solver content. Preserve them as screenshots/crops
+  from the official PDF, like Croatian reading does, and add only the interactive
+  answer controls, input fields, overlays, buttons, and compact UI labels around
+  those official images. If a task needs questions separated one by one, split
+  the official PDF crop into per-question crops instead of transcribing the
+  question text.
 - For open-response tasks without an official automatic checker, use a
   self-review flow. Place the `Otvori rješenje` button beside a blank points
   input followed by `/<maximum points>`, where the maximum comes from the
@@ -151,6 +160,10 @@ verified archive case requires a change.
   prompt, diagram, table, or other context before the subitems. Do not render
   dependent subitems as unrelated standalone tasks without their shared
   context.
+- When an official key explicitly says that a task is excluded or not scored,
+  mark that task as excluded in generated data. Keep its official crop visible,
+  show only a short note that the task is excluded, do not offer an answer
+  control or reveal a correct answer, and omit it from progress and scoring.
 - Treat the sticky footer inside a solver as an exam-wide control surface, not
   as a control for the currently visible task type. Show answered questions out
   of the total across all task types. Provide one final `Provjeri rješenja`
@@ -158,7 +171,7 @@ verified archive case requires a change.
   and total points across the whole exam. The modal must have an `X` close
   control so the user can review marked answers across every task type without
   losing the checked state.
-- Outside simulation mode, every auto-checkable task offers a `Provjeri zadatak`
+- Outside simulation mode, every auto-checkable task offers a `Provjeri`
   button beside it (via `solver-self-check.js`). It reveals only that task's
   correctness using the existing inline feedback and adds it to the running
   score and percentage in the header and sticky footer. The button is hidden

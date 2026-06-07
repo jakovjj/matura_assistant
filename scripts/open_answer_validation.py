@@ -46,6 +46,20 @@ TASK_HEADING_RE = re.compile(
     ),
     flags=re.IGNORECASE,
 )
+EXCLUDED_TASK_RE = re.compile(
+    (
+        r"(?:"
+        r"\bzadat(?:ak|ka|ku)\s+(?:je\s+)?izuzet\w*\b|"
+        r"\bzadat(?:ak|ka|ku)\s+se\s+izuzima\w*\b|"
+        r"\bizuzet\w*\s+(?:je\s+)?zadat(?:ak|ka|ku)\b|"
+        r"\bzadat(?:ak|ka|ku)\s+(?:je\s+)?poni(?:š|s)ten\w*\b|"
+        r"\bponi(?:š|s)ten\w*\s+(?:je\s+)?zadat(?:ak|ka|ku)\b|"
+        r"\bzadat(?:ak|ka|ku)\s+se\s+ne\s+boduje\b|"
+        r"\bne\s+boduje\s+se\s+(?:ovaj\s+)?zadat(?:ak|ka|ku)\b"
+        r")"
+    ),
+    flags=re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -88,6 +102,13 @@ def rubric_heading_points(text: str) -> list[int]:
         for line in str(text or "").splitlines()
         if (match := RUBRIC_HEADING_RE.match(line))
     ]
+
+
+def is_excluded_task_text(text: str) -> bool:
+    """Recognize an explicit official note that the whole task is excluded."""
+
+    compact = re.sub(r"\s+", " ", str(text or "")).strip()
+    return bool(compact and EXCLUDED_TASK_RE.search(compact))
 
 
 def declared_max_points(text: str) -> set[int]:

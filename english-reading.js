@@ -31,11 +31,22 @@ const pickerState = {
 
 let solverExam;
 let responses = {};
-let activeTaskNumber;
+let activeTaskTypeId;
 let activeQuestionNumber;
 let checked = false;
 const simulation = window.createExamSimulation({ onFinish: finishSimulation });
 const selfCheck = window.createTaskSelfCheck();
+
+const taskTypeDefinitions = {
+  choice: {
+    id: "visestruki-izbor",
+    label: "Višestruki izbor",
+  },
+  completion: {
+    id: "nadopunjavanje",
+    label: "Nadopunjavanje",
+  },
+};
 
 function isChecked(question) {
   return checked || selfCheck.has(question);
@@ -279,18 +290,20 @@ function validSourceImage(source) {
   );
 }
 
-function renderCroppedImage(source, alt) {
+function renderCroppedImage(source, alt, options = {}) {
   if (!validSourceImage(source)) return "";
 
   const crop = source.crop;
   const width = (source.width / crop.width) * 100;
   const offsetX = (-crop.x / source.width) * 100;
   const offsetY = (-crop.y / source.height) * 100;
+  const cropClass = options.cropClass ? ` ${options.cropClass}` : "";
+  const overlayHtml = options.overlayHtml || "";
 
   return `
     <figure class="pdf-source-figure">
       <div
-        class="pdf-source-crop"
+        class="pdf-source-crop${cropClass}"
         style="aspect-ratio: ${crop.width} / ${crop.height}"
       >
         <img
@@ -302,6 +315,7 @@ function renderCroppedImage(source, alt) {
           decoding="async"
           style="width: ${width}%; transform: translate(${offsetX}%, ${offsetY}%);"
         >
+        ${overlayHtml}
       </div>
     </figure>
   `;
@@ -331,6 +345,16 @@ function renderTaskSourceImages(task) {
 }
 
 function renderTaskSourceContent(task) {
+  if (hasInlineGapBlanks(task)) {
+    return `
+      ${renderInlineGapSourceImages(task)}
+      ${renderInlineGapCheckControls(task)}
+    `;
+  }
+
+  const questionImageContent = renderQuestionImageTaskContent(task);
+  if (questionImageContent) return questionImageContent;
+
   const sourceImages = renderTaskSourceImages(task);
   const sourceContent =
     sourceImages ||
@@ -344,8 +368,499 @@ function renderTaskSourceContent(task) {
   `;
 }
 
+function hasInlineGapBlanks(task) {
+  if (!["choice", "text"].includes(task?.kind) || !task?.blanks) return false;
+  const sourceImages = Array.isArray(task.sourceImages) ? task.sourceImages : [];
+  return taskQuestions(task).every((question) =>
+    validInlineBlank(task.blanks[String(question)], sourceImages),
+  );
+}
+
+function validInlineBlank(blank, sourceImages) {
+  const source = sourceImages?.[blank?.sourceImageIndex];
+  const crop = source?.crop;
+  const values = [
+    blank?.sourceImageIndex,
+    blank?.x,
+    blank?.y,
+    blank?.width,
+    blank?.height,
+    crop?.width,
+    crop?.height,
+  ].map(Number);
+
+  return Boolean(
+    validSourceImage(source) &&
+      values.every((value) => Number.isFinite(value)) &&
+      Number(blank.width) > 0 &&
+      Number(blank.height) > 0 &&
+      Number(blank.x) >= 0 &&
+      Number(blank.y) >= 0 &&
+      Number(blank.x) < Number(crop.width) &&
+      Number(blank.y) < Number(crop.height),
+  );
+}
+
+function renderInlineGapSourceImages(task) {
+  const sourceImages = inlineGapSourceImages(task);
+
+  return `
+    <section class="pdf-source-list english-inline-gap-context" aria-label="Tekst s prazninama">
+      ${sourceImages
+        .map(({ source, index }) =>
+          renderCroppedImage(
+            source,
+            `Tekst s prazninama za zadatak ${task.number}, službeni prikaz ${index + 1}.`,
+            {
+              cropClass: "english-inline-gap-crop",
+              overlayHtml: renderInlineGapControls(task, index),
+            },
+          ),
+        )
+        .join("")}
+    </section>
+  `;
+}
+
+function inlineGapSourceImages(task) {
+  const sourceImages = task.sourceImages || [];
+  const entries = sourceImages.map((source, index) => ({ source, index }));
+  if (task.kind !== "choice") return entries;
+
+  const blankSourceIndexes = taskQuestions(task)
+    .map((question) => task.blanks[String(question)]?.sourceImageIndex)
+    .filter((index) => Number.isInteger(index));
+  if (!blankSourceIndexes.length) return entries;
+
+  const lastBlankSourceIndex = Math.max(...blankSourceIndexes);
+  return entries.filter(({ index }) => index <= lastBlankSourceIndex);
+}
+
+function usesSharedInlineChoiceBank(task) {
+  return task?.kind === "choice" && /\byou do not need\b/i.test(task.text || "");
+}
+
+function renderInlineGapControls(task, sourceImageIndex) {
+  const source = task.sourceImages[sourceImageIndex];
+  return taskQuestions(task)
+    .filter((question) => task.blanks[String(question)]?.sourceImageIndex === sourceImageIndex)
+    .map((question) => renderInlineGapControl(task, String(question), source))
+    .join("");
+}
+
+function renderInlineGapControl(task, question, source) {
+  if (task.kind === "choice") return renderInlineChoiceBlank(task, question, source);
+  return renderInlineTextInput(task, question, source);
+}
+
+function renderInlineTextInput(task, question, source) {
+  const answer = responses[question] || "";
+  const stateClass = inlineTextBlankStateClass(question, answer);
+
+  return `
+    <input
+      class="english-text-blank${stateClass}"
+      id="odgovor-${escapeHtml(question)}"
+      data-question="${escapeHtml(question)}"
+      type="text"
+      value="${escapeHtml(answer)}"
+      autocomplete="off"
+      aria-label="Odgovor na pitanje ${escapeHtml(question)}"
+      style="${inlineTextBlankStyle(task.blanks[question], source)}"
+      ${simulation.inputDisabledAttribute()}
+    >
+  `;
+}
+
+function renderInlineChoiceBlank(task, question, source) {
+  const answer = responses[question] || "";
+  const stateClass = inlineChoiceBlankStateClass(question, answer);
+
+  return `
+    <button
+      class="english-choice-blank${stateClass}"
+      id="odgovor-${escapeHtml(question)}"
+      type="button"
+      data-question="${escapeHtml(question)}"
+      data-inline-choice-question="${escapeHtml(question)}"
+      data-inline-choice-task="${escapeHtml(task.number)}"
+      value="${escapeHtml(answer)}"
+      aria-haspopup="dialog"
+      aria-expanded="false"
+      aria-label="${escapeHtml(inlineChoiceBlankAriaLabel(question, answer))}"
+      style="${inlineChoiceBlankStyle(task.blanks[question], source)}"
+      ${simulation.inputDisabledAttribute()}
+    >
+      ${renderInlineChoiceBlankContent(answer)}
+    </button>
+  `;
+}
+
+function inlineTextBlankStateClass(question, answer) {
+  const answeredClass = answer ? " english-text-blank--answered" : "";
+  if (!isChecked(question) || !correctAnswers(question).length) return answeredClass;
+  return `${answeredClass}${
+    isCorrectAnswer(question, answer)
+      ? " english-text-blank--correct"
+      : " english-text-blank--wrong"
+  }`;
+}
+
+function inlineChoiceBlankStateClass(question, answer) {
+  const answeredClass = answer ? " english-choice-blank--answered" : "";
+  if (!isChecked(question) || !correctAnswers(question).length) return answeredClass;
+  return `${answeredClass}${
+    isCorrectAnswer(question, answer)
+      ? " english-choice-blank--correct"
+      : " english-choice-blank--wrong"
+  }`;
+}
+
+function renderInlineChoiceBlankContent(answer) {
+  return `
+    <span>${escapeHtml(answer)}</span>
+    <span class="english-choice-blank__chevron" aria-hidden="true"></span>
+  `;
+}
+
+function inlineChoiceBlankAriaLabel(question, answer) {
+  if (answer) return `Praznina ${question}, odabrano ${answer}. Promijeni odgovor.`;
+  return `Praznina ${question}, odaberi odgovor.`;
+}
+
+function inlineTextBlankStyle(blank, source) {
+  return inlineGapBlankStyle(blank, source, {
+    extraHeight: 9,
+    extraWidth: 24,
+    minHeight: 24,
+    minWidth: 72,
+  });
+}
+
+function inlineChoiceBlankStyle(blank, source) {
+  return inlineGapBlankStyle(blank, source, {
+    extraHeight: 3,
+    extraWidth: 4,
+    minHeight: 22,
+    minWidth: 44,
+  });
+}
+
+function inlineGapBlankStyle(blank, source, options) {
+  const crop = source.crop;
+  const fieldHeight = Math.max(options.minHeight, Number(blank.height) + options.extraHeight);
+  const preferredWidth = Math.max(options.minWidth, Number(blank.width) + options.extraWidth);
+  const centerX = Number(blank.x) + Number(blank.width) / 2;
+  const centerY = Number(blank.y) + Number(blank.height) / 2;
+  const left = Math.max(0, Math.min(crop.width - preferredWidth, centerX - preferredWidth / 2));
+  const top = Math.max(0, Math.min(crop.height - fieldHeight, centerY - fieldHeight / 2));
+  const width = Math.min(crop.width - left, preferredWidth);
+  const height = Math.min(crop.height - top, fieldHeight);
+
+  return [
+    `left: ${(left / crop.width) * 100}%`,
+    `top: ${(top / crop.height) * 100}%`,
+    `width: ${(width / crop.width) * 100}%`,
+    `height: ${(height / crop.height) * 100}%`,
+  ].join("; ");
+}
+
+function renderInlineGapCheckControls(task) {
+  if (simulation.active) return "";
+  const checkableQuestions = checkableTaskGroupQuestions(task);
+  if (checkableQuestions.length) return renderInlineTextGapCheckControls(task, checkableQuestions);
+
+  const keyLink = renderTaskAnswerKeyLink(task);
+  if (keyLink) {
+    return `
+      <section class="english-inline-check-list english-inline-check-list--group" aria-label="Provjera zadatka">
+        ${keyLink}
+      </section>
+    `;
+  }
+
+  return "";
+}
+
+function renderInlineTextGapCheckControls(task, questions) {
+  const answeredQuestions = answeredTaskGroupQuestions(questions);
+  const active =
+    answeredQuestions.length > 0 &&
+    answeredQuestions.every((question) => selfCheck.has(question));
+  const answered = answeredQuestions.length > 0;
+  const resultHtml = renderInlineTextGapResults(questions);
+
+  return `
+    <section class="english-inline-check-list english-inline-check-list--group" aria-label="Provjera zadatka">
+      ${
+        checked
+          ? ""
+          : `
+            <button
+              class="inline-check-button english-inline-group-check-button${active ? " inline-check-button--active" : ""}"
+              type="button"
+              data-inline-gap-group-check="${escapeHtml(task.number)}"
+              aria-pressed="${active ? "true" : "false"}"
+              ${answered ? "" : "disabled"}
+            >
+              ${icon(active ? "eye-off" : "circle-check", "inline-check-button__icon")}
+              <span>${active ? "Sakrij rješenja" : "Provjeri"}</span>
+            </button>
+          `
+      }
+      ${resultHtml}
+    </section>
+  `;
+}
+
+function checkableTaskGroupQuestions(task) {
+  if (!usesTaskGroupSelfCheck(task)) return [];
+  return taskQuestions(task)
+    .map(String)
+    .filter((question) => correctAnswers(question).length);
+}
+
+function usesTaskGroupSelfCheck(task) {
+  return task?.kind === "text" || hasInlineGapBlanks(task);
+}
+
+function answeredTaskGroupQuestions(questions) {
+  return questions.filter((question) => String(responses[String(question)] || "").trim());
+}
+
+function renderInlineTextGapResults(questions) {
+  const visibleQuestions = checked
+    ? questions
+    : questions.filter(
+        (question) =>
+          selfCheck.has(question) && String(responses[String(question)] || "").trim(),
+      );
+  if (!visibleQuestions.length) return "";
+
+  return `
+    <div class="english-inline-group-results">
+      ${visibleQuestions
+        .map((question) => {
+          const answer = responses[question] || "";
+          const resultClass = isCorrectAnswer(question, answer)
+            ? " english-inline-group-result--correct"
+            : " english-inline-group-result--wrong";
+
+          return `
+            <div class="english-inline-group-result${resultClass}">
+              <strong>${escapeHtml(question)}.</strong>
+              ${renderFeedback(question, answer)}
+            </div>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function renderTaskAnswerKeyLink(task) {
+  if (simulation.active || checked || !solverExam?.keyUrl) return "";
+  return `
+    <a
+      class="inline-check-button english-inline-group-check-button"
+      href="${escapeHtml(solverExam.keyUrl)}"
+      target="_blank"
+      rel="noreferrer"
+      aria-label="Otvori službeni ključ za zadatak ${escapeHtml(task.number)}"
+    >
+      ${icon("book-open", "inline-check-button__icon")}
+      <span>Otvori ključ</span>
+    </a>
+  `;
+}
+
+function taskOptionTextMap(task) {
+  const groups = taskOptionTextGroups(task);
+  const lastGroup = groups[groups.length - 1];
+  return lastGroup ? optionGroupTextMap(lastGroup) : {};
+}
+
+function taskOptionTextGroups(task) {
+  if (!task.options?.length) return [];
+
+  const optionSet = new Set(task.options || []);
+  const optionPattern = new RegExp(
+    `^\\s*([${escapeRegExp((task.options || []).join(""))}])(?:[.)])?\\s+(.+)$`,
+  );
+  const anyOptionPattern = /^\s*([A-Z])(?:[.)])?\s+(.+)$/;
+  const exampleOptions = new Set(
+    [...String(task.text || "").matchAll(/\b0\s*→\s*([A-Z])\b/g)].map((match) => match[1]),
+  );
+  const firstOption = task.options?.[0];
+  const groups = [];
+  let currentGroup = [];
+  let current = null;
+  let parsing = false;
+
+  for (const line of stripTaskHeading(task.text).split("\n")) {
+    const trimmed = line.trim();
+    const match = trimmed.match(optionPattern);
+    if (match && optionSet.has(match[1])) {
+      if (
+        currentGroup.length &&
+        (match[1] === firstOption || currentGroup.some((option) => option.label === match[1]))
+      ) {
+        groups.push(currentGroup);
+        currentGroup = [];
+      }
+
+      current = {
+        label: match[1],
+        text: match[2].trim(),
+      };
+      currentGroup.push(current);
+      parsing = true;
+      continue;
+    }
+
+    if (!parsing || !current || !trimmed) continue;
+    const externalOptionMatch = trimmed.match(anyOptionPattern);
+    if (
+      externalOptionMatch &&
+      !optionSet.has(externalOptionMatch[1]) &&
+      exampleOptions.has(externalOptionMatch[1])
+    ) {
+      current = null;
+      parsing = false;
+      continue;
+    }
+    if (/^\d{1,2}\b/.test(trimmed) || /^Task\s+\d+/i.test(trimmed)) {
+      current = null;
+      parsing = false;
+      continue;
+    }
+    current.text = `${current.text} ${trimmed}`.trim();
+  }
+
+  if (currentGroup.length) groups.push(currentGroup);
+  return groups.filter((group) => group.length >= 2);
+}
+
+function optionGroupTextMap(group) {
+  return group.reduce((map, option) => {
+    map[option.label] = option.text;
+    return map;
+  }, {});
+}
+
+function inlineChoiceOptionTextMap(task, questionNumber) {
+  const groups = taskOptionTextGroups(task);
+  if (groups.length <= 1 || usesSharedInlineChoiceBank(task)) {
+    return taskOptionTextMap(task);
+  }
+
+  const questions = taskQuestions(task).map(String);
+  const questionIndex = questions.indexOf(String(questionNumber));
+  if (questionIndex === -1) return taskOptionTextMap(task);
+
+  const hasLeadingExampleGroup =
+    groups.length > questions.length && /\bexample\b/i.test(task.text || "");
+  const groupIndex = hasLeadingExampleGroup ? questionIndex + 1 : questionIndex;
+  const group = groups[groupIndex];
+  return group ? optionGroupTextMap(group) : taskOptionTextMap(task);
+}
+
+function openInlineChoicePopover(questionNumber, anchor) {
+  if (simulation.finished) return;
+
+  const task = solverExam.tasks.find((candidate) => candidate.number === Number(anchor.dataset.inlineChoiceTask));
+  if (!task) return;
+
+  closeInlineChoicePopover();
+  anchor.setAttribute("aria-expanded", "true");
+  const popover = document.createElement("div");
+  popover.className = "english-choice-popover";
+  popover.id = "english-choice-popover";
+  popover.setAttribute("role", "dialog");
+  popover.setAttribute("aria-label", `Odgovori za prazninu ${questionNumber}`);
+  popover.innerHTML = renderInlineChoicePopover(task, questionNumber);
+  document.body.append(popover);
+  placeInlineChoicePopover(popover, anchor);
+
+  popover.querySelector("[data-inline-choice-popover-close]")?.addEventListener("click", () => {
+    closeInlineChoicePopover();
+    anchor.focus();
+  });
+
+  popover.querySelectorAll("[data-inline-choice-option]").forEach((button) => {
+    button.addEventListener("click", () => {
+      updateResponse(questionNumber, button.dataset.inlineChoiceOption);
+      anchor.focus();
+    });
+  });
+
+  const selected = popover.querySelector(".english-choice-popover__option--selected");
+  (selected || popover.querySelector("[data-inline-choice-option]"))?.focus();
+  window.setTimeout(() => {
+    document.addEventListener("click", closeInlineChoicePopover, { once: true });
+  }, 0);
+}
+
+function renderInlineChoicePopover(task, questionNumber) {
+  const answer = responses[questionNumber] || "";
+  const optionMap = inlineChoiceOptionTextMap(task, questionNumber);
+
+  return `
+    <div class="english-choice-popover__heading">
+      <strong>${escapeHtml(questionNumber)}</strong>
+      <button type="button" data-inline-choice-popover-close aria-label="Zatvori odabir">&times;</button>
+    </div>
+    <div class="english-choice-popover__options">
+      ${(task.options || [])
+        .map((option) => {
+          const selectedClass = option === answer ? " english-choice-popover__option--selected" : "";
+          return `
+            <button
+              class="english-choice-popover__option${selectedClass}"
+              type="button"
+              data-inline-choice-option="${escapeHtml(option)}"
+            >
+              <strong>${escapeHtml(option)}</strong>
+              <span>${escapeHtml(optionMap[option] || `Odgovor ${option}`)}</span>
+            </button>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function placeInlineChoicePopover(popover, anchor) {
+  const anchorRect = anchor.getBoundingClientRect();
+  const gap = 8;
+  const viewportPadding = 12;
+  let left = Math.max(viewportPadding, anchorRect.left);
+  let top = anchorRect.bottom + gap;
+
+  if (left + popover.offsetWidth > window.innerWidth - viewportPadding) {
+    left = window.innerWidth - popover.offsetWidth - viewportPadding;
+  }
+  if (top + popover.offsetHeight > window.innerHeight - viewportPadding) {
+    top = anchorRect.top - popover.offsetHeight - gap;
+  }
+
+  popover.style.left = `${Math.max(viewportPadding, left)}px`;
+  popover.style.top = `${Math.max(viewportPadding, top)}px`;
+}
+
+function closeInlineChoicePopover() {
+  document.querySelector("#english-choice-popover")?.remove();
+  document
+    .querySelectorAll("[data-inline-choice-question][aria-expanded='true']")
+    .forEach((button) => button.setAttribute("aria-expanded", "false"));
+}
+
 function renderTaskResponses(task) {
   const total = task.lastQuestion - task.firstQuestion + 1;
+  const groupCheckControls =
+    task.kind === "text" && !hasInlineGapBlanks(task)
+      ? renderInlineGapCheckControls(task)
+      : "";
 
   return `
     <section class="english-reading-responses" aria-label="Digitalni list za odgovore">
@@ -356,6 +871,7 @@ function renderTaskResponses(task) {
       <div class="response-list">
         ${taskQuestions(task).map((question) => renderQuestion(task, String(question))).join("")}
       </div>
+      ${groupCheckControls}
     </section>
   `;
 }
@@ -416,6 +932,76 @@ function taskAnsweredCount(task) {
   return taskQuestions(task).filter((question) => responses[question]?.trim()).length;
 }
 
+function taskTypeDefinition(exam, task) {
+  const firstCompletionTask = exam.level === "A" ? 3 : 4;
+  return task.number >= firstCompletionTask
+    ? taskTypeDefinitions.completion
+    : taskTypeDefinitions.choice;
+}
+
+function taskTypes(exam = solverExam) {
+  const groups = new Map();
+
+  for (const task of exam?.tasks || []) {
+    const definition = taskTypeDefinition(exam, task);
+    if (!groups.has(definition.id)) {
+      groups.set(definition.id, { ...definition, tasks: [] });
+    }
+    groups.get(definition.id).tasks.push(task);
+  }
+
+  return [...groups.values()];
+}
+
+function normalizeTaskTypeId(taskTypeId, exam = solverExam) {
+  const types = taskTypes(exam);
+  return types.some((type) => type.id === taskTypeId) ? taskTypeId : types[0]?.id;
+}
+
+function tasksForTaskType(taskTypeId = activeTaskTypeId, exam = solverExam) {
+  const normalizedTaskTypeId = normalizeTaskTypeId(taskTypeId, exam);
+  return taskTypes(exam).find((type) => type.id === normalizedTaskTypeId)?.tasks || [];
+}
+
+function questionsForTaskType(taskTypeId = activeTaskTypeId, exam = solverExam) {
+  return tasksForTaskType(taskTypeId, exam).flatMap((task) => taskQuestions(task));
+}
+
+function taskTypeForQuestion(question, exam = solverExam) {
+  const task = exam.tasks.find(
+    (candidate) => question >= candidate.firstQuestion && question <= candidate.lastQuestion,
+  );
+  return task ? taskTypeDefinition(exam, task).id : normalizeTaskTypeId("", exam);
+}
+
+function taskTypeAnsweredCount(taskType) {
+  return taskType.tasks.reduce((total, task) => total + taskAnsweredCount(task), 0);
+}
+
+function taskTypeQuestionCount(taskType) {
+  return taskType.tasks.reduce((total, task) => total + taskQuestions(task).length, 0);
+}
+
+function correctAnswers(question) {
+  const answer = solverExam?.answers?.[question];
+  if (Array.isArray(answer)) return answer.filter(Boolean).map(String);
+  return answer ? [String(answer)] : [];
+}
+
+function normalizeAnswer(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("en");
+}
+
+function isCorrectAnswer(question, answer) {
+  const normalizedAnswer = normalizeAnswer(answer);
+  return correctAnswers(question).some(
+    (correctAnswer) => normalizeAnswer(correctAnswer) === normalizedAnswer,
+  );
+}
+
 function trimEmptyLines(lines) {
   const trimmed = [...lines];
   while (trimmed.length && !trimmed[0].trim()) trimmed.shift();
@@ -454,6 +1040,42 @@ function parseQuestionSections(task) {
     contextLines: trimEmptyLines(contextLines),
     sections,
   };
+}
+
+function hasQuestionImages(task) {
+  return taskQuestions(task).every((question) =>
+    questionSourceImages(task, String(question)).length,
+  );
+}
+
+function questionSourceImages(task, question) {
+  const source = task?.questionImages?.[String(question)];
+  const images = Array.isArray(source) ? source : [source];
+  return images.filter(validSourceImage);
+}
+
+function renderQuestionImageTaskContent(task) {
+  if (task.kind !== "choice" || task.blanks || !task.options?.length) return "";
+  if (!hasQuestionImages(task)) return "";
+
+  const sourceImages = renderTaskSourceImages(task);
+  if (!sourceImages) return "";
+
+  const sections = taskQuestions(task).map((question) => ({
+    number: String(question),
+    sourceImages: questionSourceImages(task, String(question)),
+    bodyLines: [],
+    options: [],
+  }));
+
+  return `
+    ${sourceImages}
+    <div class="task-source english-reading-source english-reading-matching-questions">
+      <div class="english-reading-question-list">
+        ${sections.map((section) => renderSourceQuestion(task, section)).join("")}
+      </div>
+    </div>
+  `;
 }
 
 function parseQuestionOptionLines(task, lines) {
@@ -585,31 +1207,53 @@ function renderFallbackQuestionList(task) {
 
 function renderSourceQuestion(task, question) {
   const number = String(question.number);
+  const sourceImage = renderQuestionSourceImages(question.sourceImages, number);
   const body = renderQuestionText(question.bodyLines);
   const options = renderQuestionOptions(question.options);
 
   return `
     <article
-      class="physics-source-question english-source-question"
+      class="physics-source-question english-source-question${sourceImage ? " physics-source-question--image" : ""}"
       id="odgovor-${escapeHtml(number)}"
       data-question-number="${escapeHtml(number)}"
     >
-      <h4>${escapeHtml(number)}</h4>
+      ${sourceImage ? "" : `<h4>${escapeHtml(number)}</h4>`}
       <div class="physics-source-question__body english-source-question__body">
-        ${body || `<p>Pitanje ${escapeHtml(number)}</p>`}
+        ${sourceImage || body || `<p>Pitanje ${escapeHtml(number)}</p>`}
         ${options}
       </div>
-      ${renderQuestion(task, number)}
+      ${renderQuestion(task, number, { inline: true, includeId: false })}
     </article>
   `;
+}
+
+function renderQuestionSourceImages(sourceImages, number) {
+  const images = Array.isArray(sourceImages) ? sourceImages.filter(validSourceImage) : [];
+  return images
+    .map((source, index) => {
+      const partLabel = images.length > 1 ? `, dio ${index + 1}` : "";
+      return renderCroppedImage(
+        source,
+        `Izvorni prikaz ${number}. pitanja iz službene PDF knjižice${partLabel}.`,
+      );
+    })
+    .join("");
 }
 
 function selectedExamId() {
   return new URLSearchParams(window.location.search).get("exam");
 }
 
-function examUrl(exam) {
-  return `./engleski-citanje.html?exam=${encodeURIComponent(exam.id)}`;
+function selectedTaskTypeId(exam) {
+  return normalizeTaskTypeId(new URLSearchParams(window.location.search).get("vrsta"), exam);
+}
+
+function examUrl(exam, taskTypeId = activeTaskTypeId) {
+  const params = new URLSearchParams({ exam: exam.id });
+  const normalizedTaskTypeId = normalizeTaskTypeId(taskTypeId, exam);
+  if (normalizedTaskTypeId) params.set("vrsta", normalizedTaskTypeId);
+  if (simulation.active) params.set("nacin", "simulacija");
+  return `./engleski-citanje.html?${params.toString()}`;
 }
 
 function renderPicker() {
@@ -733,8 +1377,8 @@ function renderSolver(exam) {
   responses = simulation.active ? {} : loadResponses(exam);
   checked = false;
   selfCheck.reset();
-  activeTaskNumber = exam.tasks[0].number;
-  activeQuestionNumber = exam.tasks[0].firstQuestion;
+  activeTaskTypeId = selectedTaskTypeId(exam);
+  activeQuestionNumber = questionsForTaskType(activeTaskTypeId, exam)[0];
 
   app.innerHTML = `
     ${renderSolverHeader({
@@ -753,8 +1397,8 @@ function renderSolver(exam) {
       navigationHtml: `
         <nav
           class="task-navigation solver-header__task-navigation"
-          data-task-navigation
-          aria-label="Zadatci čitanja u ispitnom zaglavlju"
+          data-task-type-navigation
+          aria-label="Vrste zadataka čitanja u ispitnom zaglavlju"
         ></nav>
       `,
     })}
@@ -775,7 +1419,7 @@ function renderSolver(exam) {
     }
 
     <div class="solver-question-layout english-reading-layout">
-      <section class="task-content-panel english-reading-task-panel" id="task-content-panel"></section>
+      <div class="solver-question-main" id="task-content-panel"></div>
       <aside class="question-quickselect" aria-label="Brzi odabir pitanja">
         <div class="question-quickselect__heading">
           <strong>Brzi odabir</strong>
@@ -789,8 +1433,8 @@ function renderSolver(exam) {
       <div class="solver-sticky-footer__inner">
         <nav
           class="task-navigation"
-          data-task-navigation
-          aria-label="Zadatci čitanja"
+          data-task-type-navigation
+          aria-label="Vrste zadataka čitanja"
         ></nav>
         <div class="solver-sticky-footer__controls">
           <div class="solver-sticky-footer__status">
@@ -848,33 +1492,40 @@ function renderSolver(exam) {
   document.querySelector(".exam-results-dialog__backdrop")?.addEventListener("click", closeResultsDialog);
   document.addEventListener("keydown", closeResultsDialogOnEscape);
 
-  renderTaskNavigation();
+  renderTaskTypeNavigation();
   renderQuestionQuickSelect();
   renderSolverSummary();
-  renderTaskContent();
+  renderTaskTypeContent();
   simulation.start(exam.durationMinutes);
 }
 
-function renderTaskNavigation() {
-  const navigationHtml = solverExam.tasks
-    .map((task) => {
-      const total = task.lastQuestion - task.firstQuestion + 1;
-      const activeClass = task.number === activeTaskNumber ? " task-button--active" : "";
+function renderTaskTypeNavigation() {
+  const navigationHtml = taskTypes()
+    .map((taskType) => {
+      const activeClass = taskType.id === activeTaskTypeId ? " task-button--active" : "";
       return `
-        <button class="task-button${activeClass}" data-task="${task.number}" type="button">
-          <strong>Zadatak ${task.number}</strong>
-          <small>${taskAnsweredCount(task)}/${total}</small>
-        </button>
+        <a
+          class="task-button${activeClass}"
+          href="${examUrl(solverExam, taskType.id)}"
+          data-task-type="${taskType.id}"
+          ${taskType.id === activeTaskTypeId ? 'aria-current="true"' : ""}
+        >
+          <strong>${escapeHtml(taskType.label)}</strong>
+          <small>${taskTypeAnsweredCount(taskType)}/${taskTypeQuestionCount(taskType)}</small>
+        </a>
       `;
     })
     .join("");
 
-  document.querySelectorAll("[data-task-navigation]").forEach((navigation) => {
+  document.querySelectorAll("[data-task-type-navigation]").forEach((navigation) => {
     navigation.innerHTML = navigationHtml;
   });
 
-  document.querySelectorAll("[data-task]").forEach((button) => {
-    button.addEventListener("click", () => selectTask(Number(button.dataset.task)));
+  document.querySelectorAll("[data-task-type]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      selectTaskType(link.dataset.taskType);
+    });
   });
 }
 
@@ -882,7 +1533,7 @@ function renderQuestionQuickSelect() {
   const quickSelect = document.querySelector("#question-quickselect");
   if (!quickSelect) return;
 
-  const questions = allQuestions(solverExam);
+  const questions = questionsForTaskType();
   const quickSelectPanel = quickSelect.closest(".question-quickselect");
   if (quickSelectPanel) quickSelectPanel.hidden = questions.length <= 2;
 
@@ -890,8 +1541,8 @@ function renderQuestionQuickSelect() {
     .map((question) => {
       const answer = responses[question];
       const stateClass = answer ? " question-quickselect__link--answered" : "";
-      const resultClass = isChecked(question) && solverExam.answers[question]
-        ? answer === solverExam.answers[question]
+      const resultClass = isChecked(question) && correctAnswers(question).length
+        ? isCorrectAnswer(question, answer)
           ? " question-quickselect__link--correct"
           : " question-quickselect__link--wrong"
         : "";
@@ -937,28 +1588,36 @@ function renderSolverSummary() {
 
   const scoreSummary = document.querySelector("#score-summary");
   const resolved = allQuestions(solverExam).filter(
-    (question) => isChecked(question) && solverExam.answers[question],
+    (question) => isChecked(question) && correctAnswers(question).length,
   );
   const resolvedCorrect = resolved.filter(
-    (question) => responses[question] === solverExam.answers[question],
+    (question) => isCorrectAnswer(question, responses[question]),
   ).length;
   const score = resolved.length ? `${resolvedCorrect}/${resolved.length} točno` : "";
   scoreSummary.textContent = score;
   document.querySelector("#footer-score-summary").textContent = score;
 }
 
-function renderTaskContent() {
-  const task = solverExam.tasks.find((candidate) => candidate.number === activeTaskNumber);
-  document.querySelector("#task-content-panel").innerHTML = `
-    <div class="panel-heading">
-      <div>
-        <p class="eyebrow">Pitanja iz knjižice</p>
-        <h3>Zadatak ${task.number}</h3>
-      </div>
-      <small>Pitanja ${task.firstQuestion}–${task.lastQuestion}</small>
-    </div>
-    ${renderTaskSourceContent(task)}
-  `;
+function renderTaskTypeContent() {
+  document.querySelector("#task-content-panel").innerHTML = tasksForTaskType()
+    .map(
+      (task) => `
+        <section
+          class="task-content-panel english-reading-task-panel"
+          data-task-number="${task.number}"
+        >
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Pitanja iz knjižice</p>
+              <h3>Zadatak ${task.number}</h3>
+            </div>
+            <small>Pitanja ${task.firstQuestion}–${task.lastQuestion}</small>
+          </div>
+          ${renderTaskSourceContent(task)}
+        </section>
+      `,
+    )
+    .join("");
   bindResponseListeners();
 }
 
@@ -971,35 +1630,75 @@ function bindResponseListeners() {
   document.querySelectorAll('input[type="text"][data-question]').forEach((input) => {
     input.addEventListener("input", () => updateResponse(input.dataset.question, input.value));
   });
+  document.querySelectorAll("[data-inline-choice-question]").forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openInlineChoicePopover(button.dataset.inlineChoiceQuestion, button);
+    });
+  });
+  document.querySelectorAll("[data-inline-gap-group-check]").forEach((button) => {
+    button.addEventListener("click", () => {
+      toggleInlineTextGapSelfCheck(Number(button.dataset.inlineGapGroupCheck));
+    });
+  });
 }
 
 function toggleSelfCheck(question) {
   if (simulation.active || checked) return;
-  selfCheck.toggle(question, Boolean(responses[question]));
-  renderTaskNavigation();
+  selfCheck.toggle(question);
+  renderTaskTypeNavigation();
   renderQuestionQuickSelect();
   renderSolverSummary();
-  renderTaskContent();
+  renderTaskTypeContent();
 }
 
-function renderQuestion(task, question) {
+function toggleInlineTextGapSelfCheck(taskNumber) {
+  if (simulation.active || checked) return;
+
+  const task = solverExam.tasks.find((candidate) => candidate.number === taskNumber);
+  if (!usesTaskGroupSelfCheck(task)) return;
+
+  const questions = checkableTaskGroupQuestions(task);
+  const answeredQuestions = answeredTaskGroupQuestions(questions);
+  if (!answeredQuestions.length) return;
+
+  const active = answeredQuestions.every((question) => selfCheck.has(question));
+  if (active) {
+    questions.forEach((question) => selfCheck.delete(question));
+  } else {
+    answeredQuestions.forEach((question) => {
+      if (!selfCheck.has(question)) selfCheck.toggle(question);
+    });
+  }
+
+  renderTaskTypeNavigation();
+  renderQuestionQuickSelect();
+  renderSolverSummary();
+  renderTaskTypeContent();
+}
+
+function renderQuestion(task, question, options = {}) {
   const answer = responses[question] || "";
-  const correctAnswer = solverExam.answers[question];
-  const resultClass = isChecked(question) && correctAnswer
-    ? answer === solverExam.answers[question]
+  const hasCorrectAnswer = correctAnswers(question).length > 0;
+  const resultClass = isChecked(question) && hasCorrectAnswer
+    ? isCorrectAnswer(question, answer)
       ? " response-question--correct"
       : " response-question--wrong"
     : "";
-  const checkButton = selfCheck.renderButton(question, {
-    answered: Boolean(answer),
-    hidden: simulation.active || checked || !correctAnswer,
-  });
+  const checkButton =
+    task.kind === "text"
+      ? ""
+      : selfCheck.renderButton(question, {
+          hidden: simulation.active || checked || !hasCorrectAnswer,
+        });
+  const idAttribute = options.includeId === false ? "" : ` id="odgovor-${escapeHtml(question)}"`;
+  const inlineClass = options.inline ? " physics-inline-response" : "";
 
   if (task.kind === "text") {
     return `
       <div
-        class="response-question response-question--text english-inline-text-response${resultClass}"
-        id="odgovor-${escapeHtml(question)}"
+        class="response-question response-question--text english-inline-text-response${inlineClass}${resultClass}"
+        ${idAttribute}
       >
         <label class="english-inline-text-response__field">
           <strong>${escapeHtml(question)}.</strong>
@@ -1019,7 +1718,7 @@ function renderQuestion(task, question) {
   }
 
   return `
-    <fieldset class="response-question${resultClass}" id="odgovor-${escapeHtml(question)}">
+    <fieldset class="response-question${inlineClass}${resultClass}"${idAttribute}>
       <legend>${escapeHtml(question)}.</legend>
       <div class="choice-list">
         ${task.options
@@ -1034,7 +1733,7 @@ function renderQuestion(task, question) {
 
 function renderChoice(question, option, answer) {
   const selected = option === answer;
-  const correct = option === solverExam.answers[question];
+  const correct = isCorrectAnswer(question, option);
   let resultClass = "";
   if (isChecked(question) && correct) resultClass = " answer-choice--correct";
   if (isChecked(question) && selected && !correct) resultClass = " answer-choice--wrong";
@@ -1056,41 +1755,85 @@ function renderChoice(question, option, answer) {
 
 function renderFeedback(question, answer) {
   if (!isChecked(question)) return "";
-  const correctAnswer = solverExam.answers[question];
-  if (!correctAnswer) return "";
-  if (answer === correctAnswer) return `<small class="response-feedback">Točno.</small>`;
-  return `<small class="response-feedback">Točan odgovor: ${correctAnswer}.</small>`;
+  const answers = correctAnswers(question);
+  if (!answers.length) return "";
+  if (isCorrectAnswer(question, answer)) return `<small class="response-feedback">Točno.</small>`;
+  const label = answers.length > 1 ? "Točni odgovori" : "Točan odgovor";
+  return `<small class="response-feedback">${label}: ${answers.join(" ili ")}.</small>`;
 }
 
 function updateResponse(question, answer) {
   if (simulation.finished) return;
 
   const wasChecked = checked;
-  const wasSelfChecked = selfCheck.has(question);
+  const task = taskForQuestion(Number(question));
+  const groupCheckQuestions = checkableTaskGroupQuestions(task);
+  const wasSelfChecked = groupCheckQuestions.length
+    ? groupCheckQuestions.some((groupQuestion) => selfCheck.has(groupQuestion))
+    : selfCheck.has(question);
+  closeInlineChoicePopover();
   checked = false;
-  selfCheck.delete(question);
+  if (groupCheckQuestions.length) {
+    groupCheckQuestions.forEach((groupQuestion) => selfCheck.delete(groupQuestion));
+  } else {
+    selfCheck.delete(question);
+  }
   const normalizedAnswer = String(answer || "").trim();
   if (normalizedAnswer) responses[question] = normalizedAnswer;
   else delete responses[question];
   activeQuestionNumber = Number(question);
   saveResponses();
-  renderTaskNavigation();
+  renderTaskTypeNavigation();
   renderQuestionQuickSelect();
   renderSolverSummary();
   if (wasChecked || wasSelfChecked) {
     if (wasChecked) closeResultsDialog();
-    renderTaskContent();
+    renderTaskTypeContent();
   } else {
-    renderTaskResponseSummary();
+    renderTaskResponseSummary(task?.number);
+    syncRenderedInlineResponse(question);
   }
 }
 
-function renderTaskResponseSummary() {
-  const task = solverExam.tasks.find((candidate) => candidate.number === activeTaskNumber);
-  const summary = document.querySelector(".english-reading-responses__heading small");
+function renderTaskResponseSummary(taskNumber) {
+  const task = solverExam.tasks.find((candidate) => candidate.number === taskNumber);
+  const summary = document.querySelector(
+    `[data-task-number="${taskNumber}"] .english-reading-responses__heading small`,
+  );
   if (!task || !summary) return;
   const total = task.lastQuestion - task.firstQuestion + 1;
   summary.textContent = `${taskAnsweredCount(task)}/${total}`;
+}
+
+function syncRenderedInlineResponse(question) {
+  const answer = responses[question] || "";
+  document.querySelectorAll('input[type="text"][data-question]').forEach((input) => {
+    if (input.dataset.question !== String(question)) return;
+    input.classList.toggle("english-text-blank--answered", Boolean(answer));
+    input.classList.remove("english-text-blank--correct", "english-text-blank--wrong");
+  });
+  document.querySelectorAll("[data-inline-choice-question]").forEach((button) => {
+    if (button.dataset.inlineChoiceQuestion !== String(question)) return;
+    button.value = answer;
+    button.innerHTML = renderInlineChoiceBlankContent(answer);
+    button.classList.toggle("english-choice-blank--answered", Boolean(answer));
+    button.classList.remove("english-choice-blank--correct", "english-choice-blank--wrong");
+    button.setAttribute("aria-label", inlineChoiceBlankAriaLabel(question, answer));
+  });
+  document.querySelectorAll("[data-self-check]").forEach((button) => {
+    if (String(button.dataset.selfCheck) === String(question)) button.disabled = !answer;
+  });
+  syncInlineGapGroupCheckButtons();
+}
+
+function syncInlineGapGroupCheckButtons() {
+  document.querySelectorAll("[data-inline-gap-group-check]").forEach((button) => {
+    const task = solverExam.tasks.find(
+      (candidate) => candidate.number === Number(button.dataset.inlineGapGroupCheck),
+    );
+    if (!task) return;
+    button.disabled = !answeredTaskGroupQuestions(checkableTaskGroupQuestions(task)).length;
+  });
 }
 
 function taskForQuestion(question) {
@@ -1100,13 +1843,13 @@ function taskForQuestion(question) {
 }
 
 function selectQuestion(question) {
-  const task = taskForQuestion(question);
-  if (!task) return;
-
-  activeTaskNumber = task.number;
+  const taskTypeId = taskTypeForQuestion(question);
+  const taskTypeChanged = taskTypeId !== activeTaskTypeId;
+  activeTaskTypeId = taskTypeId;
   activeQuestionNumber = question;
-  renderTaskNavigation();
-  renderTaskContent();
+  history.replaceState(null, "", examUrl(solverExam, activeTaskTypeId));
+  renderTaskTypeNavigation();
+  if (taskTypeChanged) renderTaskTypeContent();
   renderQuestionQuickSelect();
 
   document
@@ -1114,12 +1857,15 @@ function selectQuestion(question) {
     ?.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 
-function selectTask(taskNumber) {
-  activeTaskNumber = taskNumber;
-  const task = solverExam.tasks.find((candidate) => candidate.number === activeTaskNumber);
-  activeQuestionNumber = task?.firstQuestion || activeQuestionNumber;
-  renderTaskNavigation();
-  renderTaskContent();
+function selectTaskType(taskTypeId) {
+  const normalizedTaskTypeId = normalizeTaskTypeId(taskTypeId);
+  if (normalizedTaskTypeId === activeTaskTypeId) return;
+
+  activeTaskTypeId = normalizedTaskTypeId;
+  activeQuestionNumber = questionsForTaskType()[0];
+  history.replaceState(null, "", examUrl(solverExam, activeTaskTypeId));
+  renderTaskTypeNavigation();
+  renderTaskTypeContent();
   renderQuestionQuickSelect();
   document.querySelector("#task-content-panel").scrollIntoView({ behavior: "smooth", block: "start" });
 }
@@ -1135,28 +1881,28 @@ function checkAnswers() {
     checked = false;
     selfCheck.reset();
     closeResultsDialog();
-    renderTaskNavigation();
+    renderTaskTypeNavigation();
     renderQuestionQuickSelect();
     renderSolverSummary();
-    renderTaskContent();
+    renderTaskTypeContent();
     return;
   }
 
   checked = true;
   selfCheck.reset();
-  renderTaskNavigation();
+  renderTaskTypeNavigation();
   renderQuestionQuickSelect();
   renderSolverSummary();
-  renderTaskContent();
+  renderTaskTypeContent();
   openResultsDialog();
 }
 
 function finishSimulation(reason) {
   checked = solverExam.checkingSupported;
-  renderTaskNavigation();
+  renderTaskTypeNavigation();
   renderQuestionQuickSelect();
   renderSolverSummary();
-  renderTaskContent();
+  renderTaskTypeContent();
 
   if (reason === "submitted") recordSubmittedSimulation();
 
@@ -1194,7 +1940,7 @@ function recordSubmittedSimulation() {
 
 function taskScore(task) {
   return taskQuestions(task).filter(
-    (question) => responses[question] === solverExam.answers[question],
+    (question) => isCorrectAnswer(question, responses[question]),
   ).length;
 }
 

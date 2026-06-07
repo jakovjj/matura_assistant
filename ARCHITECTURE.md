@@ -77,7 +77,7 @@ python3 -m py_compile scripts/fetch_ncvvo.py scripts/build_croatian_writing.py
 | `profile-store.js` | Local/profile persistence adapter za pokusaje, vjezbe i kljuceve. |
 | `auth-client.js` | Frontend auth klijent i profile sync hookovi. |
 | `exam-simulation.js` | Zajednicki timed simulation mode. |
-| `solver-self-check.js` | Zajednicki `Provjeri zadatak` za auto-checkable zadatke. |
+| `solver-self-check.js` | Zajednicki `Provjeri` za auto-checkable zadatke. |
 | `solver-header.js` | Zajednicki header za standalone solvere. |
 | `site-header.js`, `site-footer.js` | Zajednicki layout chrome. |
 | `scripts/pdf_utils.py` | Zajednicki helperi za `pdftotext`, `pdfinfo`, `pdftocairo`, PNG dimenzije i osnovni slug/term utility. |
@@ -332,9 +332,7 @@ podataka preko `server.js`.
 | `/api/profile/agent-key` | Korisnicki API key helper. |
 | `/api/english-essay/grade`, `/api/english-essay/ocr` | Legacy rute koje vracaju 410 jer je engleski esej samo pregled. |
 | `/api/croatian-writing/grade`, `/api/croatian-writing/ocr` | Legacy rute koje vracaju 410 jer su sazetak i skolski esej samo pregled. |
-| `/api/history/grade-open` | AI ocjenjivanje otvorenih zadataka iz povijesti. |
 | `/api/geography/grade-open` | AI ocjenjivanje otvorenih zadataka iz geografije. |
-| `/api/psychology/grade-open` | AI ocjenjivanje otvorenih zadataka iz psihologije. |
 
 ## Kako dodati ili popraviti interaktivni ispit
 
@@ -442,11 +440,12 @@ Sva tri se mapiraju preko istog `archiveUrl`, ali u zasebne data fajlove.
 Fizika, matematika, povijest, geografija, psihologija i politika mogu imati kombinaciju:
 
 ```text
-tasks / questions        # auto-checkable dio
-openTasks / openQuestions # rucno ili AI provjeravani otvoreni dio
-answers                  # sluzbeni odgovori za auto-check
-solutions/sourceImages   # za prikaz zadataka i rjesenja
+tasks / questions         # auto-checkable dio
+openTasks / openQuestions # otvoreni dio
+answers                   # sluzbeni odgovori za auto-check
+solutions/sourceImages    # za prikaz zadataka i rjesenja
 ```
 
-Self-review otvoreni zadaci koriste bodovni input i rjesenje. Povijest,
-geografija i psihologija imaju i AI endpoint za otvorene zadatke.
+Self-review otvoreni zadaci koriste bodovni input i izrez sluzbenoga rjesenja.
+Tako rade fizika, matematika, povijest, psihologija i politika. Geografija jos
+ima zaseban AI endpoint za otvorene zadatke.

@@ -24,7 +24,7 @@
       <div class="topbar">
         <div class="container topbar__inner">
           <span class="topbar__label">
-            Neslužbeni projekt<span class="topbar__label-extra"> za pripremu mature</span>
+            matura.com.hr
           </span>
           <div class="topbar__actions">
             <a href="https://www.ncvvo.hr/" target="_blank" rel="noreferrer">

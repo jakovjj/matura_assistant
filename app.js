@@ -70,14 +70,12 @@ const mandatorySubjects = [
 const temporarilyUnavailableSubjects = new Set([
   "Biologija",
   "Filozofija",
-  "Glazbena umjetnost",
   "Informatika",
   "Likovna umjetnost",
   "Logika",
   "Njemački jezik",
   "Sociologija",
   "Talijanski jezik",
-  "Vjeronauk",
 ]);
 
 const subjectIcons = {
@@ -86,7 +84,6 @@ const subjectIcons = {
   Filozofija: "lightbulb",
   Fizika: "atom",
   Geografija: "earth",
-  "Glazbena umjetnost": "music-2",
   "Hrvatski jezik": "book-open-text",
   Informatika: "binary",
   Kemija: "flask-conical",
@@ -99,7 +96,6 @@ const subjectIcons = {
   Psihologija: "brain",
   Sociologija: "users-round",
   "Talijanski jezik": "languages",
-  Vjeronauk: "church",
 };
 
 const subjectColors = {
@@ -108,7 +104,6 @@ const subjectColors = {
   Filozofija: "#574d3f",
   Fizika: "#225b67",
   Geografija: "#3f5f3b",
-  "Glazbena umjetnost": "#6a4a5b",
   "Hrvatski jezik": "#7a3f4a",
   Informatika: "#2e5c72",
   Kemija: "#315f69",
@@ -121,7 +116,6 @@ const subjectColors = {
   Psihologija: "#5a4968",
   Sociologija: "#4e5960",
   "Talijanski jezik": "#405e55",
-  Vjeronauk: "#4f5943",
 };
 
 const subjectImages = {
@@ -130,7 +124,6 @@ const subjectImages = {
   Filozofija: "philosophy-thinker",
   Fizika: "physics",
   Geografija: "geography",
-  "Glazbena umjetnost": "music",
   "Hrvatski jezik": "croatian-writing",
   Informatika: "informatics",
   Kemija: "chemistry",
@@ -143,7 +136,6 @@ const subjectImages = {
   Psihologija: "psychology-brain",
   Sociologija: "sociology-crowd",
   "Talijanski jezik": "italian-colosseum",
-  Vjeronauk: "religion-bible",
 };
 
 const subjectAccusativeLabels = {
@@ -152,7 +144,6 @@ const subjectAccusativeLabels = {
   Filozofija: "Filozofiju",
   Fizika: "Fiziku",
   Geografija: "Geografiju",
-  "Glazbena umjetnost": "Glazbenu umjetnost",
   "Hrvatski jezik": "Hrvatski jezik",
   Informatika: "Informatiku",
   Kemija: "Kemiju",
@@ -165,7 +156,6 @@ const subjectAccusativeLabels = {
   Psihologija: "Psihologiju",
   Sociologija: "Sociologiju",
   "Talijanski jezik": "Talijanski jezik",
-  Vjeronauk: "Vjeronauk",
 };
 
 const termLabels = {
@@ -657,20 +647,6 @@ const unavailableForeignLanguageParts = [
     description: "Ispit pisanja.",
   },
 ];
-const musicPracticeParts = [
-  {
-    id: "glazba-u-kontekstu",
-    label: "Glazba u kontekstu",
-    description: "Prva ispitna knjižica.",
-    durationMinutes: 20,
-  },
-  {
-    id: "slusanje-upoznavanje-glazbe",
-    label: "Slušanje i upoznavanje glazbe",
-    description: "Druga ispitna knjižica sa zvučnim zapisom.",
-    durationMinutes: 70,
-  },
-];
 const singleExamPart = {
   id: "ispit",
   label: "Ispit",
@@ -694,7 +670,6 @@ const singleExamDurations = {
   Povijest: 135,
   Psihologija: 90,
   Sociologija: 90,
-  Vjeronauk: 70,
 };
 const twentyFivePercentPassSubjects = new Set([
   "Biologija",
@@ -1454,10 +1429,6 @@ function interactiveParts(exam) {
 
   if (modernForeignLanguageSubjects.has(exam.subject)) {
     return unavailableParts(exam, withDurations(exam, unavailableForeignLanguageParts));
-  }
-
-  if (exam.subject === "Glazbena umjetnost") {
-    return unavailableParts(exam, musicPracticeParts);
   }
 
   const choiceExam = abcdChoiceExamForArchive(exam);
@@ -2241,7 +2212,7 @@ function solverKeysForSubject(subject) {
   if (subject === "Psihologija") return ["psychologyChoice"];
   if (subject === "Politika i gospodarstvo") return ["politicsChoice"];
 
-  if (modernForeignLanguageSubjects.has(subject) || subject === "Glazbena umjetnost") {
+  if (modernForeignLanguageSubjects.has(subject)) {
     return [];
   }
 
@@ -2449,9 +2420,10 @@ function renderSubjectPage(subject) {
   appRoot.innerHTML = `
     <div class="subject-page"${colorStyle}>
       <div class="subject-page__intro">
-        <a class="back-link back-link--home" href="./">
-          ${icon("house", "back-link__icon")}
-          <span>Svi predmeti</span>
+        <a class="back-link back-link--home" href="./" aria-label="Svi predmeti">
+          ${icon("house", "back-link__icon back-link__icon--desktop")}
+          ${icon("arrow-left", "back-link__icon back-link__icon--mobile")}
+          <span class="back-link__label">Svi predmeti</span>
         </a>
         <div class="subject-title-row">
           <span class="subject-symbol">
@@ -2718,7 +2690,7 @@ function renderSubjectExamRow(exam, hasLevels, simulationAttempts) {
           </div>
         </div>
       </td>
-      <td class="subject-exam-table__best-cell" data-label="Najbolji rezultat">
+      <td class="subject-exam-table__best-cell" data-label="Rezultat">
         ${renderBestSimulationPercentages(bestPercentages)}
       </td>
       <td data-label="Materijali">

@@ -25,8 +25,13 @@ from open_answer_validation import (
     OpenQuestionSpec,
     answer_boundary_penalty,
     assert_valid_exam_open_answers,
+    is_excluded_task_text,
     repair_open_answer_boundaries,
     rubric_heading_points,
+)
+from manual_solution_images import (
+    attach_manual_solution_images,
+    build_manual_solution_images,
 )
 from pdf_utils import pdftotext, png_dimensions, render_pdf_page_to_png
 
@@ -66,11 +71,11 @@ TASK_LABELS = {
 }
 TASK_DESCRIPTIONS = {
     "visestruki-izbor": "Odaberi jedan točan odgovor za svako pitanje.",
-    "kratki-odgovor": "Upiši kratak odgovor; AI procjenjuje bodove prema službenome ključu.",
+    "kratki-odgovor": "Upiši kratak odgovor, otvori službeno rješenje i dodijeli si bodove.",
     "kronologija": "Odaberi točan kronološki poredak ili odgovor.",
     "uz-polazni-sadrzaj": "Riješi zadatke uz povijesne izvore, zemljovide i slikovne priloge.",
-    "produzeni-odgovor": "Napiši produženi odgovor; AI procjenjuje bodove prema službenome modelu.",
-    "otvoreni-zadaci": "Upiši odgovor; AI procjenjuje bodove prema službenome ključu.",
+    "produzeni-odgovor": "Napiši produženi odgovor, otvori službeno rješenje i dodijeli si bodove.",
+    "otvoreni-zadaci": "Upiši odgovor, otvori službeno rješenje i dodijeli si bodove.",
 }
 TASK_ORDER = [
     "visestruki-izbor",
@@ -711,6 +716,15 @@ def build_tasks(entries: list[dict[str, Any]], paper_text: str, sections: list[P
         answer_text = entry["answerText"]
         section = section_for_question(sections, question)
         task_id = entry.get("taskId") or (section.task_id if section else "otvoreni-zadaci")
+        if is_excluded_task_text(answer_text):
+            grouped.setdefault(task_id, []).append(
+                {
+                    "number": question,
+                    "excluded": True,
+                    "prompt": extract_question_prompt(paper_text, sections, question),
+                }
+            )
+            continue
         answer = closed_answer(answer_text)
 
         if answer:
@@ -903,7 +917,7 @@ def refine_history_crop_box(
                 minimum_y_max = max(y_min + 48, candidate_y_max)
                 refined_y_max = minimum_y_max
 
-    _, _, _, refined_y_max = trim_crop_bottom_whitespace(
+    x_min, y_min, x_max, refined_y_max = trim_crop_bottom_whitespace(
         image,
         x_min,
         y_min,
@@ -1068,12 +1082,13 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
         key_names = find_key_names(names)
         paper_name = find_paper_name(names)
         paper_contents = archive.read(paper_name)
+        key_contents = [archive.read(name) for name in key_names]
         key_texts = [
             extracted
-            for name in key_names
+            for contents in key_contents
             for extracted in (
-                pdf_text(archive.read(name), "-raw"),
-                pdf_text(archive.read(name), "-layout"),
+                pdf_text(contents, "-raw"),
+                pdf_text(contents, "-layout"),
             )
         ]
 
@@ -1093,6 +1108,19 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     write_if_changed(destination, paper_contents)
     source_images = build_source_images(paper_contents, destination, identifier, tasks)
     attach_source_images(tasks, source_images)
+    solution_images = build_manual_solution_images(
+        key_contents,
+        destination.parent,
+        identifier,
+        PAPER_URL_PREFIX,
+        open_answers,
+        pdf_bbox_pages=pdf_bbox_pages,
+        parse_question_token=parse_question_token,
+        question_sort_key=question_sort_key,
+        render_dpi=SOURCE_RENDER_DPI,
+        required_message="pdftocairo is required to build History solution images",
+    )
+    attach_manual_solution_images(tasks, solution_images)
 
     closed_questions = sorted(answers, key=question_sort_key)
     open_questions = sorted(open_answers, key=question_sort_key)
