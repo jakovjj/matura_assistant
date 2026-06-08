@@ -846,42 +846,10 @@ function renderSolutionImage(question) {
 }
 
 function renderCroppedImage(source, alt, options = {}) {
-  const crop = source?.crop;
-  const dimensions = [
-    source?.width,
-    source?.height,
-    crop?.x,
-    crop?.y,
-    crop?.width,
-    crop?.height,
-  ].map(Number);
-  if (!source?.url || dimensions.some((value) => !Number.isFinite(value) || value < 0)) return "";
-  if (!source.width || !source.height || !crop.width || !crop.height) return "";
-
-  const width = (source.width / crop.width) * 100;
-  const offsetX = (-crop.x / source.width) * 100;
-  const offsetY = (-crop.y / source.height) * 100;
-  const displayWidth = Math.min(820, Math.max(260, Math.ceil(crop.width)));
-  const compactStyle = options.compact ? "; min-width: 0" : "";
-
-  return `
-    <figure class="physics-source-figure">
-      <div
-        class="physics-source-crop"
-        style="width: min(100%, ${displayWidth}px); aspect-ratio: ${crop.width} / ${crop.height}${compactStyle}"
-      >
-        <img
-          src="${escapeHtml(source.url)}"
-          alt="${escapeHtml(alt)}"
-          width="${source.width}"
-          height="${source.height}"
-          loading="lazy"
-          decoding="async"
-          style="width: ${width}%; transform: translate(${offsetX}%, ${offsetY}%);"
-        >
-      </div>
-    </figure>
-  `;
+  return window.renderSourceImageCrop(source, alt, {
+    ...options,
+    constrainWidth: true,
+  });
 }
 
 function renderSourceTranscript(question) {

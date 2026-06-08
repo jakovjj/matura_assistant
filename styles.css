@@ -201,6 +201,51 @@ button {
   stroke-width: 1.5;
 }
 
+.site-notice[hidden] {
+  display: none;
+}
+
+.site-notice {
+  color: #13213c;
+  background: #f2c75c;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.14);
+}
+
+.site-notice__inner {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 9px 0;
+}
+
+.site-notice__icon {
+  display: inline-flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.site-notice__icon-svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.site-notice__message {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .masthead {
   gap: 28px;
   min-height: 100px;
@@ -2102,8 +2147,12 @@ a:focus-visible {
 
 .footer-brand {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
+}
+
+.footer-brand__copy {
+  min-width: 0;
 }
 
 .footer-brand__mark {
@@ -2116,6 +2165,37 @@ a:focus-visible {
   text-align: right;
 }
 
+.footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  margin-left: 18px;
+}
+
+.footer-coffee {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 7px;
+  margin-top: 8px;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.footer-coffee svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
 .footer-github {
   display: inline-flex;
   width: 32px;
@@ -2123,7 +2203,6 @@ a:focus-visible {
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  margin-left: 18px;
 }
 
 .footer-github svg {
@@ -2132,8 +2211,14 @@ a:focus-visible {
   fill: currentColor;
 }
 
+.site-footer .footer-coffee:hover,
 .site-footer .footer-github:hover {
+  color: var(--white);
   text-decoration: none;
+}
+
+.site-footer .footer-coffee:hover {
+  border-color: rgba(255, 255, 255, 0.48);
 }
 
 .site-footer p {
@@ -2150,8 +2235,13 @@ a:focus-visible {
   text-decoration: underline;
 }
 
+.site-footer .footer-coffee,
 .site-footer .footer-github {
   text-decoration: none;
+}
+
+.site-footer .footer-coffee {
+  color: #d4deed;
 }
 
 .practice-page-heading {
@@ -4863,6 +4953,18 @@ body.solver-page {
   height: auto;
 }
 
+.source-crop--segmented {
+  display: flex;
+  flex-direction: column;
+}
+
+.source-crop-segment {
+  position: relative;
+  width: 100%;
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+
 .physics-source-crop[role="button"],
 .pdf-source-crop[role="button"] {
   cursor: zoom-in;
@@ -6619,7 +6721,7 @@ body.solver-page {
     text-align: left;
   }
 
-  .footer-github {
+  .footer-actions {
     margin: 16px 0 0;
   }
 }

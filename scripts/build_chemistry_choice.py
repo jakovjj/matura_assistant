@@ -21,6 +21,7 @@ from PIL import Image
 
 from crop_utils import (
     grayscale_image_from_png,
+    source_image_metadata,
     trim_crop_bottom_whitespace,
     trim_legacy_answer_frame,
 )
@@ -49,6 +50,8 @@ SOLUTION_CROP_VERTICAL_PADDING = 8
 SOLUTION_TABLE_RULE_MIN_WIDTH_RATIO = 0.45
 SOLUTION_TABLE_CROP_PADDING = 2
 SOLUTION_RULE_MARKER_TOLERANCE = 4
+LEGACY_SOLUTION_CROP_VERTICAL_PADDING = 0
+LEGACY_SOLUTION_TABLE_MAX_RULE_DISTANCE = 80
 TERM_ALIASES = {
     "prvi rok": "ljetni rok",
     "drugi rok": "jesenski rok",
@@ -1086,11 +1089,177 @@ def find_solution_page_crops(
     return crops, points
 
 
+def legacy_solution_marker_number(line: PdfLine) -> str | None:
+    if re.match(r"^\s*\d{1,2}\.[A-ZČĆŽŠĐ]\.", line.text, flags=re.IGNORECASE):
+        return None
+    match = re.match(
+        r"^\s*(\d{1,2}(?:[\.,]\d{1,2})?)(?:\.|\s)",
+        line.text,
+    )
+    if not match:
+        return None
+    return parse_question_token(match.group(1))
+
+
+def find_legacy_solution_page_crops(
+    contents: bytes,
+    question_numbers: list[str],
+) -> tuple[dict[str, QuestionCrop], dict[str, str]]:
+    pages = pdf_bbox_pages(contents)
+    pages_by_number = {page.number: page for page in pages}
+    rules_by_page = detect_horizontal_rules(contents, pages_by_number)
+    markers: list[QuestionMarker] = []
+    parent_markers: dict[str, QuestionMarker] = {}
+    markers_by_number: dict[str, list[QuestionMarker]] = {}
+
+    for page in pages:
+        for line in sorted_page_lines(page):
+            if line.x_min >= 180:
+                continue
+            number = legacy_solution_marker_number(line)
+            if number is None:
+                continue
+            marker = QuestionMarker(
+                number=number,
+                page=page,
+                y_min=line.y_min,
+                x_min=line.x_min,
+            )
+            markers.append(marker)
+            markers_by_number.setdefault(number, []).append(marker)
+            if "." not in number and line_is_question_token_only(line, number):
+                parent_markers.setdefault(number, marker)
+
+    markers.sort(
+        key=lambda marker: (
+            marker.page.number,
+            marker.y_min,
+            marker.x_min,
+            question_sort_key(marker.number),
+        )
+    )
+    ordered_parent_markers = sorted(
+        parent_markers.values(),
+        key=lambda marker: (marker.page.number, marker.y_min),
+    )
+
+    crops: dict[str, QuestionCrop] = {}
+    points: dict[str, str] = {}
+    missing_numbers: list[str] = []
+    for number in question_numbers:
+        parent_number = number.split(".", 1)[0]
+        exact_markers = markers_by_number.get(number, [])
+        use_parent_block = "." not in number or not exact_markers
+        marker = (
+            parent_markers.get(parent_number)
+            if use_parent_block
+            else exact_markers[0]
+        )
+        if marker is None:
+            missing_numbers.append(number)
+            continue
+
+        boundary_markers = ordered_parent_markers if use_parent_block else markers
+        next_marker = next_marker_after(marker, boundary_markers)
+        x_min = SOURCE_CROP_HORIZONTAL_MARGIN
+        x_max = marker.page.width - 18
+        y_min = max(0, marker.y_min - LEGACY_SOLUTION_CROP_VERTICAL_PADDING)
+        y_max = (
+            next_marker.y_min - LEGACY_SOLUTION_CROP_VERTICAL_PADDING
+            if next_marker and next_marker.page.number == marker.page.number
+            else marker.page.height - SOLUTION_FOOTER_MARGIN
+        )
+
+        if not use_parent_block:
+            page_rules = rules_by_page.get(marker.page.number, [])
+            previous_rule = max(
+                (
+                    rule
+                    for rule in page_rules
+                    if rule.y_max <= marker.y_min + SOLUTION_RULE_MARKER_TOLERANCE
+                ),
+                key=lambda rule: rule.y_max,
+                default=None,
+            )
+            following_rule = min(
+                (
+                    rule
+                    for rule in page_rules
+                    if rule.y_min >= marker.y_min + SOLUTION_RULE_MARKER_TOLERANCE
+                ),
+                key=lambda rule: rule.y_min,
+                default=None,
+            )
+            if (
+                previous_rule
+                and following_rule
+                and marker.y_min - previous_rule.y_max
+                <= LEGACY_SOLUTION_TABLE_MAX_RULE_DISTANCE
+                and following_rule.y_min - marker.y_min
+                <= LEGACY_SOLUTION_TABLE_MAX_RULE_DISTANCE
+            ):
+                x_min = max(
+                    0,
+                    min(previous_rule.x_min, following_rule.x_min)
+                    - SOLUTION_TABLE_CROP_PADDING,
+                )
+                x_max = min(
+                    marker.page.width,
+                    max(previous_rule.x_max, following_rule.x_max)
+                    + SOLUTION_TABLE_CROP_PADDING,
+                )
+                y_min = max(
+                    0,
+                    previous_rule.y_min - SOLUTION_TABLE_CROP_PADDING,
+                )
+                y_max = min(
+                    marker.page.height,
+                    following_rule.y_max + SOLUTION_TABLE_CROP_PADDING,
+                )
+        if y_max <= y_min:
+            missing_numbers.append(number)
+            continue
+
+        crop = QuestionCrop(
+            page=marker.page,
+            x_min=x_min,
+            y_min=y_min,
+            x_max=x_max,
+            y_max=y_max,
+        )
+        crops[number] = crop
+        block_lines = [
+            line
+            for line in sorted_page_lines(marker.page)
+            if line.y_min >= marker.y_min
+            and line.y_min < y_max
+            and line_overlaps_x_range(line, crop.x_min, crop.x_max)
+        ]
+        point_label = point_label_from_solution_lines(block_lines)
+        if point_label:
+            points[number] = point_label
+
+    if missing_numbers:
+        raise ValueError(
+            f"Could not locate legacy Chemistry solution crops for {missing_numbers}"
+        )
+    return crops, points
+
+
 def normalized_name(name: str) -> str:
     filename = Path(name).name
     normalized = unicodedata.normalize("NFD", filename).casefold()
     ascii_name = normalized.encode("ascii", "ignore").decode()
     return f"{normalized} {ascii_name}"
+
+
+def is_archive_metadata_name(name: str) -> bool:
+    return any(
+        part.casefold() == "__macosx"
+        or part.casefold() == ".ds_store"
+        or part.startswith("._")
+        for part in Path(name).parts
+    )
 
 
 def is_answer_sheet_name(name: str) -> bool:
@@ -1200,6 +1369,7 @@ def find_scoring_name(names: list[str], key_name: str) -> str:
         if name.casefold().endswith(".pdf")
         and not is_answer_sheet_name(name)
         and re.search(r"\bbodov|ocjenj", normalized_name(name), flags=re.IGNORECASE)
+        and not re.search(r"\bodluka\b", normalized_name(name), flags=re.IGNORECASE)
     ]
     if candidates:
         return sorted(candidates, key=lambda name: normalized_name(Path(name).name))[0]
@@ -1544,17 +1714,13 @@ def render_source_pages(
                     y_max,
                     detect_legacy_answer_frame=question not in aligned_questions,
                 )
-                source_images[question] = {
-                    "url": f"{PAPER_URL_PREFIX}/{quote(identifier)}/{filename}",
-                    "width": image_width,
-                    "height": image_height,
-                    "crop": {
-                        "x": x_min,
-                        "y": y_min,
-                        "width": x_max - x_min,
-                        "height": y_max - y_min,
-                    },
-                }
+                source_images[question] = source_image_metadata(
+                    page_image,
+                    url=f"{PAPER_URL_PREFIX}/{quote(identifier)}/{filename}",
+                    image_width=image_width,
+                    image_height=image_height,
+                    crop_box=(x_min, y_min, x_max, y_max),
+                )
 
     return source_images
 
@@ -2186,7 +2352,11 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     identifier = exam_id(exam)
 
     with zipfile.ZipFile(archive_path) as archive:
-        names = [info.filename for info in archive.infolist() if not info.is_dir()]
+        names = [
+            info.filename
+            for info in archive.infolist()
+            if not info.is_dir() and not is_archive_metadata_name(info.filename)
+        ]
         paper_name = find_paper_name(names)
         open_paper_name = find_open_paper_name(names, paper_name)
         key_names = find_key_names(names)
@@ -2292,7 +2462,16 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     solution_key_destination = PAPER_ROOT / identifier / "solutions.pdf"
     write_if_changed(solution_key_destination, scoring_contents)
     expected_assets.add("solutions.pdf")
-    solution_crops, _solution_points = find_solution_page_crops(scoring_contents, open_question_numbers)
+    if exam["year"] == 2013:
+        solution_crops, _solution_points = find_legacy_solution_page_crops(
+            scoring_contents,
+            open_question_numbers,
+        )
+    else:
+        solution_crops, _solution_points = find_solution_page_crops(
+            scoring_contents,
+            open_question_numbers,
+        )
     solution_images = render_source_pages(
         solution_key_destination,
         identifier,

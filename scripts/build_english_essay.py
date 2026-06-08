@@ -16,7 +16,11 @@ from typing import Any
 from urllib.parse import quote, unquote, urlparse
 from xml.etree import ElementTree
 
-from crop_utils import grayscale_image_from_png, trim_crop_bottom_whitespace
+from crop_utils import (
+    grayscale_image_from_png,
+    source_image_metadata,
+    trim_crop_bottom_whitespace,
+)
 from pdf_utils import pdftotext, png_dimensions, render_pdf_page_to_png
 
 
@@ -341,18 +345,14 @@ def render_source_page(paper_path: Path, identifier: str, crop: SourceCrop) -> d
         y_max,
     )
 
-    return {
-        "url": f"{ASSET_URL_PREFIX}/{quote(identifier)}/{filename}",
-        "page": crop.page.number,
-        "width": image_width,
-        "height": image_height,
-        "crop": {
-            "x": x_min,
-            "y": y_min,
-            "width": x_max - x_min,
-            "height": y_max - y_min,
-        },
-    }
+    return source_image_metadata(
+        page_image,
+        url=f"{ASSET_URL_PREFIX}/{quote(identifier)}/{filename}",
+        page=crop.page.number,
+        image_width=image_width,
+        image_height=image_height,
+        crop_box=(x_min, y_min, x_max, y_max),
+    )
 
 
 def build_exam(exam: dict[str, Any]) -> dict[str, Any]:

@@ -11,7 +11,7 @@ const solverDataSources = {
   },
   englishListening: {
     globalName: "ASISTENT_ZA_MATURE_ENGLISH_LISTENING",
-    src: "./data/english-listening.js",
+    src: "./data/english-listening.js?v=20260608-wma-audio",
   },
   englishEssay: {
     globalName: "ASISTENT_ZA_MATURE_ENGLISH_ESSAY",
@@ -35,7 +35,7 @@ const solverDataSources = {
   },
   croatianChoice: {
     globalName: "ASISTENT_ZA_MATURE_CROATIAN_CHOICE",
-    src: "./data/croatian-choice.js?v=20260602-croatian-tasks",
+    src: "./data/croatian-choice.js?v=20260608-croatian-legacy",
   },
   historyChoice: {
     globalName: "ASISTENT_ZA_MATURE_HISTORY_CHOICE",
@@ -48,6 +48,10 @@ const solverDataSources = {
   psychologyChoice: {
     globalName: "ASISTENT_ZA_MATURE_PSYCHOLOGY_CHOICE",
     src: "./data/psychology-choice.js?v=20260605-psychology-choice",
+  },
+  sociologyChoice: {
+    globalName: "ASISTENT_ZA_MATURE_SOCIOLOGY_CHOICE",
+    src: "./data/sociology-choice.js?v=20260608-sociology-choice",
   },
   politicsChoice: {
     globalName: "ASISTENT_ZA_MATURE_POLITICS_CHOICE",
@@ -74,7 +78,6 @@ const temporarilyUnavailableSubjects = new Set([
   "Likovna umjetnost",
   "Logika",
   "Njemački jezik",
-  "Sociologija",
   "Talijanski jezik",
 ]);
 
@@ -343,6 +346,11 @@ const solverDefinitions = {
     page: "./psihologija.html",
     storagePrefix: "psychology-choice",
   },
+  sociologyChoice: {
+    idForTerm: (exam, term) => `sociologija-${exam.year}-${slugPart(term)}`,
+    page: "./sociologija.html",
+    storagePrefix: "sociology-choice",
+  },
   politicsChoice: {
     idForTerm: (exam, term) => `politika-i-gospodarstvo-${exam.year}-${slugPart(term)}`,
     page: "./politika.html",
@@ -515,6 +523,10 @@ function psychologyChoiceIdForTerm(exam, term) {
   return solverIdForTerm("psychologyChoice", exam, term);
 }
 
+function sociologyChoiceIdForTerm(exam, term) {
+  return solverIdForTerm("sociologyChoice", exam, term);
+}
+
 function politicsChoiceIdForTerm(exam, term) {
   return solverIdForTerm("politicsChoice", exam, term);
 }
@@ -569,6 +581,10 @@ function geographyChoiceStorageKeys(choiceExam) {
 
 function psychologyChoiceStorageKeys(choiceExam) {
   return solverStorageKeys("psychologyChoice", choiceExam);
+}
+
+function sociologyChoiceStorageKeys(choiceExam) {
+  return solverStorageKeys("sociologyChoice", choiceExam);
 }
 
 function politicsChoiceStorageKeys(choiceExam) {
@@ -1046,6 +1062,10 @@ function psychologyChoiceUrl(choiceExam, simulation = false) {
   return solverUrl("psychologyChoice", choiceExam, simulation);
 }
 
+function sociologyChoiceUrl(choiceExam, simulation = false) {
+  return solverUrl("sociologyChoice", choiceExam, simulation);
+}
+
 function politicsChoiceUrl(choiceExam, simulation = false) {
   return solverUrl("politicsChoice", choiceExam, simulation);
 }
@@ -1096,6 +1116,10 @@ function geographyChoiceExamForArchive(exam) {
 
 function psychologyChoiceExamForArchive(exam) {
   return solverExamForArchive("psychologyChoice", exam);
+}
+
+function sociologyChoiceExamForArchive(exam) {
+  return solverExamForArchive("sociologyChoice", exam);
 }
 
 function politicsChoiceExamForArchive(exam) {
@@ -1405,6 +1429,24 @@ function interactiveParts(exam) {
         },
         choiceExam,
         psychologyChoiceUrl,
+      ),
+    ];
+  }
+
+  if (exam.subject === "Sociologija") {
+    const choiceExam = sociologyChoiceExamForArchive(exam);
+    return [
+      linkedPart(
+        exam,
+        {
+          id: "sociologija",
+          label: "Ispit",
+          description: "Zadatci zatvorenoga tipa i otvoreni zadatci iz ispitne knjižice.",
+          durationMinutes: singleExamDuration(exam),
+          usesAiChecking: true,
+        },
+        choiceExam,
+        sociologyChoiceUrl,
       ),
     ];
   }
@@ -1828,6 +1870,37 @@ function psychologyProgress(exam) {
   };
 }
 
+function sociologyProgress(exam) {
+  const choiceExam = sociologyChoiceExamForArchive(exam);
+  if (!choiceExam) return null;
+
+  const knownClosed = new Set((choiceExam.questions || []).map(String));
+  const knownOpen = new Set((choiceExam.openQuestions || []).map(String));
+  const stored = readMergedStorageObjects(sociologyChoiceStorageKeys(choiceExam));
+  const closedResponses =
+    stored.closedResponses && typeof stored.closedResponses === "object"
+      ? stored.closedResponses
+      : {};
+  const openResponses =
+    stored.openResponses && typeof stored.openResponses === "object"
+      ? stored.openResponses
+      : {};
+  const answeredClosed = Object.entries(closedResponses).filter(
+    ([question, answer]) =>
+      knownClosed.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+  const answeredOpen = Object.entries(openResponses).filter(
+    ([question, answer]) =>
+      knownOpen.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+
+  return {
+    answered: answeredClosed + answeredOpen,
+    id: choiceExam.id,
+    total: knownClosed.size + knownOpen.size,
+  };
+}
+
 function readPoliticsChoiceResponses(choiceExam) {
   return readMergedStorageObjects(
     politicsChoiceStorageKeys(choiceExam),
@@ -1878,6 +1951,7 @@ function abcdChoiceProgress(exam) {
     || exam.subject === "Povijest"
     || exam.subject === "Geografija"
     || exam.subject === "Psihologija"
+    || exam.subject === "Sociologija"
     || exam.subject === "Politika i gospodarstvo"
   ) return null;
 
@@ -1911,6 +1985,7 @@ function examProgress(exam) {
     historyProgress(exam),
     geographyProgress(exam),
     psychologyProgress(exam),
+    sociologyProgress(exam),
     politicsProgress(exam),
     abcdChoiceProgress(exam),
   ].filter(Boolean);
@@ -2210,6 +2285,7 @@ function solverKeysForSubject(subject) {
   if (subject === "Povijest") return ["historyChoice"];
   if (subject === "Geografija") return ["geographyChoice"];
   if (subject === "Psihologija") return ["psychologyChoice"];
+  if (subject === "Sociologija") return ["sociologyChoice"];
   if (subject === "Politika i gospodarstvo") return ["politicsChoice"];
 
   if (modernForeignLanguageSubjects.has(subject)) {
@@ -2923,6 +2999,7 @@ function renderSimulationNote() {
     <p class="simulation-note">
       <strong>Simulacija mature</strong> ima vremensko ograničenje prema trajanju
       odabranog ispita. Odgovori i napredak rješavanja iz simulacije ne spremaju se.
+      Provjera svih zadataka odvija se odjednom na kraju (nema međuprovjere zadatak po zadatak).
     </p>
   `;
 }

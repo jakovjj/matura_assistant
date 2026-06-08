@@ -18,7 +18,11 @@ from typing import Any
 from urllib.parse import quote, unquote, urlparse
 from xml.etree import ElementTree
 
-from crop_utils import grayscale_image_from_png, trim_crop_bottom_whitespace
+from crop_utils import (
+    grayscale_image_from_png,
+    source_image_metadata,
+    trim_crop_bottom_whitespace,
+)
 from pdf_utils import pdftotext, png_dimensions, render_pdf_page_to_png
 
 
@@ -456,12 +460,12 @@ def question_marker_visual_top(
     marker_page: PdfPage,
     marker_line: PdfLine,
 ) -> float:
+    marker_center = (marker_line.y_min + marker_line.y_max) / 2
     aligned_lines = [
         line
         for page, line in line_entries
         if page.number == marker_page.number
-        and line.y_max >= marker_line.y_min - 4
-        and line.y_min <= marker_line.y_max + 4
+        and abs(((line.y_min + line.y_max) / 2) - marker_center) <= 5
     ]
     return min(
         (line.y_min for line in aligned_lines),
@@ -739,18 +743,14 @@ def render_source_pages(
                     y_max,
                 )
                 source_images.setdefault(crop_key, []).append(
-                    {
-                        "url": f"{ASSET_URL_PREFIX}/{quote(identifier)}/{filename}",
-                        "page": page_number,
-                        "width": image_width,
-                        "height": image_height,
-                        "crop": {
-                            "x": x_min,
-                            "y": y_min,
-                            "width": x_max - x_min,
-                            "height": y_max - y_min,
-                        },
-                    }
+                    source_image_metadata(
+                        page_image,
+                        url=f"{ASSET_URL_PREFIX}/{quote(identifier)}/{filename}",
+                        page=page_number,
+                        image_width=image_width,
+                        image_height=image_height,
+                        crop_box=(x_min, y_min, x_max, y_max),
+                    )
                 )
 
     return source_images

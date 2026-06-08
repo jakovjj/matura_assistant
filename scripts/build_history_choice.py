@@ -19,7 +19,11 @@ from xml.etree import ElementTree
 
 from PIL import Image
 
-from crop_utils import grayscale_image_from_png, trim_crop_bottom_whitespace
+from crop_utils import (
+    grayscale_image_from_png,
+    source_image_metadata,
+    trim_crop_bottom_whitespace,
+)
 from open_answer_validation import (
     OpenAnswerValidationError,
     OpenQuestionSpec,
@@ -988,17 +992,13 @@ def render_source_pages(
                 )
                 if x_max <= x_min or y_max <= y_min:
                     continue
-                source_images[key] = {
-                    "url": f"{PAPER_URL_PREFIX}/{quote(identifier)}/{filename}",
-                    "width": image_width,
-                    "height": image_height,
-                    "crop": {
-                        "x": x_min,
-                        "y": y_min,
-                        "width": x_max - x_min,
-                        "height": y_max - y_min,
-                    },
-                }
+                source_images[key] = source_image_metadata(
+                    page_image,
+                    url=f"{PAPER_URL_PREFIX}/{quote(identifier)}/{filename}",
+                    image_width=image_width,
+                    image_height=image_height,
+                    crop_box=(x_min, y_min, x_max, y_max),
+                )
 
     return source_images, expected_assets
 

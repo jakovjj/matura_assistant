@@ -1,5 +1,6 @@
 const data = window.ASISTENT_ZA_MATURE_ABCD_CHOICE;
 const geographyData = window.ASISTENT_ZA_MATURE_GEOGRAPHY_CHOICE;
+const sociologyData = window.ASISTENT_ZA_MATURE_SOCIOLOGY_CHOICE;
 
 if (!data || !Array.isArray(data.exams)) {
   throw new Error("Nedostaje generirani indeks ABCD zadataka.");
@@ -142,6 +143,12 @@ const geographyExamsById = buildExamMap(
     term: normalizeTerm(exam.term),
   })),
 );
+const sociologyExamsById = buildExamMap(
+  (sociologyData?.exams || []).map((exam) => ({
+    ...exam,
+    term: normalizeTerm(exam.term),
+  })),
+);
 
 function questionIds(exam = solverExam) {
   return exam?.questions || [];
@@ -167,6 +174,12 @@ function geographyChoiceUrl(exam) {
   const params = new URLSearchParams({ exam: exam.id });
   if (simulation.active) params.set("nacin", "simulacija");
   return `./geografija.html?${params.toString()}`;
+}
+
+function sociologyChoiceUrl(exam) {
+  const params = new URLSearchParams({ exam: exam.id });
+  if (simulation.active) params.set("nacin", "simulacija");
+  return `./sociologija.html?${params.toString()}`;
 }
 
 function politicsChoiceUrl(exam) {
@@ -604,8 +617,14 @@ function startAbcdPage() {
 
   const exam = examsById.get(id);
   const geographyExam = geographyExamsById.get(id);
+  const sociologyExam = sociologyExamsById.get(id);
   if (geographyExam) {
     window.location.replace(geographyChoiceUrl(geographyExam));
+    return;
+  }
+
+  if (sociologyExam) {
+    window.location.replace(sociologyChoiceUrl(sociologyExam));
     return;
   }
 

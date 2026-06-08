@@ -41,6 +41,7 @@ EXCLUDED_SUBJECTS = {
     "Matematika",
     "Njemački jezik",
     "Psihologija",
+    "Sociologija",
     "Talijanski jezik",
     "Talijanski jezik i književnost",
     "Vjeronauk",

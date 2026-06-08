@@ -29,6 +29,7 @@ const taskTypeAliases = {
   citanje: defaultTaskTypeId,
   "citanje-s-polaznim-tekstom": defaultTaskTypeId,
   "visestruki-izbor": "visestruki-izbor",
+  povezivanje: "povezivanje",
   nadopunjavanje: "nadopunjavanje",
 };
 
@@ -708,39 +709,7 @@ function renderContextImages(images = [], title) {
 }
 
 function renderCroppedImage(source, alt, options = {}) {
-  const crop = source?.crop;
-  const dimensions = [
-    source?.width,
-    source?.height,
-    crop?.x,
-    crop?.y,
-    crop?.width,
-    crop?.height,
-  ].map(Number);
-  if (!source?.url || dimensions.some((value) => !Number.isFinite(value) || value < 0)) return "";
-  if (!source.width || !source.height || !crop.width || !crop.height) return "";
-
-  const width = (source.width / crop.width) * 100;
-  const offsetX = (-crop.x / source.width) * 100;
-  const offsetY = (-crop.y / source.height) * 100;
-  const cropClass = options.cropClass ? ` ${options.cropClass}` : "";
-
-  return `
-    <figure class="physics-source-figure">
-      <div class="physics-source-crop${cropClass}" style="aspect-ratio: ${crop.width} / ${crop.height}">
-        <img
-          src="${escapeHtml(source.url)}"
-          alt="${escapeHtml(alt)}"
-          width="${source.width}"
-          height="${source.height}"
-          loading="lazy"
-          decoding="async"
-          style="width: ${width}%; transform: translate(${offsetX}%, ${offsetY}%);"
-        >
-        ${options.overlayHtml || ""}
-      </div>
-    </figure>
-  `;
+  return window.renderSourceImageCrop(source, alt, options);
 }
 
 function bindResponseListeners() {
@@ -996,6 +965,8 @@ function updateQuickSelectActiveState() {
 
 function renderQuestion(question) {
   const answer = responses[question] || "";
+  const questionData = questionByNumber.get(String(question));
+  const options = questionData?.choiceOptions || ["A", "B", "C", "D"];
   const resultClass = isChecked(question)
     ? isCorrectAnswer(question, answer)
       ? " response-question--correct"
@@ -1006,7 +977,7 @@ function renderQuestion(question) {
     <fieldset class="physics-inline-response ${resultClass}">
       <legend>Odgovor na ${escapeHtml(question)}. pitanje</legend>
       <div class="choice-list">
-        ${["A", "B", "C", "D"]
+        ${options
           .map((option) => renderChoice(question, option, answer))
           .join("")}
       </div>

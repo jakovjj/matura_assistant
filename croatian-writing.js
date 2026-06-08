@@ -109,31 +109,7 @@ function hasValidSourceImage(source) {
 
 function renderCroppedImage(source, alt) {
   if (!hasValidSourceImage(source)) return "";
-
-  const crop = source.crop;
-  const width = (source.width / crop.width) * 100;
-  const offsetX = (-crop.x / source.width) * 100;
-  const offsetY = (-crop.y / source.height) * 100;
-
-  return `
-    <figure class="pdf-source-figure">
-      <div
-        class="pdf-source-crop"
-        style="aspect-ratio: ${crop.width} / ${crop.height}"
-      >
-        <img
-          src="${escapeHtml(source.url)}"
-          alt="${escapeHtml(alt)}"
-          loading="lazy"
-          style="
-            width: ${width}%;
-            max-width: none;
-            transform: translate(${offsetX}%, ${offsetY}%);
-          "
-        />
-      </div>
-    </figure>
-  `;
+  return window.renderSourceImageCrop(source, alt, { variant: "pdf" });
 }
 
 function renderTaskSourceImages(exam) {

@@ -4,6 +4,134 @@
     "a, button, input, label, select, textarea, [role='button'], [data-completion-question]";
   const MIN_SCALE = 1;
   const MAX_SCALE = 5;
+  const fallbackRenderSourceImageCrop = window.renderSourceImageCrop;
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function validSourceCrop(source, crop) {
+    const dimensions = [
+      source?.width,
+      source?.height,
+      crop?.x,
+      crop?.y,
+      crop?.width,
+      crop?.height,
+    ].map(Number);
+    return Boolean(
+      source?.url &&
+        dimensions.every((value) => Number.isFinite(value) && value >= 0) &&
+        Number(source.width) > 0 &&
+        Number(source.height) > 0 &&
+        Number(crop.width) > 0 &&
+        Number(crop.height) > 0,
+    );
+  }
+
+  function validSegments(source) {
+    const crop = source?.crop;
+    const segments = Array.isArray(source?.segments) ? source.segments : [];
+    if (segments.length < 2 || !validSourceCrop(source, crop)) return [];
+
+    const cropXMax = Number(crop.x) + Number(crop.width);
+    const cropYMax = Number(crop.y) + Number(crop.height);
+    const valid = segments.every((segment) => {
+      if (!validSourceCrop(source, segment)) return false;
+      const x = Number(segment.x);
+      const y = Number(segment.y);
+      const width = Number(segment.width);
+      const height = Number(segment.height);
+      return (
+        x >= Number(crop.x) &&
+        y >= Number(crop.y) &&
+        x + width <= cropXMax &&
+        y + height <= cropYMax &&
+        x === Number(crop.x) &&
+        width === Number(crop.width)
+      );
+    });
+    return valid ? segments : [];
+  }
+
+  function sourceCropImage(source, crop, alt, loading, index = 0) {
+    const width = (Number(source.width) / Number(crop.width)) * 100;
+    const offsetX = (-Number(crop.x) / Number(source.width)) * 100;
+    const offsetY = (-Number(crop.y) / Number(source.height)) * 100;
+    const accessibleAlt = index === 0 ? `alt="${escapeHtml(alt)}"` : 'alt="" aria-hidden="true"';
+    return `
+      <img
+        src="${escapeHtml(source.url)}"
+        ${accessibleAlt}
+        width="${Number(source.width)}"
+        height="${Number(source.height)}"
+        loading="${loading}"
+        decoding="async"
+        style="width: ${width}%; transform: translate(${offsetX}%, ${offsetY}%);"
+      >
+    `;
+  }
+
+  window.renderSourceImageCrop = function renderSourceImageCrop(source, alt, options = {}) {
+    try {
+      const crop = source?.crop;
+      if (!validSourceCrop(source, crop)) return "";
+
+      const variant = options.variant === "pdf" ? "pdf" : "physics";
+      const figureClass = `${variant}-source-figure`;
+      const cropBaseClass = `${variant}-source-crop`;
+      const cropClass = options.cropClass ? ` ${options.cropClass}` : "";
+      const overlayHtml = options.overlayHtml || "";
+      const segments = overlayHtml ? [] : validSegments(source);
+      const renderedCrops = segments.length ? segments : [crop];
+      const displayedHeight = renderedCrops.reduce(
+        (total, segment) => total + Number(segment.height),
+        0,
+      );
+      const segmentedClass = segments.length ? " source-crop--segmented" : "";
+      const displayWidth = options.constrainWidth
+        ? `width: min(100%, ${Math.min(820, Math.max(260, Math.ceil(Number(crop.width))))}px); `
+        : "";
+      const compactStyle = options.compact ? "min-width: 0; " : "";
+      const loading = options.loading === "eager" ? "eager" : "lazy";
+      const imageHtml = segments.length
+        ? segments
+            .map(
+              (segment, index) => `
+                <div
+                  class="source-crop-segment"
+                  style="aspect-ratio: ${segment.width} / ${segment.height}"
+                >
+                  ${sourceCropImage(source, segment, alt, loading, index)}
+                </div>
+              `,
+            )
+            .join("")
+        : sourceCropImage(source, crop, alt, loading);
+
+      return `
+        <figure class="${figureClass}">
+          <div
+            class="${cropBaseClass}${cropClass}${segmentedClass}"
+            style="${displayWidth}${compactStyle}aspect-ratio: ${crop.width} / ${displayedHeight}"
+          >
+            ${imageHtml}
+            ${overlayHtml}
+          </div>
+        </figure>
+      `;
+    } catch (error) {
+      console.error("Could not render segmented source image crop.", error);
+      return typeof fallbackRenderSourceImageCrop === "function"
+        ? fallbackRenderSourceImageCrop(source, alt, options)
+        : "";
+    }
+  };
 
   let dialog;
   let viewport;

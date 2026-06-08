@@ -9,7 +9,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from crop_utils import grayscale_image_from_png, trim_crop_bottom_whitespace
+from crop_utils import (
+    grayscale_image_from_png,
+    source_image_metadata,
+    trim_crop_bottom_whitespace,
+)
 from pdf_utils import png_dimensions, render_pdf_page_to_png
 
 
@@ -341,17 +345,13 @@ def _render_solution_pages(
                 if x_max <= x_min or y_max <= y_min:
                     continue
                 images.setdefault(number, []).append(
-                    {
-                        "url": f"{url_prefix}/{identifier}/{filename}",
-                        "width": image_width,
-                        "height": image_height,
-                        "crop": {
-                            "x": x_min,
-                            "y": y_min,
-                            "width": x_max - x_min,
-                            "height": y_max - y_min,
-                        },
-                    }
+                    source_image_metadata(
+                        page_image,
+                        url=f"{url_prefix}/{identifier}/{filename}",
+                        image_width=image_width,
+                        image_height=image_height,
+                        crop_box=(x_min, y_min, x_max, y_max),
+                    )
                 )
 
     return images

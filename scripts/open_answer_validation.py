@@ -13,6 +13,7 @@ from typing import Any, Iterable
 ROOT = Path(__file__).resolve().parents[1]
 INDEXES = (
     ("data/psychology-choice.js", "window.ASISTENT_ZA_MATURE_PSYCHOLOGY_CHOICE="),
+    ("data/sociology-choice.js", "window.ASISTENT_ZA_MATURE_SOCIOLOGY_CHOICE="),
     ("data/geography-choice.js", "window.ASISTENT_ZA_MATURE_GEOGRAPHY_CHOICE="),
     ("data/history-choice.js", "window.ASISTENT_ZA_MATURE_HISTORY_CHOICE="),
     ("data/politics-choice.js", "window.ASISTENT_ZA_MATURE_POLITICS_CHOICE="),
@@ -535,7 +536,7 @@ def _is_trailing_metadata(line: str) -> bool:
             (
                 r"^\s*(?:Izvor:|Prilagođeno prema:|https?://|www\.|NCVVO\b|Nacionalni centar\b|"
                 r"OIB:|Mati[čc]ni broj\b|DM\s+\d{4}\b|"
-                r"(?:Psihologija|Geografija|Povijest)\s+\d{4}\b)"
+                r"(?:Psihologija|Sociologija|Geografija|Povijest)\s+\d{4}\b)"
             ),
             line,
             flags=re.IGNORECASE,
@@ -588,6 +589,8 @@ def _looks_like_sentence_continuation(previous: str, following: str, maximum: in
         return False
     if previous.endswith((".", "!", "?", ":", ";", "…", ")", "]")):
         return False
+    if _ends_with_zero_point_rubric(previous):
+        return False
 
     first_line = following.splitlines()[0].strip()
     if not first_line or RUBRIC_HEADING_RE.match(first_line) or MODEL_HEADING_RE.match(first_line):
@@ -600,6 +603,29 @@ def _looks_like_sentence_continuation(previous: str, following: str, maximum: in
         return False
 
     return maximum > 1 or bool(rubric_heading_points(previous))
+
+
+def _ends_with_zero_point_rubric(text: str) -> bool:
+    lines = str(text or "").splitlines()
+    zero_index = next(
+        (
+            index
+            for index in range(len(lines) - 1, -1, -1)
+            if re.match(r"^\s*0\s+bodova?\b", lines[index], flags=re.IGNORECASE)
+        ),
+        None,
+    )
+    if zero_index is None:
+        return False
+
+    return not any(
+        MODEL_HEADING_RE.match(line)
+        or (
+            (match := RUBRIC_HEADING_RE.match(line))
+            and int(match.group("points")) > 0
+        )
+        for line in lines[zero_index + 1 :]
+    )
 
 
 def _deduplicate_issues(issues: list[ValidationIssue]) -> list[ValidationIssue]:
@@ -623,7 +649,7 @@ def main() -> None:
         for issue in issues:
             print(f"- {issue.format()}")
         raise SystemExit(1)
-    print("Sva četiri generirana indeksa imaju pouzdane granice službenih odgovora.")
+    print("Svi generirani indeksi imaju pouzdane granice službenih odgovora.")
 
 
 if __name__ == "__main__":

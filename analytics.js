@@ -18,6 +18,7 @@
     "matematika.html": { examPart: "Ispit", subject: "Matematika" },
     "politika.html": { examPart: "Ispit", subject: "Politika i gospodarstvo" },
     "povijest.html": { examPart: "Ispit", subject: "Povijest" },
+    "sociologija.html": { examPart: "Ispit", subject: "Sociologija" },
   };
 
   window.dataLayer = window.dataLayer || [];

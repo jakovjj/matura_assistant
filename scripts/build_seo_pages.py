@@ -109,7 +109,7 @@ def app_shell_page(*, title: str, description: str, canonical_url: str, page_sch
     <link rel="canonical" href="{esc(canonical_url)}" />
     <link rel="sitemap" type="application/xml" href="{SITE_ORIGIN}/sitemap.xml" />
     <link rel="icon" type="image/webp" href="./assets/asistent_za_maturu.webp" />
-    <link rel="stylesheet" href="./styles.css?v=20260605-source-crop-fit" />
+    <link rel="stylesheet" href="./styles.css?v=20260608-footer-coffee" />
     <script id="seo-structured-data" type="application/ld+json">{structured_data(page_schema)}</script>
     <script>
       document.documentElement.classList.add("is-app-subpage");

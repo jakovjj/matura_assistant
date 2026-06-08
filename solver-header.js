@@ -73,6 +73,64 @@
       .replaceAll("'", "&#039;");
   }
 
+  function validSourceCrop(source, crop) {
+    const dimensions = [
+      source?.width,
+      source?.height,
+      crop?.x,
+      crop?.y,
+      crop?.width,
+      crop?.height,
+    ].map(Number);
+    return Boolean(
+      source?.url &&
+        dimensions.every((value) => Number.isFinite(value) && value >= 0) &&
+        Number(source.width) > 0 &&
+        Number(source.height) > 0 &&
+        Number(crop.width) > 0 &&
+        Number(crop.height) > 0,
+    );
+  }
+
+  function renderSourceImageCrop(source, alt, options = {}) {
+    const crop = source?.crop;
+    if (!validSourceCrop(source, crop)) return "";
+
+    const variant = options.variant === "pdf" ? "pdf" : "physics";
+    const figureClass = `${variant}-source-figure`;
+    const cropClass = `${variant}-source-crop${options.cropClass ? ` ${options.cropClass}` : ""}`;
+    const displayWidth = options.constrainWidth
+      ? `width: min(100%, ${Math.min(820, Math.max(260, Math.ceil(Number(crop.width))))}px); `
+      : "";
+    const compactStyle = options.compact ? "min-width: 0; " : "";
+    const loading = options.loading === "eager" ? "eager" : "lazy";
+    const width = (Number(source.width) / Number(crop.width)) * 100;
+    const offsetX = (-Number(crop.x) / Number(source.width)) * 100;
+    const offsetY = (-Number(crop.y) / Number(source.height)) * 100;
+
+    return `
+      <figure class="${figureClass}">
+        <div
+          class="${cropClass}"
+          style="${displayWidth}${compactStyle}aspect-ratio: ${crop.width} / ${crop.height}"
+        >
+          <img
+            src="${escapeHtml(source.url)}"
+            alt="${escapeHtml(alt)}"
+            width="${Number(source.width)}"
+            height="${Number(source.height)}"
+            loading="${loading}"
+            decoding="async"
+            style="width: ${width}%; transform: translate(${offsetX}%, ${offsetY}%);"
+          >
+          ${options.overlayHtml || ""}
+        </div>
+      </figure>
+    `;
+  }
+
+  window.renderSourceImageCrop = renderSourceImageCrop;
+
   function normalizeKey(value) {
     return String(value ?? "").trim().toLocaleLowerCase("hr");
   }

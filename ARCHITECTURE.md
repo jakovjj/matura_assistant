@@ -130,6 +130,7 @@ Ne editirati rucno osim kao privremeni debug.
 | `data/history-choice.js` | `scripts/build_history_choice.py` | `files/ncvvo/` | `povijest.html`, `app.js` |
 | `data/geography-choice.js` | `scripts/build_geography_choice.py` | `files/ncvvo/` | `geografija.html`, `app.js` |
 | `data/psychology-choice.js` | `scripts/build_psychology_choice.py` | `files/ncvvo/` | `psihologija.html`, `app.js` |
+| `data/sociology-choice.js` | `scripts/build_sociology_choice.py` | `files/ncvvo/` | `sociologija.html`, `app.js` |
 | `data/politics-choice.js` | `scripts/build_politics_choice.py` | `files/ncvvo/` | `politika.html`, `app.js` |
 | `data/abcd-choice.js` | `scripts/build_abcd_choice.py` | `files/ncvvo/` | `abcd.html`, `app.js` |
 
@@ -200,6 +201,7 @@ razine i vrste dijela. Najvaznije funkcije su u `app.js`.
 | Povijest | `povijest-<year>-<term-slug>` |
 | Geografija | `geografija-<year>-<term-slug>` |
 | Psihologija | `psihologija-<year>-<term-slug>` |
+| Sociologija | `sociologija-<year>-<term-slug>` |
 | Politika i gospodarstvo | `politika-i-gospodarstvo-<year>-<term-slug>` |
 
 Rokovi imaju alias mapiranje:
@@ -227,6 +229,7 @@ Zbog toga storage i mapiranje cesto pokusavaju i legacy ID i normalizirani ID.
 | Povijest | `povijest.html` | `history-choice.js` | `data/history-choice.js` | `files/interactive/history-choice/` |
 | Geografija | `geografija.html` | `geography-choice.js` | `data/geography-choice.js` | `files/interactive/geography-choice/` |
 | Psihologija | `psihologija.html` | `psychology-choice.js` | `data/psychology-choice.js` | `files/interactive/psychology-choice/` |
+| Sociologija | `sociologija.html` | `sociology-choice.js` | `data/sociology-choice.js` | `files/interactive/sociology-choice/` |
 | Politika i gospodarstvo | `politika.html` | `politics-choice.js` | `data/politics-choice.js` | `files/interactive/politics-choice/` |
 | Genericki ABCD | `abcd.html` | `abcd-choice.js` | `data/abcd-choice.js` | `files/interactive/abcd-choice/` |
 
@@ -434,7 +437,7 @@ Sva tri se mapiraju preko istog `archiveUrl`, ali u zasebne data fajlove.
 
 ## Brza orijentacija za otvorene zadatke
 
-Fizika, matematika, povijest, geografija, psihologija i politika mogu imati kombinaciju:
+Fizika, matematika, povijest, geografija, psihologija, sociologija i politika mogu imati kombinaciju:
 
 ```text
 tasks / questions         # auto-checkable dio
@@ -444,4 +447,4 @@ solutions/sourceImages    # za prikaz zadataka i rjesenja
 ```
 
 Self-review otvoreni zadaci koriste bodovni input i izrez sluzbenoga rjesenja.
-Tako rade fizika, matematika, povijest, geografija, psihologija i politika.
+Tako rade fizika, matematika, povijest, geografija, psihologija, sociologija i politika.

@@ -1,0 +1,6 @@
+# Uključi ili isključi banner u headeru.
+# Dozvoljene vrijednosti: true ili false
+enabled=true
+
+# Tekst koji se prikazuje u banneru.
+message=Obavijest: neke stavke privremeno nisu u funkciji radi ažuriranja. Sve će se vratiti unutar do 21.00.

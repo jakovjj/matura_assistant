@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import io
+from typing import Any
 
 from PIL import Image, ImageStat
 
 PANEL_SHADE_BYTES = tuple(bytes([value]) for value in range(219, 226))
+INTERNAL_GAP_THRESHOLD = 248
+INTERNAL_GAP_MIN_HEIGHT = 120
+INTERNAL_GAP_MIN_WIDTH_RATIO = 0.18
+INTERNAL_GAP_KEEP_HEIGHT = 36
 
 
 def grayscale_image_from_png(contents: bytes) -> Image.Image:
@@ -500,3 +505,124 @@ def trim_crop_horizontal_whitespace(
         return x_min, y_min, x_max, y_max
 
     return candidate_x_min, y_min, candidate_x_max, y_max
+
+
+def compact_vertical_whitespace_segments(
+    image: Image.Image,
+    x_min: int,
+    y_min: int,
+    x_max: int,
+    y_max: int,
+    *,
+    threshold: int = INTERNAL_GAP_THRESHOLD,
+    minimum_gap_height: int = INTERNAL_GAP_MIN_HEIGHT,
+    minimum_gap_width_ratio: float = INTERNAL_GAP_MIN_WIDTH_RATIO,
+    keep_gap_height: int = INTERNAL_GAP_KEEP_HEIGHT,
+    scan_margin: int = 12,
+    maximum_dark_ratio: float = 0.0015,
+) -> list[tuple[int, int, int, int]]:
+    """Split a crop around large, nearly white internal horizontal bands."""
+
+    width = x_max - x_min
+    height = y_max - y_min
+    if width <= 0 or height <= 0:
+        return [(x_min, y_min, x_max, y_max)]
+
+    minimum_gap = max(
+        minimum_gap_height,
+        int(width * minimum_gap_width_ratio),
+    )
+    if height < minimum_gap * 2:
+        return [(x_min, y_min, x_max, y_max)]
+
+    margin = min(scan_margin, max(0, (width - 1) // 4))
+    scan_x_min = x_min + margin
+    scan_x_max = x_max - margin
+    if scan_x_max <= scan_x_min:
+        return [(x_min, y_min, x_max, y_max)]
+
+    region = image.crop((scan_x_min, y_min, scan_x_max, y_max)).convert("L")
+    scan_width, scan_height = region.size
+    data = region.tobytes()
+    maximum_dark_pixels = max(1, int(scan_width * maximum_dark_ratio))
+    blank_rows: list[int] = []
+    for row_index in range(scan_height):
+        offset = row_index * scan_width
+        row = data[offset : offset + scan_width]
+        if sum(value < threshold for value in row) <= maximum_dark_pixels:
+            blank_rows.append(row_index)
+
+    candidate_gaps = [
+        (start, end + 1)
+        for start, end in grouped_indices(blank_rows)
+        if end - start + 1 >= minimum_gap
+        and start > 0
+        and end < scan_height - 1
+    ]
+    if not candidate_gaps:
+        return [(x_min, y_min, x_max, y_max)]
+
+    segments: list[tuple[int, int, int, int]] = []
+    segment_y_min = y_min
+    keep_before = keep_gap_height // 2
+    keep_after = keep_gap_height - keep_before
+    for gap_start, gap_end in candidate_gaps:
+        segment_y_max = min(y_max, y_min + gap_start + keep_before)
+        next_y_min = max(y_min, y_min + gap_end - keep_after)
+        if segment_y_max > segment_y_min:
+            segments.append((x_min, segment_y_min, x_max, segment_y_max))
+        segment_y_min = max(segment_y_min, next_y_min)
+
+    if segment_y_min < y_max:
+        segments.append((x_min, segment_y_min, x_max, y_max))
+
+    if len(segments) < 2:
+        return [(x_min, y_min, x_max, y_max)]
+    return segments
+
+
+def source_image_metadata(
+    image: Image.Image,
+    *,
+    url: str,
+    image_width: int,
+    image_height: int,
+    crop_box: tuple[int, int, int, int],
+    page: int | None = None,
+    compact_internal_whitespace: bool = True,
+) -> dict[str, Any]:
+    x_min, y_min, x_max, y_max = crop_box
+    metadata: dict[str, Any] = {
+        "url": url,
+        "width": image_width,
+        "height": image_height,
+        "crop": {
+            "x": x_min,
+            "y": y_min,
+            "width": x_max - x_min,
+            "height": y_max - y_min,
+        },
+    }
+    if page is not None:
+        metadata["page"] = page
+
+    if compact_internal_whitespace:
+        segments = compact_vertical_whitespace_segments(
+            image,
+            x_min,
+            y_min,
+            x_max,
+            y_max,
+        )
+        if len(segments) > 1:
+            metadata["segments"] = [
+                {
+                    "x": segment_x_min,
+                    "y": segment_y_min,
+                    "width": segment_x_max - segment_x_min,
+                    "height": segment_y_max - segment_y_min,
+                }
+                for segment_x_min, segment_y_min, segment_x_max, segment_y_max in segments
+            ]
+
+    return metadata

@@ -747,40 +747,7 @@ function renderCroppedImages(sources, alt) {
 }
 
 function renderCroppedImage(source, alt) {
-  const crop = source?.crop;
-  const dimensions = [
-    source?.width,
-    source?.height,
-    crop?.x,
-    crop?.y,
-    crop?.width,
-    crop?.height,
-  ].map(Number);
-  if (!source?.url || dimensions.some((value) => !Number.isFinite(value) || value < 0)) return "";
-  if (!source.width || !source.height || !crop.width || !crop.height) return "";
-
-  const width = (source.width / crop.width) * 100;
-  const offsetX = (-crop.x / source.width) * 100;
-  const offsetY = (-crop.y / source.height) * 100;
-
-  return `
-    <figure class="physics-source-figure">
-      <div
-        class="physics-source-crop"
-        style="aspect-ratio: ${crop.width} / ${crop.height}"
-      >
-        <img
-          src="${escapeHtml(source.url)}"
-          alt="${escapeHtml(alt)}"
-          width="${source.width}"
-          height="${source.height}"
-          loading="lazy"
-          decoding="async"
-          style="width: ${width}%; transform: translate(${offsetX}%, ${offsetY}%);"
-        >
-      </div>
-    </figure>
-  `;
+  return window.renderSourceImageCrop(source, alt);
 }
 
 function renderSourceTranscript(question) {
