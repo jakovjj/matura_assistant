@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="hr">
+  <head>
+    <meta charset="UTF-8" />
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#14345b" />
+    <title>Prototip nadopunjavanja | Asistent za Mature</title>
+    <script>
+      if (["matura.com.hr", "www.matura.com.hr"].includes(window.location.hostname)) {
+        window.location.replace(`https://matura.jandric.com${window.location.pathname}`);
+      }
+    </script>
+    <link rel="icon" type="image/webp" href="/assets/asistent_za_maturu.webp" />
+    <link
+      rel="stylesheet"
+      href="/ispiti/hrvatski-jezik/2025-ljetni-rok/nadopunjavanje-prototip/prototype.css?v=20260608"
+    />
+  </head>
+  <body>
+    <header class="test-header">
+      <div class="test-header__inner">
+        <a href="/" class="test-header__brand">Asistent za Mature</a>
+        <div class="test-header__labels">
+          <span>Testni prikaz</span>
+          <strong>Neslužbeni projekt</strong>
+        </div>
+      </div>
+    </header>
+
+    <main class="prototype-shell">
+      <section class="prototype-intro">
+        <p class="eyebrow">Hrvatski jezik · 2025. · Ljetni rok</p>
+        <h1>Nadopunjavanje na mobitelu</h1>
+        <p>
+          Prototip prikazuje jednu prazninu po koraku. Odgovori postoje samo u ovoj
+          otvorenoj stranici i ne ulaze u spremljeni napredak.
+        </p>
+      </section>
+
+      <div id="completion-prototype"></div>
+    </main>
+
+    <dialog class="full-text-dialog" id="full-text-dialog">
+      <div class="full-text-dialog__header">
+        <div>
+          <span>SLUŽBENI PRIKAZ</span>
+          <strong>Cijeli tekst zadatka</strong>
+        </div>
+        <button type="button" data-close-full-text aria-label="Zatvori cijeli tekst">
+          &times;
+        </button>
+      </div>
+      <div class="full-text-dialog__body" data-full-text-body></div>
+    </dialog>
+
+    <script src="/ispiti/hrvatski-jezik/2025-ljetni-rok/nadopunjavanje-prototip/prototype.js?v=20260608"></script>
+  </body>
+</html>

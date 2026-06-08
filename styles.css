@@ -21,20 +21,31 @@
 }
 
 html {
+  max-width: 100%;
+  overflow-x: hidden;
   scroll-behavior: smooth;
 }
 
 body {
   display: flex;
   flex-direction: column;
+  max-width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
   margin: 0;
+  overflow-x: hidden;
   color: var(--ink);
   background: var(--white);
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.5;
+}
+
+@supports (overflow: clip) {
+  html,
+  body {
+    overflow-x: clip;
+  }
 }
 
 main {
@@ -495,8 +506,7 @@ button {
 }
 
 .profile-summary h2,
-.profile-section-heading h2,
-.profile-agent-key h2 {
+.profile-section-heading h2 {
   margin: 2px 0 0;
   color: var(--navy);
   font-size: 26px;
@@ -643,180 +653,6 @@ button {
   margin: 8px 0 0;
   color: var(--muted);
   line-height: 1.45;
-}
-
-.profile-agent-key {
-  padding: 18px;
-}
-
-.profile-agent-key h2 {
-  margin: 0;
-  font-size: 20px;
-}
-
-.profile-agent-key__heading {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.profile-agent-key__heading p {
-  max-width: 720px;
-  margin: 5px 0 0;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-.profile-agent-key__controls {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.profile-agent-key__icon-wrap {
-  flex: 0 0 auto;
-  display: inline-flex;
-  width: 24px;
-  height: 24px;
-  align-items: center;
-  justify-content: center;
-  margin-top: 2px;
-  color: var(--navy);
-}
-
-.profile-agent-key__icon {
-  width: 22px;
-  height: 22px;
-  color: var(--navy);
-  fill: none;
-  overflow: visible;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-}
-
-.profile-agent-key__login {
-  display: inline-block;
-  margin-top: 8px;
-  font-size: 14px;
-}
-
-.profile-agent-key__form {
-  display: grid;
-  gap: 6px;
-  max-width: 780px;
-  margin-top: 14px;
-}
-
-.profile-agent-key__controls input {
-  width: auto;
-  min-width: 0;
-  flex: 1 1 360px;
-  padding: 8px 10px;
-}
-
-.profile-agent-key__hint {
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.profile-agent-key__hint code {
-  color: var(--navy);
-  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-  font-size: 12px;
-}
-
-.profile-agent-key__saved {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.profile-agent-key__saved-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  min-height: 35px;
-  margin: 0;
-  color: #1c6138;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.profile-agent-key__saved-label svg {
-  flex: 0 0 auto;
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-}
-
-.profile-agent-key__status,
-.profile-agent-key__message {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.profile-agent-key__status[data-tone="error"],
-.profile-agent-key__message[data-tone="error"] {
-  color: #a32626;
-}
-
-.profile-agent-key__message[data-tone="success"] {
-  color: #1c6138;
-}
-
-.profile-agent-key__help {
-  max-width: 780px;
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.profile-agent-key__help summary {
-  width: max-content;
-  color: var(--navy);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.profile-agent-key__help summary:hover {
-  color: var(--blue-dark);
-}
-
-.profile-agent-key__help summary:focus-visible {
-  outline: 2px solid var(--blue);
-  outline-offset: 3px;
-}
-
-.profile-agent-key__help-body {
-  display: grid;
-  gap: 5px;
-  margin-top: 6px;
-}
-
-.profile-agent-key__help ol {
-  display: grid;
-  gap: 3px;
-  margin: 0;
-  padding-left: 18px;
-}
-
-.profile-agent-key__help p {
-  margin: 0;
 }
 
 .page-heading {
@@ -3224,15 +3060,7 @@ body.solver-page {
   overflow: hidden;
 }
 
-.ai-key-required-dialog-open {
-  overflow: hidden;
-}
-
 .exam-results-dialog[hidden] {
-  display: none;
-}
-
-.ai-key-required-dialog[hidden] {
   display: none;
 }
 
@@ -3245,22 +3073,7 @@ body.solver-page {
   padding: 20px;
 }
 
-.ai-key-required-dialog {
-  position: fixed;
-  inset: 0;
-  z-index: 110;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-}
-
 .exam-results-dialog__backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 20, 52, 0.58);
-}
-
-.ai-key-required-dialog__backdrop {
   position: absolute;
   inset: 0;
   background: rgba(0, 20, 52, 0.58);
@@ -3276,15 +3089,6 @@ body.solver-page {
   text-align: center;
 }
 
-.ai-key-required-dialog__panel {
-  position: relative;
-  width: min(100%, 460px);
-  padding: 28px;
-  background: var(--white);
-  border-top: 4px solid var(--navy);
-  box-shadow: 0 18px 60px rgba(0, 29, 77, 0.28);
-}
-
 .exam-results-dialog__close {
   position: absolute;
   top: 10px;
@@ -3298,44 +3102,6 @@ body.solver-page {
   border: 1px solid var(--line-dark);
   font-size: 24px;
   line-height: 1;
-}
-
-.ai-key-required-dialog__close {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  color: var(--navy);
-  background: var(--soft);
-  border: 1px solid var(--line-dark);
-  font-size: 24px;
-  line-height: 1;
-}
-
-.ai-key-required-dialog__panel .eyebrow {
-  margin: 0 0 6px;
-  color: var(--blue);
-}
-
-.ai-key-required-dialog__panel h2 {
-  margin: 0;
-  color: var(--navy);
-}
-
-.ai-key-required-dialog__panel p:not(.eyebrow) {
-  margin: 14px 0 0;
-  color: var(--muted);
-  line-height: 1.5;
-}
-
-.ai-key-required-dialog__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 20px;
 }
 
 .exam-results-dialog__check {
@@ -3759,6 +3525,7 @@ body.solver-page {
 .pdf-source-figure {
   margin: 0;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
   overflow-x: hidden;
   background: #f8fafc;
@@ -4089,6 +3856,22 @@ body.solver-page {
   border-color: var(--blue);
 }
 
+.english-choice-popover__option--used {
+  color: var(--muted);
+  background: #f7f9fc;
+}
+
+.english-choice-popover__option--used strong {
+  color: var(--muted);
+  background: #eef2f6;
+  border-color: var(--line-dark);
+}
+
+.english-choice-popover__option--used span {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
 .english-inline-check-list {
   display: grid;
   gap: 8px;
@@ -4284,6 +4067,12 @@ body.solver-page {
 
 .solver-question-layout--single {
   grid-template-columns: minmax(0, 1fr);
+}
+
+.english-listening-layout {
+  width: min(100%, 980px);
+  margin-right: auto;
+  margin-left: auto;
 }
 
 .question-quickselect,
@@ -4536,13 +4325,14 @@ body.solver-page {
 .croatian-source-context {
   display: grid;
   gap: 10px;
-  padding: 14px;
+  padding: 14px 0;
   background: #f8fafc;
   border: 1px solid var(--line);
 }
 
 .croatian-source-context .eyebrow {
   margin: 0;
+  padding-inline: 14px;
   color: var(--navy);
 }
 
@@ -5024,12 +4814,6 @@ body.solver-page {
   white-space: nowrap;
 }
 
-.physics-inline-response__label {
-  color: var(--navy);
-  font-size: 13px;
-  font-weight: 700;
-}
-
 .physics-inline-response .choice-list {
   flex: 0 0 auto;
 }
@@ -5040,7 +4824,7 @@ body.solver-page {
 }
 
 .physics-inline-response .response-feedback {
-  flex: 0 1 auto;
+  flex: 1 0 100%;
   padding-left: 0;
   font-weight: 700;
 }
@@ -5056,6 +4840,7 @@ body.solver-page {
 .physics-source-figure {
   margin: 0;
   width: 100%;
+  max-width: 100%;
   min-width: 0;
   overflow-x: hidden;
 }
@@ -5528,6 +5313,15 @@ body.solver-page {
 }
 
 @media (max-width: 860px) {
+  .solver-page .solver-header,
+  .physics-solver-active .solver-header,
+  .croatian-solver-active .solver-header {
+    width: 100%;
+    max-width: 100%;
+    margin-right: 0;
+    margin-left: 0;
+  }
+
   .page-heading__grid,
   .archive-layout,
   .practice-layout {
@@ -5944,6 +5738,7 @@ body.solver-page {
   body.solver-page .physics-source-figure,
   body.solver-page .pdf-source-figure {
     width: 100%;
+    max-width: 100%;
     overflow-x: hidden;
   }
 
@@ -5951,6 +5746,7 @@ body.solver-page {
   body.solver-page .pdf-source-crop {
     width: 100% !important;
     max-width: 100%;
+    overflow-x: hidden;
   }
 
   body.solver-page .english-source-question {
@@ -6319,8 +6115,8 @@ body.solver-page {
 
   .solver-header__footer .task-navigation {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 7px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
     padding: 0;
     overflow: visible;
   }
@@ -6328,15 +6124,16 @@ body.solver-page {
   .solver-header__task-navigation .task-button {
     display: grid;
     max-width: none;
-    min-height: 54px;
-    grid-template-columns: auto auto;
+    min-height: 42px;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 3px 8px;
-    justify-content: center;
-    justify-items: center;
-    padding: 9px 10px;
+    gap: 3px 12px;
+    justify-content: stretch;
+    justify-items: start;
+    padding: 8px 10px;
     background: #f8fafc;
     border-color: var(--line-dark);
+    text-align: left;
     white-space: normal;
   }
 
@@ -6354,6 +6151,7 @@ body.solver-page {
   }
 
   .solver-header__task-navigation .task-button small {
+    justify-self: end;
     padding: 2px 6px;
     background: var(--white);
     border: 1px solid currentColor;
@@ -6363,10 +6161,60 @@ body.solver-page {
 
   .solver-header__task-navigation .task-button__grading {
     grid-column: 1 / -1;
+    justify-self: start;
     flex-basis: auto;
     color: var(--muted);
     font-size: 11px;
     line-height: 1.2;
+  }
+
+  .task-type-pager {
+    display: grid;
+    grid-template-columns: 44px 44px;
+    justify-content: space-between;
+    gap: 0;
+    padding: 0 14px;
+  }
+
+  .task-type-pager > span {
+    width: 44px;
+    height: 44px;
+  }
+
+  .task-type-pager__button {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    max-width: none;
+    min-width: 0;
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+    overflow: visible;
+    text-align: center;
+  }
+
+  .task-type-pager__button--next {
+    justify-self: end;
+    text-align: center;
+  }
+
+  .task-type-pager__copy {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    border: 0;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .task-type-pager__icon {
+    width: 22px;
+    height: 22px;
   }
 
   .question-quickselect,

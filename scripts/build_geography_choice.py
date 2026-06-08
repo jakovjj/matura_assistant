@@ -35,6 +35,10 @@ from open_answer_validation import (
     repair_open_answer_boundaries,
     rubric_heading_points,
 )
+from manual_solution_images import (
+    attach_manual_solution_images,
+    build_manual_solution_images,
+)
 from pdf_utils import pdftotext, png_dimensions, render_pdf_page_to_png
 
 
@@ -56,6 +60,7 @@ SOURCE_LINE_ONLY_MIN_GAP = 72
 SOURCE_LINE_ONLY_PIXEL_THRESHOLD = 214
 SOURCE_BLANK_PIXEL_THRESHOLD = 236
 SOURCE_TRAILING_RULE_MIN_COUNT = 2
+SOURCE_MAX_CONTINUATION_PAGES = 1
 
 TERM_ALIASES = {
     "prvi rok": "ljetni rok",
@@ -74,11 +79,11 @@ TASK_LABELS = {
 }
 TASK_DESCRIPTIONS = {
     "visestruki-izbor": "Odaberi jedan točan odgovor za svako pitanje.",
-    "visestruke-kombinacije": "Upiši kombinaciju odgovora; AI procjenjuje bod prema službenome ključu.",
+    "visestruke-kombinacije": "Upiši kombinaciju, otvori službeno rješenje i dodijeli si bod.",
     "povezivanje": "Poveži svaku stavku s odgovarajućim odgovorom.",
-    "kratki-odgovor": "Upiši kratak odgovor; AI procjenjuje bodove prema službenome ključu.",
-    "produzeni-odgovor": "Napiši produženi odgovor; AI procjenjuje bodove prema službenome modelu.",
-    "otvoreni-zadaci": "Upiši odgovor; AI procjenjuje bodove prema službenome ključu.",
+    "kratki-odgovor": "Upiši kratak odgovor, otvori službeno rješenje i dodijeli si bodove.",
+    "produzeni-odgovor": "Napiši produženi odgovor, otvori službeno rješenje i dodijeli si bodove.",
+    "otvoreni-zadaci": "Upiši odgovor, otvori službeno rješenje i dodijeli si bodove.",
 }
 TASK_ORDER = [
     "visestruki-izbor",
@@ -427,6 +432,78 @@ def find_geography_question_crops(markers: dict[str, QuestionMarker]) -> dict[st
         )
 
     return crops
+
+
+def continuation_crop_y_min(page: PdfPage) -> float:
+    return max(
+        SOURCE_CONTENT_TOP_MARGIN + SOURCE_CROP_VERTICAL_PADDING,
+        running_header_bottom(page) + SOURCE_CROP_VERTICAL_PADDING,
+    )
+
+
+def continuation_question_crop(page: PdfPage, y_max: float | None = None) -> QuestionCrop | None:
+    y_min = continuation_crop_y_min(page)
+    y_max = min(y_max or page.height - SOURCE_FOOTER_MARGIN, page.height - SOURCE_FOOTER_MARGIN)
+    if y_max <= y_min + SOURCE_CROP_VERTICAL_PADDING:
+        return None
+
+    return QuestionCrop(
+        page=page,
+        x_min=SOURCE_CROP_HORIZONTAL_MARGIN,
+        y_min=y_min,
+        x_max=page.width - SOURCE_CROP_HORIZONTAL_MARGIN,
+        y_max=y_max,
+    )
+
+
+def find_geography_question_crop_groups(
+    pages: list[PdfPage],
+    markers: dict[str, QuestionMarker],
+) -> dict[str, list[QuestionCrop]]:
+    primary_crops = find_geography_question_crops(markers)
+    ordered_markers = sorted(
+        markers.values(),
+        key=lambda marker: (marker.page.number, marker.y_min, question_sort_key(marker.number)),
+    )
+    crop_groups: dict[str, list[QuestionCrop]] = {}
+
+    for index, marker in enumerate(ordered_markers):
+        question_crops: list[QuestionCrop] = []
+        primary_crop = primary_crops.get(marker.number)
+        if primary_crop:
+            question_crops.append(primary_crop)
+
+        next_marker = ordered_markers[index + 1] if index + 1 < len(ordered_markers) else None
+        if next_marker and next_marker.page.number > marker.page.number:
+            page_gap = next_marker.page.number - marker.page.number
+            continuation_pages = page_gap - 1
+            if continuation_pages > SOURCE_MAX_CONTINUATION_PAGES:
+                if question_crops:
+                    crop_groups[marker.number] = question_crops
+                continue
+
+            for page_number in range(marker.page.number + 1, next_marker.page.number):
+                if page_number - 1 >= len(pages):
+                    continue
+                continuation_crop = continuation_question_crop(pages[page_number - 1])
+                if continuation_crop:
+                    question_crops.append(continuation_crop)
+
+            if (
+                continuation_pages < SOURCE_MAX_CONTINUATION_PAGES
+                and next_marker.y_min > continuation_crop_y_min(next_marker.page) + SOURCE_LINE_ONLY_MIN_GAP
+            ):
+                continuation_crop = continuation_question_crop(
+                    next_marker.page,
+                    next_marker.y_min - SOURCE_CROP_VERTICAL_PADDING,
+                )
+                if continuation_crop:
+                    question_crops.append(continuation_crop)
+
+        if question_crops:
+            crop_groups[marker.number] = question_crops
+
+    return crop_groups
 
 
 def is_key_name(name: str) -> bool:
@@ -1371,7 +1448,7 @@ def build_source_images(
     paper_path: Path,
     identifier: str,
     tasks: list[dict[str, Any]],
-) -> dict[str, dict[str, Any]]:
+) -> dict[str, list[dict[str, Any]]]:
     question_numbers = [
         str(question["number"])
         for task in tasks
@@ -1388,39 +1465,52 @@ def build_source_images(
 
     pages = pdf_bbox_pages(paper_contents)
     markers = find_geography_question_markers(pages, wanted_numbers)
-    crops = find_geography_question_crops(markers)
-    all_crops = {
-        **{
-            f"question:{question}": crops[question]
-            for question in question_numbers
-            if question in crops
-        },
-        **{
-            f"context:{parent}": crops[parent]
-            for parent in parent_numbers
-            if parent in crops
-        },
-    }
+    crop_groups = find_geography_question_crop_groups(pages, markers)
+    all_crops: dict[str, QuestionCrop] = {}
+    grouped_keys: dict[str, list[str]] = {}
+
+    def add_crop_group(group_key: str, crops: list[QuestionCrop]) -> None:
+        for index, crop in enumerate(crops):
+            crop_key = f"{group_key}:{index}"
+            all_crops[crop_key] = crop
+            grouped_keys.setdefault(group_key, []).append(crop_key)
+
+    for question in question_numbers:
+        if question in crop_groups:
+            add_crop_group(f"question:{question}", crop_groups[question])
+    for parent in parent_numbers:
+        if parent in crop_groups:
+            add_crop_group(f"context:{parent}", crop_groups[parent])
+
     source_images, expected_assets = render_source_pages(paper_path, identifier, all_crops)
     remove_unexpected_assets(identifier, expected_assets)
-    return source_images
+    return {
+        group_key: [
+            source_images[crop_key]
+            for crop_key in crop_keys
+            if crop_key in source_images
+        ]
+        for group_key, crop_keys in grouped_keys.items()
+    }
 
 
 def attach_source_images(
     tasks: list[dict[str, Any]],
-    source_images: dict[str, dict[str, Any]],
+    source_images: dict[str, list[dict[str, Any]]],
 ) -> None:
     for task in tasks:
         for question in task.get("questions", []):
             number = str(question["number"])
-            source_image = source_images.get(f"question:{number}")
-            if source_image:
-                question["sourceImage"] = source_image
+            question_source_images = source_images.get(f"question:{number}") or []
+            if question_source_images:
+                question["sourceImage"] = question_source_images[0]
+                if len(question_source_images) > 1:
+                    question["sourceImages"] = question_source_images
 
             parent = parent_question_number(number)
-            context_image = source_images.get(f"context:{parent}") if parent else None
-            if context_image:
-                question["contextImages"] = [context_image]
+            context_images = source_images.get(f"context:{parent}") if parent else None
+            if context_images:
+                question["contextImages"] = context_images
 
 
 def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
@@ -1432,12 +1522,13 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
         key_names = find_key_names(names)
         paper_names = find_paper_names(names)
         paper_contents = combine_pdf_contents([archive.read(name) for name in paper_names])
+        key_contents = [archive.read(name) for name in key_names]
         key_texts = [
             extracted
-            for name in key_names
+            for contents in key_contents
             for extracted in (
-                pdf_text(archive.read(name), "-raw"),
-                pdf_text(archive.read(name), "-layout"),
+                pdf_text(contents, "-raw"),
+                pdf_text(contents, "-layout"),
             )
         ]
 
@@ -1460,6 +1551,19 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     write_if_changed(destination, paper_contents)
     source_images = build_source_images(paper_contents, destination, identifier, tasks)
     attach_source_images(tasks, source_images)
+    solution_images = build_manual_solution_images(
+        key_contents,
+        destination.parent,
+        identifier,
+        PAPER_URL_PREFIX,
+        open_answers,
+        pdf_bbox_pages=pdf_bbox_pages,
+        parse_question_token=parse_question_token,
+        question_sort_key=question_sort_key,
+        render_dpi=SOURCE_RENDER_DPI,
+        required_message="pdftocairo is required to build Geography solution images",
+    )
+    attach_manual_solution_images(tasks, solution_images)
 
     closed_questions = sorted(answers, key=question_sort_key)
     open_questions = sorted(open_answers, key=question_sort_key)

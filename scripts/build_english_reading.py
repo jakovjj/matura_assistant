@@ -772,7 +772,9 @@ def render_source_pages(
     identifier: str,
     crops: dict[CropKey, list[SourceCrop]],
     expected_assets: set[str],
+    preserve_horizontal_keys: set[CropKey] | None = None,
 ) -> dict[CropKey, list[dict[str, Any]]]:
+    preserve_horizontal_keys = preserve_horizontal_keys or set()
     destination = PAPER_ROOT / identifier
     crops_by_page: dict[int, list[tuple[CropKey, SourceCrop]]] = {}
     for crop_key, task_crops in crops.items():
@@ -812,6 +814,7 @@ def render_source_pages(
                     y_min,
                     x_max,
                     y_max,
+                    detect_legacy_answer_frame=crop_key not in preserve_horizontal_keys,
                 )
                 source_images.setdefault(crop_key, []).append(
                     {
@@ -888,13 +891,13 @@ def underscore_region(word: PdfWord) -> tuple[float, float, float, float] | None
 
 def question_from_parenthesized_gap(line: PdfLine, word_index: int) -> str | None:
     word = line.words[word_index]
-    embedded = re.search(r"\((\d{1,2})\)\s*_+", word.text)
+    embedded = re.search(r"\((\d{1,2})\)\s*_+", word.text.replace("\xad", ""))
     if embedded:
         return embedded.group(1)
 
     previous = " ".join(
         item.text for item in line.words[max(0, word_index - 4) : word_index]
-    )
+    ).replace("\xad", "")
     match = re.search(r"\((\d{1,2})\)\s*$", previous)
     return match.group(1) if match else None
 
@@ -1059,6 +1062,58 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
         task.number: rendered_images.get(("task", task.number), [])
         for task in tasks
     }
+    expected_blank_counts = {
+        task.number: task.last_question - task.first_question + 1 for task in tasks
+    }
+    gap_task_numbers = {
+        task.number for task in tasks if task.number >= (3 if exam["level"] == "A" else 4)
+    }
+    incomplete_gap_task_numbers = {
+        task.number
+        for task in tasks
+        if task.number in gap_task_numbers
+        and len(
+            text_blank_regions(
+                task_crops.get(task.number, []),
+                task,
+                source_images.get(task.number, []),
+            )
+        )
+        != expected_blank_counts[task.number]
+    }
+    if incomplete_gap_task_numbers:
+        preserved_rendered_images = render_source_pages(
+            destination / "paper.pdf",
+            identifier,
+            render_crops,
+            expected_assets,
+            preserve_horizontal_keys={
+                ("task", task_number) for task_number in incomplete_gap_task_numbers
+            },
+        )
+        preserved_source_images = {
+            task.number: preserved_rendered_images.get(("task", task.number), [])
+            for task in tasks
+        }
+        for task in tasks:
+            if task.number not in incomplete_gap_task_numbers:
+                continue
+            current_count = len(
+                text_blank_regions(
+                    task_crops.get(task.number, []),
+                    task,
+                    source_images.get(task.number, []),
+                )
+            )
+            preserved_count = len(
+                text_blank_regions(
+                    task_crops.get(task.number, []),
+                    task,
+                    preserved_source_images.get(task.number, []),
+                )
+            )
+            if preserved_count > current_count:
+                source_images[task.number] = preserved_source_images[task.number]
     question_images: dict[int, dict[str, dict[str, Any] | list[dict[str, Any]]]] = {}
     for task_number, task_question_crops in matching_question_crops.items():
         question_images[task_number] = {}

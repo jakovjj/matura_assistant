@@ -17,8 +17,14 @@ from typing import Any
 from urllib.parse import quote, unquote, urlparse
 from xml.etree import ElementTree
 
-from crop_utils import grayscale_image_from_png, trim_crop_bottom_whitespace
-from pdf_utils import pdftotext, png_dimensions, render_pdf_page_to_png
+from PIL import Image
+
+from crop_utils import (
+    grayscale_image_from_png,
+    trim_crop_bottom_whitespace,
+    trim_crop_horizontal_whitespace,
+)
+from pdf_utils import pdftotext, pdfinfo_page_count, png_dimensions, render_pdf_page_to_png
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -176,9 +182,28 @@ def find_key_name(names: list[str]) -> str:
         and re.search(r"klju|kljuc", normalized_name(name))
         and "list" not in normalized_name(name)
     ]
-    if len(candidates) != 1:
+    if len(candidates) == 1:
+        return candidates[0]
+    if len(candidates) > 1:
         raise ValueError(f"Expected one Croatian answer key, found {candidates}")
-    return candidates[0]
+
+    filled_answer_sheets = [
+        name
+        for name in pdfs
+        if is_filled_answer_sheet_name(name)
+    ]
+    if len(filled_answer_sheets) == 1:
+        return filled_answer_sheets[0]
+
+    raise ValueError(f"Expected one Croatian answer key, found {candidates}")
+
+
+def is_filled_answer_sheet_name(name: str) -> bool:
+    normalized = normalized_name(name)
+    return bool(
+        "list" in normalized
+        and re.search(r"\bs[ao]\s+odgovorima\b|list_sa_odgovorima", normalized)
+    )
 
 
 def pdf_text(contents: bytes) -> str:
@@ -833,26 +858,42 @@ def validate_answer_sequence(
         set(questions) | (blank_questions or set()),
         key=question_sort_key,
     )
-    integer_questions = [
-        int(question) for question in all_detected_questions if "." not in question
-    ]
-    decimal_questions = [
-        question for question in all_detected_questions if "." in question
-    ]
+    integer_questions = {int(question) for question in all_detected_questions if "." not in question}
+    decimal_questions_by_parent: dict[int, list[int]] = {}
+    for question in all_detected_questions:
+        if "." not in question:
+            continue
+        whole, decimal = question.split(".", 1)
+        decimal_questions_by_parent.setdefault(int(whole), []).append(int(decimal))
 
-    if not integer_questions:
+    if not integer_questions and not decimal_questions_by_parent:
         raise ValueError("No regular Croatian answer numbers found")
-    expected_integers = list(range(1, max(integer_questions) + 1))
-    if integer_questions != expected_integers:
+
+    max_question = max([*integer_questions, *decimal_questions_by_parent])
+    for question_number in range(1, max_question + 1):
+        has_integer = question_number in integer_questions
+        decimals = sorted(decimal_questions_by_parent.get(question_number, []))
+        if has_integer and decimals:
+            raise ValueError(f"Croatian answer key mixes parent and subitems: {question_number}")
+        if has_integer:
+            continue
+        if decimals:
+            expected_decimals = list(range(1, len(decimals) + 1))
+            if decimals != expected_decimals:
+                raise ValueError(
+                    f"Croatian decimal answers are not contiguous for {question_number}: "
+                    f"expected {expected_decimals}, found {decimals}"
+                )
+            continue
         raise ValueError(
-            f"Croatian answer key is not contiguous: expected {expected_integers}, "
-            f"found {integer_questions}"
+            f"Croatian answer key is not contiguous: missing {question_number}"
         )
 
-    if decimal_questions:
-        base = max(integer_questions) + 1
+    decimal_questions = [question for question in all_detected_questions if "." in question]
+    if decimal_questions and max(decimal_questions_by_parent) == max_question:
+        base = max(integer_questions, default=0) + 1
         expected_decimals = [f"{base}.{index}" for index in range(1, len(decimal_questions) + 1)]
-        if decimal_questions != expected_decimals:
+        if min(decimal_questions_by_parent) == base and decimal_questions != expected_decimals:
             raise ValueError(
                 f"Croatian decimal answers are not contiguous: expected {expected_decimals}, "
                 f"found {decimal_questions}"
@@ -886,6 +927,358 @@ def parse_choice_answers(text: str) -> tuple[list[str], dict[str, list[str]]]:
         previous_question = question
 
     questions = validate_answer_sequence(answers, blank_questions)
+    return questions, {question: answers[question] for question in questions}
+
+
+def is_answer_sheet_pink(rgb: tuple[int, int, int]) -> bool:
+    red, green, blue = rgb
+    return red > 185 and 100 < green < 225 and 120 < blue < 240 and red > green + 10
+
+
+def is_answer_box_white(rgb: tuple[int, int, int]) -> bool:
+    red, green, blue = rgb
+    return red > 238 and green > 238 and blue > 238
+
+
+def is_answer_mark(rgb: tuple[int, int, int]) -> bool:
+    red, green, blue = rgb
+    return (
+        (blue > red + 15 and blue > green + 5 and red < 180)
+        or (red < 120 and green < 130 and blue < 170)
+    )
+
+
+def grouped_runs(values: list[int], gap: int = 2) -> list[tuple[int, int]]:
+    groups: list[tuple[int, int]] = []
+    for value in values:
+        if groups and value <= groups[-1][1] + gap:
+            groups[-1] = (groups[-1][0], value)
+        else:
+            groups.append((value, value))
+    return groups
+
+
+def cluster_numbers(values: list[int], tolerance: int = 18) -> list[int]:
+    clusters: list[list[int]] = []
+    for value in sorted(values):
+        if clusters and value <= round(sum(clusters[-1]) / len(clusters[-1])) + tolerance:
+            clusters[-1].append(value)
+        else:
+            clusters.append([value])
+    return [round(sum(cluster) / len(cluster)) for cluster in clusters]
+
+
+def rendered_pdf_images(contents: bytes) -> list[Image.Image]:
+    page_count = pdfinfo_page_count(
+        contents,
+        required_message="pdfinfo is required to read Croatian answer sheets",
+    )
+    images: list[Image.Image] = []
+    with tempfile.TemporaryDirectory() as tmpdir:
+        source = Path(tmpdir) / "source.pdf"
+        source.write_bytes(contents)
+        for page_number in range(1, page_count + 1):
+            output_prefix = Path(tmpdir) / f"page-{page_number}"
+            render_pdf_page_to_png(
+                source,
+                output_prefix,
+                page_number,
+                SOURCE_RENDER_DPI,
+                required_message="pdftocairo is required to read Croatian answer sheets",
+            )
+            images.append(Image.open(output_prefix.with_suffix(".png")).convert("RGB"))
+    return images
+
+
+def answer_sheet_row_centers_in_region(
+    image: Image.Image,
+    expected_count: int,
+    *,
+    x_min: int | None = None,
+    x_max: int | None = None,
+) -> list[int]:
+    width, height = image.size
+    pixels = image.load()
+    start_x = 0 if x_min is None else max(0, x_min)
+    end_x = width if x_max is None else min(width, x_max)
+    threshold = max(40, (end_x - start_x) * 0.3)
+    pink_rows = [
+        y
+        for y in range(height)
+        if sum(1 for x in range(start_x, end_x) if is_answer_sheet_pink(pixels[x, y])) > threshold
+    ]
+    groups = [
+        (start, end)
+        for start, end in grouped_runs(pink_rows)
+        if 25 <= end - start + 1 <= 65
+    ]
+    centers = [
+        round((start + end) / 2)
+        for start, end in groups
+        if 90 < start < height - 150
+    ]
+
+    if len(centers) >= expected_count:
+        return centers[:expected_count]
+
+    if not centers:
+        raise ValueError("Could not locate Croatian answer-sheet rows")
+
+    diffs = [
+        centers[index + 1] - centers[index]
+        for index in range(len(centers) - 1)
+        if 30 <= centers[index + 1] - centers[index] <= 60
+    ]
+    spacing = round(sum(diffs) / len(diffs)) if diffs else 45
+    return [round(centers[0] + index * spacing) for index in range(expected_count)]
+
+
+def answer_sheet_row_centers(image: Image.Image, expected_count: int) -> list[int]:
+    return answer_sheet_row_centers_in_region(image, expected_count)
+
+
+def tall_answer_sheet_groups_in_region(
+    image: Image.Image,
+    *,
+    x_min: int,
+    x_max: int,
+) -> list[tuple[int, int]]:
+    pixels = image.load()
+    threshold = max(40, (x_max - x_min) * 0.3)
+    pink_rows = [
+        y
+        for y in range(image.height)
+        if sum(1 for x in range(x_min, x_max) if is_answer_sheet_pink(pixels[x, y])) > threshold
+    ]
+    return [
+        (start, end)
+        for start, end in grouped_runs(pink_rows)
+        if end - start + 1 > 100 and 90 < start < image.height - 150
+    ]
+
+
+def nearby_pink(image: Image.Image, x: int, y: int) -> bool:
+    width, height = image.size
+    pixels = image.load()
+    for dx, dy in ((0, -12), (0, 12), (-12, 0), (12, 0)):
+        xx = min(width - 1, max(0, x + dx))
+        yy = min(height - 1, max(0, y + dy))
+        if is_answer_sheet_pink(pixels[xx, yy]):
+            return True
+    return False
+
+
+def answer_box_centers(
+    image: Image.Image,
+    *,
+    x_min: int,
+    x_max: int,
+    y_min: int,
+    y_max: int,
+) -> list[tuple[int, int]]:
+    pixels = image.load()
+    white: set[tuple[int, int]] = set()
+    for y in range(max(0, y_min), min(image.height, y_max)):
+        for x in range(max(0, x_min), min(image.width, x_max)):
+            if is_answer_box_white(pixels[x, y]) and nearby_pink(image, x, y):
+                white.add((x, y))
+
+    seen: set[tuple[int, int]] = set()
+    centers: list[tuple[int, int]] = []
+    for point in list(white):
+        if point in seen:
+            continue
+        stack = [point]
+        seen.add(point)
+        xs: list[int] = []
+        ys: list[int] = []
+        while stack:
+            x, y = stack.pop()
+            xs.append(x)
+            ys.append(y)
+            for neighbor in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                if neighbor in white and neighbor not in seen:
+                    seen.add(neighbor)
+                    stack.append(neighbor)
+        component_width = max(xs) - min(xs) + 1
+        component_height = max(ys) - min(ys) + 1
+        area = len(xs)
+        if 8 <= component_width <= 40 and 8 <= component_height <= 40 and area > 60:
+            centers.append((round(sum(xs) / len(xs)), round(sum(ys) / len(ys))))
+    return centers
+
+
+def regular_answer_x_centers(image: Image.Image, row_centers: list[int]) -> tuple[list[int], list[int]]:
+    y_min = max(0, min(row_centers) - 30)
+    y_max = min(image.height, max(row_centers) + 30)
+    centers = answer_box_centers(
+        image,
+        x_min=40,
+        x_max=image.width - 40,
+        y_min=y_min,
+        y_max=y_max,
+    )
+    left = cluster_numbers([x for x, _ in centers if x < image.width * 0.45])
+    right = cluster_numbers([x for x, _ in centers if x > image.width * 0.45])
+    if len(left) < 4 or len(right) < 4:
+        raise ValueError("Could not locate Croatian answer-sheet answer columns")
+    return left[-4:], right[-4:]
+
+
+def answer_mark_score(image: Image.Image, x_center: int, y_center: int) -> int:
+    pixels = image.load()
+    score = 0
+    for y in range(y_center - 16, y_center + 17):
+        for x in range(x_center - 16, x_center + 17):
+            if 0 <= x < image.width and 0 <= y < image.height and is_answer_mark(pixels[x, y]):
+                score += 1
+    return score
+
+
+def selected_answer(
+    image: Image.Image,
+    x_centers: list[int],
+    y_center: int,
+    options: list[str],
+) -> str:
+    scores = [
+        (answer_mark_score(image, x_center, y_center), option)
+        for x_center, option in zip(x_centers, options)
+    ]
+    score, option = max(scores)
+    if score < 45:
+        raise ValueError(f"Could not read Croatian answer-sheet mark at row {y_center}: {scores}")
+    return option
+
+
+def read_regular_answer_rows(
+    image: Image.Image,
+    row_centers: list[int],
+    left_x_centers: list[int],
+    right_x_centers: list[int],
+    left_questions: list[str],
+    right_questions: list[str],
+) -> dict[str, list[str]]:
+    answers: dict[str, list[str]] = {}
+    for row_index, question in enumerate(left_questions):
+        answers[question] = [
+            selected_answer(image, left_x_centers, row_centers[row_index], ["A", "B", "C", "D"])
+        ]
+    for row_index, question in enumerate(right_questions):
+        answers[question] = [
+            selected_answer(image, right_x_centers, row_centers[row_index], ["A", "B", "C", "D"])
+        ]
+    return answers
+
+
+def matching_subitem_y_centers(image: Image.Image, y_min: int, y_max: int) -> list[int]:
+    first_center = y_min + 45
+    last_center = y_max - 39
+    if last_center <= first_center:
+        raise ValueError("Could not locate Croatian matching answer rows")
+    spacing = (last_center - first_center) / 4
+    return [round(first_center + index * spacing) for index in range(5)]
+
+
+def matching_answer_x_centers(image: Image.Image, y_centers: list[int]) -> list[int]:
+    centers = answer_box_centers(
+        image,
+        x_min=150,
+        x_max=round(image.width * 0.45),
+        y_min=min(y_centers) - 25,
+        y_max=max(y_centers) + 25,
+    )
+    x_centers = cluster_numbers([x for x, _ in centers], tolerance=18)
+    if len(x_centers) < 3:
+        raise ValueError("Could not locate Croatian matching answer columns")
+    return x_centers[:3]
+
+
+def parse_filled_answer_sheet_answers(
+    contents: bytes,
+    exam: dict[str, Any],
+) -> tuple[list[str], dict[str, list[str]]]:
+    images = rendered_pdf_images(contents)
+    if len(images) < 2:
+        raise ValueError("Expected a two-page Croatian answer sheet")
+
+    first_page_rows = answer_sheet_row_centers(images[0], 20)
+    first_left_x, first_right_x = regular_answer_x_centers(images[0], first_page_rows)
+    answers = read_regular_answer_rows(
+        images[0],
+        first_page_rows,
+        first_left_x,
+        first_right_x,
+        [str(number) for number in range(1, 21)],
+        [str(number) for number in range(21, 41)],
+    )
+
+    if exam["year"] <= 2014:
+        page = images[1]
+        left_rows = answer_sheet_row_centers_in_region(
+            page,
+            10,
+            x_min=60,
+            x_max=round(page.width * 0.45),
+        )
+        right_rows = answer_sheet_row_centers_in_region(
+            page,
+            20,
+            x_min=round(page.width * 0.45),
+            x_max=page.width - 40,
+        )
+        second_left_x, second_right_x = first_left_x, first_right_x
+        answers.update(
+            read_regular_answer_rows(
+                page,
+                left_rows,
+                second_left_x,
+                second_right_x,
+                [str(number) for number in range(41, 46)] + [str(number) for number in range(48, 53)],
+                [],
+            )
+        )
+        answers.update(
+            read_regular_answer_rows(
+                page,
+                right_rows,
+                second_left_x,
+                second_right_x,
+                [],
+                [str(number) for number in range(53, 73)],
+            )
+        )
+
+        tall_groups = tall_answer_sheet_groups_in_region(
+            page,
+            x_min=60,
+            x_max=round(page.width * 0.45),
+        )
+        if len(tall_groups) < 2:
+            raise ValueError("Could not locate Croatian matching answer blocks")
+        first_matching_rows = matching_subitem_y_centers(page, tall_groups[0][0], tall_groups[0][1])
+        second_matching_rows = matching_subitem_y_centers(page, tall_groups[1][0], tall_groups[1][1])
+        first_matching_x = matching_answer_x_centers(page, first_matching_rows)
+        second_matching_x = matching_answer_x_centers(page, second_matching_rows)
+        for index, y_center in enumerate(first_matching_rows, start=1):
+            answers[f"46.{index}"] = [selected_answer(page, first_matching_x, y_center, ["A", "B", "C"])]
+        for index, y_center in enumerate(second_matching_rows, start=1):
+            answers[f"47.{index}"] = [selected_answer(page, second_matching_x, y_center, ["A", "B", "C"])]
+    else:
+        second_page_rows = answer_sheet_row_centers(images[1], 20)
+        second_left_x, second_right_x = regular_answer_x_centers(images[1], second_page_rows)
+        answers.update(
+            read_regular_answer_rows(
+                images[1],
+                second_page_rows,
+                second_left_x,
+                second_right_x,
+                [str(number) for number in range(41, 61)],
+                [str(number) for number in range(61, 81)],
+            )
+        )
+
+    questions = validate_answer_sequence(answers)
     return questions, {question: answers[question] for question in questions}
 
 
@@ -949,6 +1342,14 @@ def render_source_pages(
                     x_max,
                     y_max,
                 )
+                if key.startswith("context:"):
+                    x_min, y_min, x_max, y_max = trim_crop_horizontal_whitespace(
+                        page_image,
+                        x_min,
+                        y_min,
+                        x_max,
+                        y_max,
+                    )
                 source_images[key] = {
                     "url": f"{PAPER_URL_PREFIX}/{quote(identifier)}/{filename}",
                     "width": image_width,
@@ -971,6 +1372,30 @@ def remove_unexpected_assets(identifier: str, expected_assets: set[str]) -> None
     for path in destination.iterdir():
         if path.is_file() and path.name not in expected_assets:
             path.unlink()
+
+
+def normalize_context_crop_widths(
+    source_images: dict[str, dict[str, Any]],
+    contexts: dict[str, list[QuestionCrop]],
+) -> None:
+    for question, crops in contexts.items():
+        images = [
+            source_images[f"context:{question}:{index}"]
+            for index in range(len(crops))
+        ]
+        if len(images) < 2:
+            continue
+
+        left_ratio = min(image["crop"]["x"] / image["width"] for image in images)
+        right_ratio = max(
+            (image["crop"]["x"] + image["crop"]["width"]) / image["width"]
+            for image in images
+        )
+        for image in images:
+            x_min = max(0, math.floor(left_ratio * image["width"]))
+            x_max = min(image["width"], math.ceil(right_ratio * image["width"]))
+            image["crop"]["x"] = x_min
+            image["crop"]["width"] = x_max - x_min
 
 
 def build_tasks(
@@ -1010,6 +1435,7 @@ def build_tasks(
         all_crops,
         force_render,
     )
+    normalize_context_crop_widths(source_images, contexts)
     remove_unexpected_assets(identifier, expected_assets)
     completion_blanks = completion_blank_regions(
         completion_text_source_crops,

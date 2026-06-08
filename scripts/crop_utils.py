@@ -456,3 +456,47 @@ def trim_crop_bottom_whitespace(
         return x_min, y_min, x_max, y_max
 
     return x_min, y_min, x_max, candidate_y_max
+
+
+def trim_crop_horizontal_whitespace(
+    image: Image.Image,
+    x_min: int,
+    y_min: int,
+    x_max: int,
+    y_max: int,
+    *,
+    padding: int = 6,
+    min_trim: int = 8,
+    threshold: int = 248,
+    min_content_ratio: float = 0.005,
+) -> tuple[int, int, int, int]:
+    width = x_max - x_min
+    height = y_max - y_min
+    if width <= 0 or height <= 0:
+        return x_min, y_min, x_max, y_max
+
+    region = image.crop((x_min, y_min, x_max, y_max)).convert("L")
+    data = region.tobytes()
+    min_content_pixels = max(3, int(height * min_content_ratio))
+    content_columns: list[int] = []
+    for column_index in range(width):
+        content_pixels = sum(
+            data[row_index * width + column_index] < threshold
+            for row_index in range(height)
+        )
+        if content_pixels >= min_content_pixels:
+            content_columns.append(column_index)
+
+    if not content_columns:
+        return x_min, y_min, x_max, y_max
+
+    candidate_x_min = max(x_min, x_min + content_columns[0] - padding)
+    candidate_x_max = min(x_max, x_min + content_columns[-1] + 1 + padding)
+    if candidate_x_min - x_min < min_trim:
+        candidate_x_min = x_min
+    if x_max - candidate_x_max < min_trim:
+        candidate_x_max = x_max
+    if candidate_x_max <= candidate_x_min:
+        return x_min, y_min, x_max, y_max
+
+    return candidate_x_min, y_min, candidate_x_max, y_max

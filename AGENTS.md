@@ -148,6 +148,17 @@ verified archive case requires a change.
   those official images. If a task needs questions separated one by one, split
   the official PDF crop into per-question crops instead of transcribing the
   question text.
+- When parsing completion/nadopunjavanje tasks that contain an official example
+  item, such as `(0)`, treat that example as a visible, non-scored example
+  control rather than as a normal answer. Render the same kind of inline field
+  used for real blanks, preselect the official example answer, and make the
+  selected answer visually bold. The example selector may open so the user can
+  see the other official options, but those options must be disabled and cannot
+  be selected. Never include example items in quick select, saved answers,
+  progress, scoring, simulation answers, or `Provjeri` behavior. If the official
+  example answer cannot be detected reliably from markers such as `0→B`, a
+  bolded option in the crop, or the official key, keep the example visible in
+  the PDF crop and do not invent an interactive example answer.
 - For open-response tasks without an official automatic checker, use a
   self-review flow. Place the `Otvori rješenje` button beside a blank points
   input followed by `/<maximum points>`, where the maximum comes from the

@@ -7,6 +7,7 @@ import json
 import math
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import unicodedata
@@ -53,7 +54,8 @@ BLANK_PAGE_PARTS = {
     "01",
     "02",
 }
-AUDIO_SUFFIXES = {".mp3", ".m4a", ".ogg", ".wav"}
+AUDIO_SUFFIXES = {".mp3", ".m4a", ".ogg", ".wav", ".wma"}
+WEB_AUDIO_SUFFIXES = {".mp3", ".m4a", ".ogg", ".wav"}
 SOURCE_RENDER_DPI = 144
 SOURCE_CROP_HORIZONTAL_MARGIN = 48
 SOURCE_CROP_VERTICAL_PADDING = 9
@@ -110,10 +112,14 @@ class SourceCrop:
     y_max: float
 
 
+CropKey = tuple[str, int] | tuple[str, int, str]
+PdfLineEntry = tuple[PdfPage, PdfLine]
+
+
 A_TASKS = (
     Task(1, 1, 5, "ABCDEFGH"),
     Task(2, 6, 13, "ABC"),
-    Task(3, 14, 19, "ABCDEFGH"),
+    Task(3, 14, 19, "ABC"),
     Task(4, 20, 25, "ABC"),
 )
 
@@ -396,9 +402,201 @@ def write_if_changed(path: Path, contents: bytes) -> None:
     path.write_bytes(contents)
 
 
-def find_task_source_crops(contents: bytes, tasks: tuple[Task, ...]) -> dict[int, list[SourceCrop]]:
+def marker_position(marker: TaskMarker) -> tuple[int, float]:
+    return marker.page.number, marker.y_min
+
+
+def question_number_from_line(line: PdfLine) -> str | None:
+    match = re.match(r"^\s*(\d{1,2})\b", line.text.strip())
+    return match.group(1) if match else None
+
+
+def task_question_marker_number(
+    page: PdfPage,
+    line: PdfLine,
+    expected_questions: set[str],
+) -> str | None:
+    question = question_number_from_line(line)
+    if question not in expected_questions:
+        return None
+    if line.y_min >= page.height - 80:
+        return None
+    if line.x_min > SOURCE_CROP_HORIZONTAL_MARGIN + 48:
+        return None
+    return question
+
+
+def task_line_entries(
+    pages: list[PdfPage],
+    marker: TaskMarker,
+    next_marker: TaskMarker | None,
+) -> list[PdfLineEntry]:
+    line_entries: list[PdfLineEntry] = []
+    for page in pages:
+        if page.number < marker.page.number:
+            continue
+        if next_marker and page.number > next_marker.page.number:
+            continue
+
+        for line in sorted_page_lines(page):
+            if not line.text.strip():
+                continue
+            position = (page.number, line.y_min)
+            if position < marker_position(marker):
+                continue
+            if next_marker and position >= marker_position(next_marker):
+                continue
+            line_entries.append((page, line))
+
+    return line_entries
+
+
+def question_marker_visual_top(
+    line_entries: list[PdfLineEntry],
+    marker_page: PdfPage,
+    marker_line: PdfLine,
+) -> float:
+    aligned_lines = [
+        line
+        for page, line in line_entries
+        if page.number == marker_page.number
+        and line.y_max >= marker_line.y_min - 4
+        and line.y_min <= marker_line.y_max + 4
+    ]
+    return min(
+        (line.y_min for line in aligned_lines),
+        default=marker_line.y_min,
+    )
+
+
+def is_listening_end_marker(line: PdfLine) -> bool:
+    return bool(
+        re.search(
+            r"(?:five minutes.*copy your answers|end of the listening paper)",
+            line.text,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
+def numbered_question_crops(
+    line_entries: list[PdfLineEntry],
+    task: Task,
+) -> dict[str, list[SourceCrop]]:
+    expected_questions = [
+        str(question)
+        for question in range(task.first_question, task.last_question + 1)
+    ]
+    expected_set = set(expected_questions)
+    marker_candidates: list[tuple[str, PdfPage, PdfLine]] = []
+    for page, line in line_entries:
+        question = task_question_marker_number(page, line, expected_set)
+        if question:
+            marker_candidates.append((question, page, line))
+
+    selected_markers: list[tuple[str, PdfPage, PdfLine]] = []
+    cursor = (0, -1.0)
+    for question in expected_questions:
+        marker = next(
+            (
+                candidate
+                for candidate in marker_candidates
+                if candidate[0] == question
+                and (candidate[1].number, candidate[2].y_min) > cursor
+            ),
+            None,
+        )
+        if marker is None:
+            return {}
+        selected_markers.append(marker)
+        cursor = (marker[1].number, marker[2].y_min)
+
+    crops: dict[str, list[SourceCrop]] = {}
+    for index, (question, marker_page, marker_line) in enumerate(selected_markers):
+        start_y = question_marker_visual_top(
+            line_entries,
+            marker_page,
+            marker_line,
+        )
+        start = (marker_page.number, start_y)
+        next_question_marker = (
+            selected_markers[index + 1]
+            if index + 1 < len(selected_markers)
+            else None
+        )
+        if next_question_marker:
+            end = (
+                next_question_marker[1].number,
+                question_marker_visual_top(
+                    line_entries,
+                    next_question_marker[1],
+                    next_question_marker[2],
+                ),
+            )
+        else:
+            end = next(
+                (
+                    (page.number, line.y_min)
+                    for page, line in line_entries
+                    if (page.number, line.y_min) > start
+                    and is_listening_end_marker(line)
+                ),
+                (10_000, 10_000.0),
+            )
+        group_entries = [
+            (page, line)
+            for page, line in line_entries
+            if page.number == marker_page.number
+            and start <= (page.number, line.y_min) < end
+            and (
+                not is_running_header_or_footer(line.text)
+                or line is marker_line
+            )
+        ]
+
+        question_crops: list[SourceCrop] = []
+        page_numbers = list(dict.fromkeys(page.number for page, _line in group_entries))
+        for page_number in page_numbers:
+            page_entries = [
+                (page, line)
+                for page, line in group_entries
+                if page.number == page_number
+            ]
+            page = page_entries[0][0]
+            lines = [line for _page, line in page_entries]
+            y_min = max(
+                0,
+                min(line.y_min for line in lines) - SOURCE_CROP_VERTICAL_PADDING,
+            )
+            y_max = min(
+                page.height,
+                max(line.y_max for line in lines) + SOURCE_CROP_VERTICAL_PADDING,
+            )
+            question_crops.append(
+                SourceCrop(
+                    page=page,
+                    x_min=SOURCE_CROP_HORIZONTAL_MARGIN,
+                    y_min=y_min,
+                    x_max=page.width - SOURCE_CROP_HORIZONTAL_MARGIN,
+                    y_max=y_max,
+                )
+            )
+
+        crops[question] = question_crops
+
+    return crops
+
+
+def find_task_source_crops(
+    contents: bytes,
+    tasks: tuple[Task, ...],
+) -> tuple[
+    dict[int, list[SourceCrop]],
+    dict[int, dict[str, list[SourceCrop]]],
+]:
     pages = pdf_bbox_pages(contents)
     task_numbers = {task.number for task in tasks}
+    task_by_number = {task.number: task for task in tasks}
     markers: list[TaskMarker] = []
 
     for page in pages:
@@ -410,7 +608,7 @@ def find_task_source_crops(contents: bytes, tasks: tuple[Task, ...]) -> dict[int
             if number in task_numbers:
                 markers.append(TaskMarker(number=number, page=page, y_min=line.y_min))
 
-    markers.sort(key=lambda marker: (marker.page.number, marker.y_min))
+    markers.sort(key=marker_position)
     found_numbers = [marker.number for marker in markers]
     expected_numbers = [task.number for task in tasks]
     if found_numbers != expected_numbers:
@@ -420,8 +618,19 @@ def find_task_source_crops(contents: bytes, tasks: tuple[Task, ...]) -> dict[int
         )
 
     crops: dict[int, list[SourceCrop]] = {}
+    question_crops: dict[int, dict[str, list[SourceCrop]]] = {}
     for index, marker in enumerate(markers):
         next_marker = markers[index + 1] if index + 1 < len(markers) else None
+        task = task_by_number[marker.number]
+        line_entries = task_line_entries(pages, marker, next_marker)
+        task_question_crops = numbered_question_crops(line_entries, task)
+        first_question_position = None
+        if task_question_crops:
+            first_question_crop = task_question_crops[str(task.first_question)][0]
+            first_question_position = (
+                first_question_crop.page.number,
+                first_question_crop.y_min,
+            )
         task_crops: list[SourceCrop] = []
         for page in pages:
             if page.number < marker.page.number:
@@ -441,9 +650,19 @@ def find_task_source_crops(contents: bytes, tasks: tuple[Task, ...]) -> dict[int
                     continue
                 if next_marker and page.number == next_marker.page.number and line.y_min >= next_marker.y_min:
                     continue
+                if (
+                    first_question_position
+                    and (page.number, line.y_min) >= first_question_position
+                ):
+                    continue
                 relevant_lines.append(line)
 
             if not relevant_lines:
+                if (
+                    first_question_position
+                    and page.number >= first_question_position[0]
+                ):
+                    break
                 continue
 
             y_min = max(0, relevant_lines[0].y_min - SOURCE_CROP_VERTICAL_PADDING)
@@ -467,23 +686,25 @@ def find_task_source_crops(contents: bytes, tasks: tuple[Task, ...]) -> dict[int
         if not task_crops:
             raise ValueError(f"Task {marker.number} has no visible source crop")
         crops[marker.number] = task_crops
+        if task_question_crops:
+            question_crops[marker.number] = task_question_crops
 
-    return crops
+    return crops, question_crops
 
 
 def render_source_pages(
     paper_path: Path,
     identifier: str,
-    crops: dict[int, list[SourceCrop]],
+    crops: dict[CropKey, list[SourceCrop]],
     expected_assets: set[str],
-) -> dict[int, list[dict[str, Any]]]:
+) -> dict[CropKey, list[dict[str, Any]]]:
     destination = ASSET_ROOT / identifier
-    crops_by_page: dict[int, list[tuple[int, SourceCrop]]] = {}
-    for task_number, task_crops in crops.items():
+    crops_by_page: dict[int, list[tuple[CropKey, SourceCrop]]] = {}
+    for crop_key, task_crops in crops.items():
         for crop in task_crops:
-            crops_by_page.setdefault(crop.page.number, []).append((task_number, crop))
+            crops_by_page.setdefault(crop.page.number, []).append((crop_key, crop))
 
-    source_images: dict[int, list[dict[str, Any]]] = {}
+    source_images: dict[CropKey, list[dict[str, Any]]] = {}
     with tempfile.TemporaryDirectory() as temporary_directory:
         temporary_root = Path(temporary_directory)
         for page_number, page_crops in sorted(crops_by_page.items()):
@@ -503,7 +724,7 @@ def render_source_pages(
             expected_assets.add(filename)
             page_image = grayscale_image_from_png(contents)
 
-            for task_number, crop in page_crops:
+            for crop_key, crop in page_crops:
                 scale_x = image_width / crop.page.width
                 scale_y = image_height / crop.page.height
                 x_min = max(0, math.floor(crop.x_min * scale_x))
@@ -517,7 +738,7 @@ def render_source_pages(
                     x_max,
                     y_max,
                 )
-                source_images.setdefault(task_number, []).append(
+                source_images.setdefault(crop_key, []).append(
                     {
                         "url": f"{ASSET_URL_PREFIX}/{quote(identifier)}/{filename}",
                         "page": page_number,
@@ -637,6 +858,54 @@ def remove_orphaned_audio(audio_root: Path, expected_names: set[str]) -> None:
             path.unlink()
 
 
+def convert_audio_to_mp3(contents: bytes, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        source = Path(tmpdir) / "source.wma"
+        output = Path(tmpdir) / "output.mp3"
+        source.write_bytes(contents)
+        try:
+            subprocess.run(
+                [
+                    "ffmpeg",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-y",
+                    "-i",
+                    str(source),
+                    "-codec:a",
+                    "libmp3lame",
+                    "-q:a",
+                    "4",
+                    str(output),
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError("ffmpeg is required to convert WMA listening audio") from exc
+        except subprocess.CalledProcessError as exc:
+            message = exc.stderr.decode("utf-8", errors="replace")
+            raise RuntimeError(f"ffmpeg failed to convert WMA listening audio: {message}") from exc
+        write_if_changed(destination, output.read_bytes())
+
+
+def write_web_audio(contents: bytes, source_name: str, destination: Path) -> str:
+    suffix = Path(source_name).suffix.casefold()
+    if suffix == ".wma":
+        mp3_destination = destination.with_suffix(".mp3")
+        convert_audio_to_mp3(contents, mp3_destination)
+        return mp3_destination.name
+
+    if suffix not in WEB_AUDIO_SUFFIXES:
+        raise ValueError(f"Unsupported web audio format: {source_name}")
+
+    write_if_changed(destination, contents)
+    return destination.name
+
+
 def build_exam(exam: dict[str, Any]) -> dict[str, Any] | None:
     archive_path = local_archive_path(exam["url"])
     tasks = tasks_for(exam)
@@ -659,12 +928,42 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any] | None:
         destination = ASSET_ROOT / identifier
         expected_assets = {"paper.pdf"}
         write_if_changed(destination / "paper.pdf", paper_contents)
-        source_images = render_source_pages(
+        task_crops, task_question_crops = find_task_source_crops(
+            paper_contents,
+            tasks,
+        )
+        render_crops: dict[CropKey, list[SourceCrop]] = {
+            ("task", task_number): crops
+            for task_number, crops in task_crops.items()
+        }
+        for task_number, questions in task_question_crops.items():
+            for question, crops in questions.items():
+                render_crops[("question", task_number, question)] = crops
+        rendered_images = render_source_pages(
             destination / "paper.pdf",
             identifier,
-            find_task_source_crops(paper_contents, tasks),
+            render_crops,
             expected_assets,
         )
+        source_images = {
+            task.number: rendered_images.get(("task", task.number), [])
+            for task in tasks
+        }
+        question_images: dict[
+            int,
+            dict[str, dict[str, Any] | list[dict[str, Any]]],
+        ] = {}
+        for task_number, questions in task_question_crops.items():
+            question_images[task_number] = {}
+            for question in questions:
+                images = rendered_images.get(
+                    ("question", task_number, question),
+                    [],
+                )
+                if images:
+                    question_images[task_number][question] = (
+                        images[0] if len(images) == 1 else images
+                    )
 
         audio_items = []
         expected_audio_names = set()
@@ -673,9 +972,16 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any] | None:
             if "cijeli" not in slugify(Path(audio_name).stem):
                 split_index += 1
             suffix = Path(audio_name).suffix.casefold()
-            local_name = f"{index:02}{suffix}"
+            local_suffix = ".mp3" if suffix == ".wma" else suffix
+            local_name = f"{index:02}{local_suffix}"
             expected_audio_names.add(local_name)
-            write_if_changed(destination / "audio" / local_name, archive.read(audio_name))
+            written_name = write_web_audio(
+                archive.read(audio_name),
+                audio_name,
+                destination / "audio" / local_name,
+            )
+            if written_name != local_name:
+                raise ValueError(f"Unexpected converted audio name: {written_name}")
             audio_items.append(
                 {
                     "label": audio_label(audio_name, split_index, len(audio_names)),
@@ -702,10 +1008,18 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any] | None:
         "checkingSupported": has_checking,
         "audio": audio_items,
         "tasks": [
-            task.to_json() | {
+            (
+                task.to_json()
+                | {
                 "text": task_texts[task.number],
                 "sourceImages": source_images.get(task.number, []),
-            }
+                }
+                | (
+                    {"questionImages": question_images[task.number]}
+                    if question_images.get(task.number)
+                    else {}
+                )
+            )
             for task in tasks
         ],
         "answers": answers,

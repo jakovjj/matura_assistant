@@ -11,7 +11,6 @@ const rootDir = __dirname;
 loadEnvFile(path.join(rootDir, ".env"));
 
 const config = {
-  agentKeyEncryptionSecret: process.env.AGENT_KEY_ENCRYPTION_SECRET || "",
   authSecret: process.env.AUTH_SECRET || "",
   cookieName: process.env.AUTH_COOKIE_NAME || "azm_session",
   cookieSecure:
@@ -19,8 +18,6 @@ const config = {
     process.env.NODE_ENV === "production" ||
     /^https:\/\//i.test(process.env.PUBLIC_BASE_URL || ""),
   essayModel: process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
-  geographyModel:
-    process.env.OPENAI_GEOGRAPHY_MODEL || process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
   host: process.env.HOST || "0.0.0.0",
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
@@ -34,6 +31,7 @@ const config = {
   feedbackFile: path.resolve(rootDir, process.env.FEEDBACK_FILE || "var/feedback/messages.jsonl"),
   feedbackTextFile: path.resolve(rootDir, process.env.FEEDBACK_TEXT_FILE || "var/feedback/messages.txt"),
   legacyStoreFile: path.resolve(rootDir, process.env.AUTH_STORE_FILE || "var/auth-store.json"),
+  userLoginsTextFile: path.resolve(rootDir, process.env.USER_LOGINS_TEXT_FILE || "var/users/logins.txt"),
 };
 
 const rateLimit = {
@@ -53,10 +51,6 @@ const englishEssayIndex = {
 const croatianWritingIndex = {
   file: path.join(rootDir, "data", "croatian-writing.js"),
   prefix: "window.ASISTENT_ZA_MATURE_CROATIAN_WRITING=",
-};
-const geographyChoiceIndex = {
-  file: path.join(rootDir, "data", "geography-choice.js"),
-  prefix: "window.ASISTENT_ZA_MATURE_GEOGRAPHY_CHOICE=",
 };
 const generalGradingSystemPrompt = loadPromptFile("general-grading-system.txt");
 const essayScoreSchema = {
@@ -271,16 +265,6 @@ async function main() {
     }
     console.warn("Upozorenje: AUTH_SECRET nije postavljen. Koristim samo razvojni fallback.");
   }
-  if (!config.agentKeyEncryptionSecret) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        "AGENT_KEY_ENCRYPTION_SECRET mora biti postavljen prije produkcijskog pokretanja.",
-      );
-    }
-    console.warn(
-      "Upozorenje: AGENT_KEY_ENCRYPTION_SECRET nije postavljen. Koristim samo razvojni fallback.",
-    );
-  }
   if (
     process.env.NODE_ENV === "production" &&
     googleAuthEnabled() &&
@@ -344,11 +328,6 @@ async function handleRequest(request, response) {
     return;
   }
 
-  if (url.pathname === "/api/profile/agent-key") {
-    await handleProfileAgentKey(request, response);
-    return;
-  }
-
   if (url.pathname === "/api/feedback") {
     await handleFeedback(request, response);
     return;
@@ -361,11 +340,6 @@ async function handleRequest(request, response) {
     url.pathname === "/api/croatian-writing/ocr"
   ) {
     handleWritingPreviewOnlyApi(response);
-    return;
-  }
-
-  if (url.pathname === "/api/geography/grade-open") {
-    await handleGeographyOpenGrade(request, response);
     return;
   }
 
@@ -685,55 +659,6 @@ async function handleProfilePracticeProgress(request, response) {
   sendJson(response, 200, { items: user.practiceProgress });
 }
 
-async function handleProfileAgentKey(request, response) {
-  if (!["GET", "HEAD", "PUT", "DELETE"].includes(request.method)) {
-    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "GET, PUT, DELETE" });
-    return;
-  }
-
-  const session = currentSession(request);
-  const user = session ? store.users[session.userId] : null;
-  if (!session || !user) {
-    sendJson(response, 401, { error: "Prijava je potrebna." });
-    return;
-  }
-
-  if (request.method === "GET" || request.method === "HEAD") {
-    sendJson(response, 200, { agentKey: publicAgentKey(user.agentKey) });
-    return;
-  }
-
-  if (request.method === "DELETE") {
-    delete user.agentKey;
-    user.updatedAt = new Date().toISOString();
-    await persistStore();
-    sendJson(response, 200, { agentKey: publicAgentKey(null) });
-    return;
-  }
-
-  let body;
-  try {
-    body = await readJsonBody(request);
-  } catch {
-    sendJson(response, 400, { error: "Zahtjev nema ispravan JSON zapis." });
-    return;
-  }
-
-  const apiKey = normalizeOpenAiApiKey(body?.apiKey);
-  if (!apiKey) {
-    sendJson(response, 400, {
-      error: "Upiši ispravan OpenAI API ključ bez razmaka.",
-    });
-    return;
-  }
-
-  user.agentKey = encryptAgentKey(apiKey);
-  user.updatedAt = new Date().toISOString();
-  await persistStore();
-
-  sendJson(response, 200, { agentKey: publicAgentKey(user.agentKey) });
-}
-
 async function handleEnglishEssayGrade(request, response) {
   if (request.method !== "POST") {
     sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
@@ -1006,85 +931,6 @@ async function handleCroatianWritingOcr(request, response) {
   }
 }
 
-async function handleGeographyOpenGrade(request, response) {
-  if (request.method !== "POST") {
-    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
-    return;
-  }
-
-  const ipAddress = clientIp(request);
-  if (!rateLimit.ip.check(ipAddress)) {
-    sendJson(response, 429, {
-      error: "Poslano je previše zahtjeva. Pričekaj nekoliko minuta i pokušaj ponovno.",
-    });
-    return;
-  }
-
-  const session = currentSession(request);
-  const user = session ? store.users[session.userId] : null;
-  let apiKey = config.openAiApiKey;
-
-  if (user?.agentKey) {
-    try {
-      apiKey = decryptAgentKey(user.agentKey);
-    } catch (error) {
-      console.error("OpenAI API ključ nije moguće pročitati:", error.message);
-      sendJson(response, 400, { error: "Spremljeni OpenAI API ključ nije moguće pročitati." });
-      return;
-    }
-  }
-
-  if (!apiKey) {
-    sendJson(response, user ? 400 : 401, {
-      authRequired: !user,
-      code: "missing_ai_key",
-      error: user
-        ? "Spremi OpenAI API ključ u profilu prije AI ocjenjivanja."
-        : "Prijava i spremljeni OpenAI API ključ potrebni su za AI ocjenjivanje.",
-    });
-    return;
-  }
-
-  let body;
-  try {
-    body = await readJsonBody(request, 96 * 1024);
-  } catch {
-    sendJson(response, 400, { error: "Zahtjev nema ispravan JSON zapis." });
-    return;
-  }
-
-  const examId = stringOrEmpty(body?.examId);
-  const geographyExam = loadGeographyChoiceExam(examId);
-  if (!geographyExam) {
-    sendJson(response, 404, { error: "Odabrani ispit iz Geografije nije dostupan." });
-    return;
-  }
-
-  const answers = normalizeHistoryOpenAnswers(body?.answers, geographyExam);
-  if (!Object.keys(answers).length) {
-    sendJson(response, 400, { error: "Pošalji barem jedan otvoreni odgovor za ocjenjivanje." });
-    return;
-  }
-  if (rejectUnreliableOfficialAnswers(response, geographyExam, answers)) return;
-
-  try {
-    const grades = await gradeGeographyOpenAnswersWithOpenAI({
-      apiKey,
-      geographyExam,
-      answers,
-    });
-    sendJson(response, 200, {
-      grades,
-      model: config.geographyModel,
-    });
-  } catch (error) {
-    console.error("Ocjenjivanje otvorenih zadataka iz Geografije nije uspjelo:", error.message);
-    sendJson(response, 502, {
-      error: "OpenAI ocjenjivanje nije uspjelo. Provjeri API ključ i pokušaj ponovno.",
-    });
-  }
-}
-
 function upsertGoogleUser(profile) {
   const now = new Date().toISOString();
   let user =
@@ -1333,6 +1179,59 @@ function formatFeedbackTimestamp(timestamp) {
   return date.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, " UTC");
 }
 
+function writeUserLoginReport() {
+  const users = Object.values(store.users || {}).sort(compareUsersForReport);
+
+  const lines = [
+    "Asistent za Mature - lokalni pregled korisnika",
+    `Generirano: ${formatFeedbackTimestamp(new Date().toISOString())}`,
+    `Ukupno korisnika: ${users.length}`,
+    "",
+    "Korisnici",
+  ];
+
+  if (!users.length) {
+    lines.push("- Nema spremljenih korisnika.");
+  }
+
+  users.forEach((user, index) => {
+    lines.push(`${index + 1}. ${reportText(user.email) || "-"}`);
+    lines.push(`   Ime: ${reportText(user.displayName) || "-"}`);
+    lines.push(`   ID: ${reportText(user.id) || "-"}`);
+    lines.push(`   Provider: ${reportText(user.authProvider) || "-"}`);
+    lines.push(`   Kreiran: ${formatFeedbackTimestamp(user.createdAt)}`);
+    lines.push(`   Zadnja prijava: ${formatFeedbackTimestamp(user.lastLoginAt)}`);
+    lines.push(`   Zadnja aktivnost: ${formatFeedbackTimestamp(user.updatedAt)}`);
+  });
+
+  fs.mkdirSync(path.dirname(config.userLoginsTextFile), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(config.userLoginsTextFile, `${lines.join("\n")}\n`, {
+    encoding: "utf8",
+    mode: 0o600,
+  });
+}
+
+function compareUsersForReport(left, right) {
+  return (
+    reportTimestamp(right.lastLoginAt || right.updatedAt || right.createdAt) -
+      reportTimestamp(left.lastLoginAt || left.updatedAt || left.createdAt) ||
+    reportText(left.email).localeCompare(reportText(right.email), "hr")
+  );
+}
+
+function reportTimestamp(value) {
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function reportText(value, maxLength = 300) {
+  return String(value || "")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
 function normalizeSimulationAttempt(attempt) {
   if (!attempt || typeof attempt !== "object" || Array.isArray(attempt)) return null;
 
@@ -1491,19 +1390,6 @@ function loadCroatianWritingExam(examId) {
     rubric,
     criteria: Array.isArray(rubric?.criteria) ? rubric.criteria : exam.criteria || [],
   };
-}
-
-function loadGeographyChoiceExam(examId) {
-  if (!examId) return null;
-
-  const source = fs.readFileSync(geographyChoiceIndex.file, "utf8").trim();
-  if (!source.startsWith(geographyChoiceIndex.prefix) || !source.endsWith(";")) {
-    throw new Error("Geography choice index has an unsupported format.");
-  }
-
-  const payload = JSON.parse(source.slice(geographyChoiceIndex.prefix.length, -1));
-  const exams = Array.isArray(payload.exams) ? payload.exams : [];
-  return exams.find((exam) => exam && exam.id === examId) || null;
 }
 
 function normalizeHistoryOpenAnswers(rawAnswers, historyExam) {
@@ -2183,17 +2069,6 @@ function countTextWords(value) {
   return String(value || "").match(/[\p{L}\p{N}]+(?:[-'’][\p{L}\p{N}]+)*/gu)?.length || 0;
 }
 
-async function gradeGeographyOpenAnswersWithOpenAI({ apiKey, geographyExam, answers }) {
-  return gradeOpenAnswersWithOpenAI({
-    apiKey,
-    answers,
-    exam: geographyExam,
-    model: config.geographyModel,
-    schemaName: "geography_open_answer_scores",
-    subject: "Geografija",
-  });
-}
-
 async function gradeOpenAnswersWithOpenAI({ apiKey, exam, answers, model, schemaName, subject }) {
   const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
     body: JSON.stringify({
@@ -2255,14 +2130,7 @@ function buildOpenAnswerGradingSystemPrompt(subject) {
     .trim();
 }
 
-function subjectSpecificOpenGradingRules(subject) {
-  if (subject === "Geografija") {
-    return [
-      "- Priznaj geografski jednakovrijedne nazive, točne standardne varijante naziva, ispravan izračun i obrazloženje ako ga zadatak traži.",
-      "- Kod kombiniranih odgovora traži sve elemente navedene u službenome ključu za puni broj bodova.",
-    ].join("\n");
-  }
-
+function subjectSpecificOpenGradingRules() {
   return "- Ocjenjuj strogo prema službenome modelu odgovora.";
 }
 
@@ -2521,24 +2389,6 @@ function clampInteger(value, minimum, maximum) {
   return Math.max(minimum, Math.min(maximum, integer));
 }
 
-function encryptAgentKey(apiKey) {
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", agentKeyEncryptionKey(), iv);
-  cipher.setAAD(Buffer.from("asistent-za-mature:agent-key:v1:openai"));
-
-  const ciphertext = Buffer.concat([cipher.update(apiKey, "utf8"), cipher.final()]);
-  return {
-    algorithm: "aes-256-gcm",
-    ciphertext: ciphertext.toString("base64url"),
-    iv: iv.toString("base64url"),
-    keyHint: apiKey.slice(-4),
-    provider: "openai",
-    tag: cipher.getAuthTag().toString("base64url"),
-    updatedAt: new Date().toISOString(),
-    version: 1,
-  };
-}
-
 function decryptAgentKey(agentKey) {
   const normalized = normalizeEncryptedAgentKey(agentKey);
   if (!normalized) return "";
@@ -2563,28 +2413,9 @@ function agentKeyEncryptionKey() {
     .createHash("sha256")
     .update("asistent-za-mature:agent-key-encryption:v1\0")
     .update(
-      config.agentKeyEncryptionSecret ||
-        config.authSecret ||
-        "asistent-za-mature-dev-agent-key-secret",
+      config.authSecret || "asistent-za-mature-dev-agent-key-secret",
     )
     .digest();
-}
-
-function publicAgentKey(agentKey) {
-  const normalized = normalizeEncryptedAgentKey(agentKey);
-  if (!normalized) {
-    return {
-      configured: false,
-      provider: "openai",
-    };
-  }
-
-  return {
-    configured: true,
-    maskedKey: `****${normalized.keyHint}`,
-    provider: normalized.provider,
-    updatedAt: normalized.updatedAt,
-  };
 }
 
 function normalizeEncryptedAgentKey(agentKey) {
@@ -3205,6 +3036,12 @@ function persistStore() {
   } catch (error) {
     database.exec("ROLLBACK");
     throw error;
+  }
+
+  try {
+    writeUserLoginReport();
+  } catch (error) {
+    console.error("Lokalni pregled korisnika nije moguće osvježiti:", error);
   }
 }
 

@@ -91,32 +91,6 @@
     }
   }
 
-  async function requestAgentKey(options = {}) {
-    const response = await fetch("/api/profile/agent-key", {
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      ...options,
-    });
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) throw new Error("API nije dostupan.");
-
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Zahtjev nije uspio.");
-    return data.agentKey;
-  }
-
-  async function loadAgentKey(user) {
-    if (!user) return { configured: false, provider: "openai" };
-
-    try {
-      return await requestAgentKey();
-    } catch {
-      return { configured: false, provider: "openai", unavailable: true };
-    }
-  }
-
   function mergeSimulations(...lists) {
     const simulationsById = new Map();
 
@@ -140,7 +114,7 @@
     `;
   }
 
-  function renderProfile({ agentKey, localProfile, serverSimulations, user }) {
+  function renderProfile({ localProfile, serverSimulations, user }) {
     const simulations = user
       ? mergeSimulations(serverSimulations, localProfile.simulations || [])
       : localProfile.simulations || [];
@@ -174,192 +148,8 @@
           </div>
           ${simulations.length ? renderSimulationTable(simulations) : renderEmptyState()}
         </section>
-
-        ${renderAgentKeyPanel({ agentKey, user })}
       </div>
     `;
-  }
-
-  function renderAgentKeyPanel({ agentKey, user }) {
-    const heading = `
-      <div class="profile-agent-key__heading">
-        <span class="profile-agent-key__icon-wrap">
-          <svg class="profile-agent-key__icon" aria-hidden="true" viewBox="0 0 24 24">
-            <circle cx="8" cy="12" r="3.5" />
-            <path d="M11.5 12H20" />
-            <path d="M16 12v3" />
-            <path d="M18.5 12v2" />
-          </svg>
-        </span>
-        <div>
-          <h2>OpenAI API ključ</h2>
-          <p>
-            Koristit će se za provjeru točnosti otvorenih pitanja koja imaju AI provjeru.
-          </p>
-        </div>
-      </div>
-    `;
-    const helpFooter = `
-      <details class="profile-agent-key__help">
-        <summary>Kako dobiti ključ?</summary>
-        <div class="profile-agent-key__help-body">
-          <ol>
-            <li>
-              Otvori
-              <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">
-                OpenAI API keys
-              </a>.
-            </li>
-            <li>
-              Klikni
-              <a
-                href="https://platform.openai.com/docs/quickstart/step-2-setup-your-api-key"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Create new secret key
-              </a>
-              i odmah spremi prikazani ključ.
-            </li>
-            <li>
-              Ako API pozivi ne prolaze, provjeri
-              <a
-                href="https://help.openai.com/en/articles/8264644-how-can-i-set-up-prepaid-billing"
-                target="_blank"
-                rel="noreferrer"
-              >
-                billing i kredite
-              </a>.
-            </li>
-          </ol>
-          <p>Puni tajni ključ prikazuje se samo pri izradi. Ne dijeli ga javno.</p>
-        </div>
-      </details>
-    `;
-
-    if (!user) {
-      return `
-        <section class="profile-panel profile-agent-key" data-agent-key-panel>
-          ${heading}
-          <a class="profile-agent-key__login" href="./prijava.html?next=%2Fprofil.html">
-            Prijavi se za spremanje vlastitog ključa.
-          </a>
-          ${helpFooter}
-        </section>
-      `;
-    }
-
-    const configured = agentKey?.configured === true;
-    const unavailable = agentKey?.unavailable === true;
-    const status = unavailable ? "Status ključa trenutačno nije dostupan." : "";
-    const formContent = configured
-      ? `
-          <div class="profile-agent-key__saved">
-            <p class="profile-agent-key__saved-label">
-              <svg aria-hidden="true" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="9" />
-                <path d="m8 12 3 3 5-6" />
-              </svg>
-              <span>Ključ spremljen</span>
-            </p>
-            <button class="secondary-button" type="button" data-agent-key-delete>
-              Obriši ključ
-            </button>
-          </div>
-        `
-      : `
-          <div class="profile-agent-key__controls">
-            <input
-              aria-label="Vlastiti OpenAI API ključ"
-              name="apiKey"
-              type="password"
-              minlength="20"
-              maxlength="512"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="npr. sk-proj-abc123...xyz789"
-              required
-            />
-            <button class="primary-button" type="submit">Spremi</button>
-          </div>
-          <p class="profile-agent-key__hint">
-            Primjer formata: <code>sk-proj-abc123...xyz789</code>. Unesi puni ključ bez razmaka.
-          </p>
-        `;
-
-    return `
-      <section class="profile-panel profile-agent-key" data-agent-key-panel>
-        ${heading}
-        <form class="profile-agent-key__form" data-agent-key-form>
-          ${formContent}
-          ${status ? `<p class="profile-agent-key__status" ${unavailable ? 'data-tone="error"' : ""}>${escapeHtml(status)}</p>` : ""}
-          <p class="profile-agent-key__message" data-agent-key-message hidden></p>
-        </form>
-        ${helpFooter}
-      </section>
-    `;
-  }
-
-  function setAgentKeyPending(pending) {
-    root.querySelectorAll("[data-agent-key-form] button, [data-agent-key-form] input").forEach(
-      (control) => {
-        control.disabled = pending;
-      },
-    );
-  }
-
-  function showAgentKeyMessage(message, tone) {
-    const messageNode = root.querySelector("[data-agent-key-message]");
-    if (!messageNode) return;
-
-    messageNode.hidden = !message;
-    messageNode.dataset.tone = tone || "";
-    messageNode.textContent = message;
-  }
-
-  function replaceAgentKeyPanel(agentKey, message) {
-    const panel = root.querySelector("[data-agent-key-panel]");
-    if (!panel) return;
-
-    const wrapper = document.createElement("div");
-    wrapper.innerHTML = renderAgentKeyPanel({ agentKey, user: true });
-    panel.replaceWith(wrapper.firstElementChild);
-    showAgentKeyMessage(message, "success");
-  }
-
-  async function saveAgentKey(event) {
-    event.preventDefault();
-
-    const form = event.target;
-    const formData = new FormData(form);
-    setAgentKeyPending(true);
-    showAgentKeyMessage("", "");
-
-    try {
-      const agentKey = await requestAgentKey({
-        body: JSON.stringify({ apiKey: formData.get("apiKey") }),
-        method: "PUT",
-      });
-      replaceAgentKeyPanel(agentKey, "OpenAI API ključ je spremljen.");
-    } catch (error) {
-      showAgentKeyMessage(error.message || "Spremanje ključa nije uspjelo.", "error");
-      setAgentKeyPending(false);
-    }
-  }
-
-  async function deleteAgentKey() {
-    if (!window.confirm("Obrisati spremljeni OpenAI API ključ?")) return;
-
-    setAgentKeyPending(true);
-    showAgentKeyMessage("", "");
-
-    try {
-      const agentKey = await requestAgentKey({ method: "DELETE" });
-      replaceAgentKeyPanel(agentKey, "OpenAI API ključ je obrisan.");
-    } catch (error) {
-      showAgentKeyMessage(error.message || "Brisanje ključa nije uspjelo.", "error");
-      setAgentKeyPending(false);
-    }
   }
 
   function renderEmptyState() {
@@ -431,20 +221,12 @@
 
     renderLoading();
     const user = await loadAuthUser();
-    const [localProfile, serverSimulations, agentKey] = await Promise.all([
+    const [localProfile, serverSimulations] = await Promise.all([
       Promise.resolve(profileStore.getProfile()),
       loadServerSimulations(),
-      loadAgentKey(user),
     ]);
-    renderProfile({ agentKey, localProfile, serverSimulations, user });
+    renderProfile({ localProfile, serverSimulations, user });
   }
-
-  root.addEventListener("submit", (event) => {
-    if (event.target.matches("[data-agent-key-form]")) saveAgentKey(event);
-  });
-  root.addEventListener("click", (event) => {
-    if (event.target.closest("[data-agent-key-delete]")) deleteAgentKey();
-  });
 
   init();
 })();

@@ -215,96 +215,6 @@
     `;
   }
 
-  let aiKeyDialog;
-  let aiKeyDialogResolve;
-  let aiKeyDialogPreviousFocus;
-
-  function ensureAiKeyRequiredDialog() {
-    if (aiKeyDialog) return aiKeyDialog;
-
-    aiKeyDialog = document.createElement("div");
-    aiKeyDialog.className = "ai-key-required-dialog";
-    aiKeyDialog.id = "ai-key-required-dialog";
-    aiKeyDialog.setAttribute("role", "dialog");
-    aiKeyDialog.setAttribute("aria-modal", "true");
-    aiKeyDialog.setAttribute("aria-labelledby", "ai-key-required-title");
-    aiKeyDialog.hidden = true;
-    aiKeyDialog.innerHTML = `
-      <div class="ai-key-required-dialog__backdrop" data-ai-key-dialog-close></div>
-      <section class="ai-key-required-dialog__panel">
-        <button
-          class="ai-key-required-dialog__close"
-          type="button"
-          aria-label="Zatvori poruku"
-          data-ai-key-dialog-close
-        >
-          &times;
-        </button>
-        <p class="eyebrow">AI ocjenjivanje</p>
-        <h2 id="ai-key-required-title">Potreban je GPT ključ</h2>
-        <p>
-          Za AI ocjenjivanje otvorenih pitanja moraš se prijaviti i u profilu
-          unijeti vlastiti OpenAI API ključ.
-        </p>
-        <div class="ai-key-required-dialog__actions">
-          <a class="primary-button" data-ai-key-dialog-profile href="./profil.html">
-            Prijavi se i unesi GPT ključ
-          </a>
-          <button class="secondary-button" type="button" data-ai-key-dialog-skip>
-            Ocijeni bez AI pitanja
-          </button>
-        </div>
-      </section>
-    `;
-
-    aiKeyDialog.addEventListener("click", (event) => {
-      if (event.target.closest("[data-ai-key-dialog-close]")) closeAiKeyRequiredDialog("cancel");
-      if (event.target.closest("[data-ai-key-dialog-skip]")) closeAiKeyRequiredDialog("skip-ai");
-    });
-
-    document.body.append(aiKeyDialog);
-    return aiKeyDialog;
-  }
-
-  function closeAiKeyRequiredDialog(action) {
-    if (!aiKeyDialog || aiKeyDialog.hidden) return;
-
-    aiKeyDialog.hidden = true;
-    document.body.classList.remove("ai-key-required-dialog-open");
-    const resolve = aiKeyDialogResolve;
-    aiKeyDialogResolve = null;
-
-    aiKeyDialogPreviousFocus?.focus();
-    aiKeyDialogPreviousFocus = null;
-    resolve?.(action);
-  }
-
-  function openAiKeyRequiredDialog(options = {}) {
-    const dialog = ensureAiKeyRequiredDialog();
-    const link = dialog.querySelector("[data-ai-key-dialog-profile]");
-    const authRequired = options.authRequired === true;
-
-    link.href = authRequired
-      ? `./prijava.html?next=${encodeURIComponent("/profil.html")}`
-      : "./profil.html";
-    link.textContent = authRequired
-      ? "Prijavi se i unesi GPT ključ"
-      : "Unesi GPT ključ u profilu";
-
-    aiKeyDialogPreviousFocus = document.activeElement;
-    dialog.hidden = false;
-    document.body.classList.add("ai-key-required-dialog-open");
-
-    return new Promise((resolve) => {
-      aiKeyDialogResolve = resolve;
-      link.focus();
-    });
-  }
-
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") closeAiKeyRequiredDialog("cancel");
-  });
-
   let solverFooterResizeObserver = null;
   let observedSolverFooter = null;
 
@@ -342,5 +252,4 @@
 
   window.renderSolverHeader = renderSolverHeader;
   window.formatSolverExamTitle = formatExamTitle;
-  window.openAiKeyRequiredDialog = openAiKeyRequiredDialog;
 })();

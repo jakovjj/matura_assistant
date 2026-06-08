@@ -795,7 +795,7 @@ function renderQuestionFallback(question, number) {
   if (question.type === "open") return renderOpenPrompt(question);
   return `
     <p class="history-open-question__prompt">
-      Pronađi ${escapeHtml(number)}. zadatak u službenoj PDF knjižici i odaberi odgovor.
+      Pronađi ${escapeHtml(number)}. zadatak u službenoj PDF knjižici.
     </p>
   `;
 }
@@ -1001,7 +1001,6 @@ function renderClosedQuestionResponse(question) {
   return `
     <fieldset class="physics-inline-response ${resultClass}">
       <legend>Odgovor na ${escapeHtml(question)}. zadatak</legend>
-      <span class="physics-inline-response__label">Odaberi odgovor</span>
       <div class="choice-list">
         ${["A", "B", "C", "D"]
           .map((option) => renderChoice(question, option, answer))

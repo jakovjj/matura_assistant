@@ -1070,7 +1070,6 @@ function renderQuestion(question) {
   return `
     <fieldset class="physics-inline-response ${resultClass}">
       <legend>Odgovor na ${question}. pitanje</legend>
-      <span class="physics-inline-response__label">Odaberi odgovor</span>
       <div class="choice-list">
         ${questionOptions(question)
           .map((option) => renderChoice(question, option, answer))

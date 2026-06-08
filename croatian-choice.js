@@ -664,7 +664,7 @@ function completionBlankDisplayText(question, answer) {
 
 function completionBlankAriaLabel(question, answer) {
   if (answer) return `Praznina ${question}, odabrano ${answer}. Promijeni odgovor.`;
-  return `Praznina ${question}, odaberi odgovor.`;
+  return `Praznina ${question}, nije odgovoreno.`;
 }
 
 function renderSourceQuestion(question) {
@@ -674,7 +674,7 @@ function renderSourceQuestion(question) {
     `Izvorni prikaz ${number}. pitanja iz službene PDF knjižice.`,
   );
   const completionPrompt = activeTaskTypeId === "nadopunjavanje"
-    ? `<p>Odaberi odgovor za prazninu ${escapeHtml(number)}.</p>`
+    ? `<p>Praznina ${escapeHtml(number)}.</p>`
     : "";
 
   return `
@@ -1005,7 +1005,6 @@ function renderQuestion(question) {
   return `
     <fieldset class="physics-inline-response ${resultClass}">
       <legend>Odgovor na ${escapeHtml(question)}. pitanje</legend>
-      <span class="physics-inline-response__label">Odaberi odgovor</span>
       <div class="choice-list">
         ${["A", "B", "C", "D"]
           .map((option) => renderChoice(question, option, answer))

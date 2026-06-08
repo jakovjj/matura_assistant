@@ -325,10 +325,54 @@ function renderTaskSourceImages(task) {
 }
 
 function renderTaskSourceContent(task) {
-  return (
+  const sourceImages =
     renderTaskSourceImages(task) ||
-    `<div class="task-source">${renderTaskSource(task.text)}</div>`
-  );
+    `<div class="task-source">${renderTaskSource(task.text)}</div>`;
+
+  return `
+    ${sourceImages}
+    <div class="task-source english-reading-source english-listening-question-content">
+      <div class="english-reading-question-list">
+        ${taskQuestions(task)
+          .map((question) => renderSourceQuestion(task, String(question)))
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function questionSourceImages(task, question) {
+  const source = task?.questionImages?.[String(question)];
+  const images = Array.isArray(source) ? source : [source];
+  return images.filter(validSourceImage);
+}
+
+function renderSourceQuestion(task, question) {
+  const sourceImages = questionSourceImages(task, question);
+  const fallbackLabel = task.number === 1 ? `Snimka ${question}` : `Pitanje ${question}`;
+  const sourceImage = sourceImages
+    .map((source, index) => {
+      const partLabel = sourceImages.length > 1 ? `, dio ${index + 1}` : "";
+      return renderCroppedImage(
+        source,
+        `Izvorni prikaz ${question}. pitanja iz službene PDF knjižice${partLabel}.`,
+      );
+    })
+    .join("");
+
+  return `
+    <article
+      class="physics-source-question english-source-question${sourceImage ? " physics-source-question--image" : ""}"
+      id="odgovor-${escapeHtml(question)}"
+      data-question-number="${escapeHtml(question)}"
+    >
+      ${sourceImage ? "" : `<h4>${escapeHtml(question)}</h4>`}
+      <div class="physics-source-question__body english-source-question__body">
+        ${sourceImage || `<p>${escapeHtml(fallbackLabel)}</p>`}
+      </div>
+      ${renderQuestion(task, question, { inline: true, includeId: false })}
+    </article>
+  `;
 }
 
 function allQuestions(exam) {
@@ -493,8 +537,7 @@ function renderPicker() {
         </div>
         <p>
           Dostupni su rokovi čiji arhivski paket sadrži službene audiosnimke.
-          Za razdoblje od 2016. do 2018. godine audiosnimke nisu objavljene
-          unutar arhivskih ZIP paketa.
+          Stariji WMA zapisi pretvaraju se u MP3 tijekom pripreme podataka.
         </p>
       </div>
 
@@ -864,35 +907,20 @@ function renderTaskTypeContent() {
     .map(
       (task, taskIndex) => `
         <div
-          class="solver-question-layout solver-question-layout--workspace solver-question-layout--single"
+          class="solver-question-layout solver-question-layout--single english-listening-layout"
           data-task-number="${task.number}"
         >
-          <div class="solver-workspace">
-            <section class="task-content-panel">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">Pitanja iz knjižice</p>
-                  <h3>Zadatak ${task.number}</h3>
-                </div>
-                <small>Pitanja ${task.firstQuestion}–${task.lastQuestion}</small>
+          <section class="task-content-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Pitanja iz knjižice</p>
+                <h3>Zadatak ${task.number}</h3>
               </div>
-              ${shouldRenderTaskAudio(task, taskIndex) ? renderTaskAudioBlock(task) : ""}
-              ${renderTaskSourceContent(task)}
-            </section>
-
-            <section class="answer-panel" aria-live="polite">
-              <div class="panel-heading">
-                <div>
-                  <p class="eyebrow">Digitalni list za odgovore</p>
-                  <h3>Zadatak ${task.number}</h3>
-                </div>
-                <small>Pitanja ${task.firstQuestion}–${task.lastQuestion}</small>
-              </div>
-              <div class="response-list">
-                ${taskQuestions(task).map((question) => renderQuestion(task, question)).join("")}
-              </div>
-            </section>
-          </div>
+              <small>Pitanja ${task.firstQuestion}–${task.lastQuestion}</small>
+            </div>
+            ${shouldRenderTaskAudio(task, taskIndex) ? renderTaskAudioBlock(task) : ""}
+            ${renderTaskSourceContent(task)}
+          </section>
         </div>
       `,
     )
@@ -913,7 +941,7 @@ function toggleSelfCheck(question) {
   renderTaskTypeContent();
 }
 
-function renderQuestion(task, question) {
+function renderQuestion(task, question, options = {}) {
   const answer = responses[question] || "";
   const correctAnswer = solverExam.answers[question];
   const resultClass = isChecked(question)
@@ -921,9 +949,11 @@ function renderQuestion(task, question) {
       ? " response-question--correct"
       : " response-question--wrong"
     : "";
+  const idAttribute = options.includeId === false ? "" : ` id="odgovor-${question}"`;
+  const inlineClass = options.inline ? " physics-inline-response" : "";
 
   return `
-    <fieldset class="response-question ${resultClass}" id="odgovor-${question}">
+    <fieldset class="response-question${inlineClass}${resultClass}"${idAttribute}>
       <legend>${question}.</legend>
       <div class="choice-list">
         ${task.options.map((option) => renderChoice(question, option, answer)).join("")}

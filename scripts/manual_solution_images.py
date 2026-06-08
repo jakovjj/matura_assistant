@@ -117,10 +117,13 @@ def _find_solution_markers(
     ]
 
     for page, line in ordered_lines:
+        number_text = line.first_word.strip()
         match = re.fullmatch(
             r"(?P<number>\d{1,3}(?:[\.,]\d{1,2})?)[\.\"”]+",
-            line.first_word.strip(),
+            number_text,
         )
+        if not match and line.x_min <= page.width * 0.20:
+            match = re.fullmatch(r"(?P<number>\d{1,3})", number_text)
         if not match:
             continue
         try:

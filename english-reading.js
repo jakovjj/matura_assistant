@@ -437,7 +437,9 @@ function inlineGapSourceImages(task) {
 }
 
 function usesSharedInlineChoiceBank(task) {
-  return task?.kind === "choice" && /\byou do not need\b/i.test(task.text || "");
+  if (task?.kind !== "choice" || !task?.blanks || !Array.isArray(task.options)) return false;
+  const hasUnusedOptionInstruction = /\byou do not need\b/i.test(task.text || "");
+  return hasUnusedOptionInstruction || task.options.length > taskQuestions(task).length;
 }
 
 function renderInlineGapControls(task, sourceImageIndex) {
@@ -525,7 +527,7 @@ function renderInlineChoiceBlankContent(answer) {
 
 function inlineChoiceBlankAriaLabel(question, answer) {
   if (answer) return `Praznina ${question}, odabrano ${answer}. Promijeni odgovor.`;
-  return `Praznina ${question}, odaberi odgovor.`;
+  return `Praznina ${question}, nije odgovoreno.`;
 }
 
 function inlineTextBlankStyle(blank, source) {
@@ -804,6 +806,7 @@ function openInlineChoicePopover(questionNumber, anchor) {
 function renderInlineChoicePopover(task, questionNumber) {
   const answer = responses[questionNumber] || "";
   const optionMap = inlineChoiceOptionTextMap(task, questionNumber);
+  const usedOptions = inlineChoiceUsedOptions(task, questionNumber);
 
   return `
     <div class="english-choice-popover__heading">
@@ -814,11 +817,19 @@ function renderInlineChoicePopover(task, questionNumber) {
       ${(task.options || [])
         .map((option) => {
           const selectedClass = option === answer ? " english-choice-popover__option--selected" : "";
+          const usedBy = usedOptions.get(option) || [];
+          const usedClass = usedBy.length && option !== answer
+            ? " english-choice-popover__option--used"
+            : "";
+          const usedLabel = usedBy.length
+            ? ` aria-label="${escapeHtml(`${option}, već odabrano u praznini ${usedBy.join(", ")}`)}"`
+            : "";
           return `
             <button
-              class="english-choice-popover__option${selectedClass}"
+              class="english-choice-popover__option${selectedClass}${usedClass}"
               type="button"
               data-inline-choice-option="${escapeHtml(option)}"
+              ${usedLabel}
             >
               <strong>${escapeHtml(option)}</strong>
               <span>${escapeHtml(optionMap[option] || `Odgovor ${option}`)}</span>
@@ -828,6 +839,24 @@ function renderInlineChoicePopover(task, questionNumber) {
         .join("")}
     </div>
   `;
+}
+
+function inlineChoiceUsedOptions(task, questionNumber) {
+  if (!usesSharedInlineChoiceBank(task)) return new Map();
+
+  const optionSet = new Set(task.options || []);
+  const usedOptions = new Map();
+  taskQuestions(task)
+    .map(String)
+    .filter((question) => question !== String(questionNumber))
+    .forEach((question) => {
+      const answer = String(responses[question] || "").trim();
+      if (!answer || !optionSet.has(answer)) return;
+      if (!usedOptions.has(answer)) usedOptions.set(answer, []);
+      usedOptions.get(answer).push(question);
+    });
+
+  return usedOptions;
 }
 
 function placeInlineChoicePopover(popover, anchor) {
