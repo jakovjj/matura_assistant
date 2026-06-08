@@ -1,6 +1,6 @@
 # Uključi ili isključi banner u headeru.
 # Dozvoljene vrijednosti: true ili false
-enabled=true
+enabled=false
 
 # Tekst koji se prikazuje u banneru.
 message=Obavijest: Sve stavke bi sada trebale biti dostupne. Ako nešto i dalje ne radi, slobodno pošaljite poruku. Hvala!

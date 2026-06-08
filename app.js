@@ -1179,14 +1179,17 @@ function withDurations(exam, parts) {
   });
 }
 
-function linkedPart(exam, part, practiceExam, urlBuilder) {
+function linkedPart(exam, part, practiceExam, urlBuilder, solverKey = "") {
   if (!practiceExam) return unavailablePart(exam, part);
+
+  const solver = solverKey ? solverRegistry[solverKey]?.storagePrefix || "" : "";
 
   return {
     ...part,
     available: true,
     durationMinutes: practiceExam.durationMinutes ?? part.durationMinutes ?? null,
     examId: practiceExam.id,
+    ...(solver ? { solver } : {}),
     href: urlBuilder(practiceExam),
     simulationHref: urlBuilder(practiceExam, true),
   };
@@ -1314,9 +1317,15 @@ function interactiveParts(exam) {
     return parts.map((part) => {
       const isReading = part.id === "citanje";
       const isListening = part.id === "slusanje";
-      if (isReading) return linkedPart(exam, part, readingExam, englishReadingUrl);
-      if (isListening) return linkedPart(exam, part, listeningExam, englishListeningUrl);
-      if (part.id === "esej") return linkedPart(exam, part, essayExam, englishEssayUrl);
+      if (isReading) {
+        return linkedPart(exam, part, readingExam, englishReadingUrl, "englishReading");
+      }
+      if (isListening) {
+        return linkedPart(exam, part, listeningExam, englishListeningUrl, "englishListening");
+      }
+      if (part.id === "esej") {
+        return linkedPart(exam, part, essayExam, englishEssayUrl, "englishEssay");
+      }
       return unavailablePart(exam, part);
     });
   }
@@ -2099,25 +2108,33 @@ function normalizedSimulationPartLabel(value) {
     .toLocaleLowerCase("hr-HR");
 }
 
-function simulationAttemptMatchesPart(attempt, exam, part) {
+function normalizedSimulationSolver(value) {
+  return String(value || "")
+    .trim()
+    .toLocaleLowerCase("en-US");
+}
+
+function simulationAttemptMatchesPart(attempt, exam, part, requirePartIdentity = false) {
   if (!attempt || typeof attempt !== "object") return false;
-  if (part.examId && attempt.examId === part.examId) return true;
+  const sameExamId = Boolean(part.examId && attempt.examId === part.examId);
+  if (!sameExamId && !simulationAttemptMatchesArchiveExam(attempt, exam)) return false;
 
   const attemptPart = normalizedSimulationPartLabel(attempt.part);
   const partLabel = normalizedSimulationPartLabel(part.label);
-  return (
-    attemptPart
-    && partLabel
-    && attemptPart === partLabel
-    && simulationAttemptMatchesArchiveExam(attempt, exam)
-  );
+  const attemptSolver = normalizedSimulationSolver(attempt.solver);
+  const partSolver = normalizedSimulationSolver(part.solver);
+  const partMatches = Boolean(attemptPart && partLabel && attemptPart === partLabel);
+  const solverMatches = Boolean(attemptSolver && partSolver && attemptSolver === partSolver);
+
+  if (partMatches || solverMatches) return true;
+  return sameExamId && !requirePartIdentity;
 }
 
-function bestSimulationPercentageForPart(exam, part, attempts) {
+function bestSimulationPercentageForPart(exam, part, attempts, requirePartIdentity = false) {
   let best = null;
 
   for (const attempt of attempts) {
-    if (!simulationAttemptMatchesPart(attempt, exam, part)) continue;
+    if (!simulationAttemptMatchesPart(attempt, exam, part, requirePartIdentity)) continue;
 
     const percentage = simulationAttemptPercentage(attempt);
     if (percentage === null) continue;
@@ -2128,16 +2145,26 @@ function bestSimulationPercentageForPart(exam, part, attempts) {
 }
 
 function bestSimulationPercentages(exam, attempts) {
-  return interactiveParts(exam)
-    .filter((part) => part.checkingSupported !== false)
-    .map((part) => {
-      const percentage = bestSimulationPercentageForPart(exam, part, attempts);
-      return {
-        hasResult: percentage !== null,
-        label: part.label,
-        percentage: percentage ?? 0,
-      };
-    });
+  const parts = interactiveParts(exam).filter((part) => part.checkingSupported !== false);
+  const examIdCounts = parts.reduce((counts, part) => {
+    if (part.examId) counts.set(part.examId, (counts.get(part.examId) || 0) + 1);
+    return counts;
+  }, new Map());
+
+  return parts.map((part) => {
+    const requirePartIdentity = Boolean(part.examId && examIdCounts.get(part.examId) > 1);
+    const percentage = bestSimulationPercentageForPart(
+      exam,
+      part,
+      attempts,
+      requirePartIdentity,
+    );
+    return {
+      hasResult: percentage !== null,
+      label: part.label,
+      percentage: percentage ?? 0,
+    };
+  });
 }
 
 function percentageTone(percentage) {
@@ -2151,9 +2178,13 @@ function percentageTone(percentage) {
 function renderBestSimulationPercentageCircle(result) {
   const percentage = Math.max(0, Math.min(100, Math.round(numberOrNull(result.percentage) ?? 0)));
   const tone = result.hasResult ? percentageTone(percentage) : "empty";
+  const title = result.hasResult
+    ? `${result.label}: ${percentage}%`
+    : `${result.label}: nema rezultata`;
+  const text = result.hasResult ? `${percentage}%` : "-";
   return `<span class="subject-best-score subject-best-score--${tone}" title="${escapeHtml(
-    result.label,
-  )}: ${percentage}%">${escapeHtml(`${percentage}%`)}</span>`;
+    title,
+  )}">${escapeHtml(text)}</span>`;
 }
 
 function renderBestSimulationPercentages(results) {
@@ -2163,7 +2194,7 @@ function renderBestSimulationPercentages(results) {
   const label = safeResults
     .map((result) => {
       const percentage = Math.max(0, Math.min(100, Math.round(numberOrNull(result.percentage) ?? 0)));
-      return `${result.label}: ${percentage}%`;
+      return result.hasResult ? `${result.label}: ${percentage}%` : `${result.label}: nema rezultata`;
     })
     .join(", ");
 

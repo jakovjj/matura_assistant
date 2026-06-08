@@ -1651,7 +1651,7 @@ def build_tasks(
         else []
     )
     completion_text_source_crops = (
-        completion_text_crops(pages, completion_questions)
+        completion_text_crops(pages, questions)
         if completion_questions
         else []
     )

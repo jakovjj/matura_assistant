@@ -29,11 +29,15 @@ const pickerState = {
   year: "",
 };
 
+const audioSettingsStorageKey = "asistent-za-mature:english-listening:audio-settings";
+
 let solverExam;
 let responses = {};
 let activeTaskTypeId;
 let activeQuestionNumber;
 let activeAudioIndexes = new Map();
+let audioSettings = loadAudioSettings();
+let syncingAudioSettings = false;
 let checked = false;
 const simulation = window.createExamSimulation({ onFinish: finishSimulation });
 const selfCheck = window.createTaskSelfCheck();
@@ -122,6 +126,35 @@ function listeningExamIdForTerm(exam, term) {
 
 function listeningStorageKeyForId(id) {
   return `asistent-za-mature:english-listening:${id}`;
+}
+
+function normalizedVolume(value) {
+  const volume = Number(value);
+  if (!Number.isFinite(volume)) return null;
+  return Math.min(1, Math.max(0, volume));
+}
+
+function loadAudioSettings() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(audioSettingsStorageKey) || "{}");
+    if (!stored || typeof stored !== "object" || Array.isArray(stored)) return {};
+
+    const volume = normalizedVolume(stored.volume);
+    return {
+      ...(volume === null ? {} : { volume }),
+      ...(typeof stored.muted === "boolean" ? { muted: stored.muted } : {}),
+    };
+  } catch {
+    return {};
+  }
+}
+
+function saveAudioSettings() {
+  try {
+    localStorage.setItem(audioSettingsStorageKey, JSON.stringify(audioSettings));
+  } catch {
+    // Audio playback still works if storage is unavailable.
+  }
 }
 
 function listeningStorageKeys(exam) {
@@ -779,7 +812,13 @@ function renderTaskAudioBlock(task) {
         <strong>${escapeHtml(activeEntry.label)}</strong>
         <small>${escapeHtml(track.sourceName)}</small>
       </div>
-      <audio controls preload="metadata" src="${escapeHtml(track.url)}">
+      <audio
+        controls
+        preload="metadata"
+        src="${escapeHtml(track.url)}"
+        data-task-audio="${task.number}"
+        data-audio-current-index="${activeEntry.audioIndex}"
+      >
         Vaš preglednik ne podržava reprodukciju audiosnimke.
       </audio>
       ${
@@ -791,6 +830,97 @@ function renderTaskAudioBlock(task) {
       }
     </div>
   `;
+}
+
+function audioPlaybackKey(audio) {
+  return audio.dataset.audioCurrentIndex || audio.getAttribute("src") || "";
+}
+
+function captureAudioPlaybackState() {
+  const section = document.querySelector("#section-content");
+  if (!section) return new Map();
+
+  const state = new Map();
+  section.querySelectorAll("audio[data-task-audio]").forEach((audio) => {
+    const key = audioPlaybackKey(audio);
+    if (!key) return;
+
+    state.set(key, {
+      currentTime: audio.currentTime,
+      playbackRate: audio.playbackRate,
+      volume: audio.volume,
+      muted: audio.muted,
+      wasPlaying: !audio.paused && !audio.ended,
+    });
+  });
+  return state;
+}
+
+function restoreAudioPlaybackState(state) {
+  const section = document.querySelector("#section-content");
+  if (!section) return;
+
+  section.querySelectorAll("audio[data-task-audio]").forEach((audio) => {
+    const saved = state.get(audioPlaybackKey(audio));
+    if (!saved) return;
+
+    audio.playbackRate = saved.playbackRate;
+    audio.volume = saved.volume;
+    audio.muted = saved.muted;
+
+    const restoreTime = () => {
+      if (Number.isFinite(saved.currentTime)) {
+        try {
+          audio.currentTime = Math.min(saved.currentTime, audio.duration || saved.currentTime);
+        } catch {
+          // Some browsers reject seeking before the media is fully ready.
+        }
+      }
+      const shouldResume = saved.wasPlaying && !saved.resumed;
+      saved.resumed = saved.resumed || shouldResume;
+      if (shouldResume) audio.play()?.catch?.(() => {});
+    };
+
+    if (audio.readyState >= 1) restoreTime();
+    else audio.addEventListener("loadedmetadata", restoreTime, { once: true });
+  });
+}
+
+function applyAudioSettings(audio) {
+  const volume = normalizedVolume(audioSettings.volume);
+  if (volume !== null) audio.volume = volume;
+  if (typeof audioSettings.muted === "boolean") audio.muted = audioSettings.muted;
+}
+
+function applyAudioSettingsToRenderedAudio(sourceAudio) {
+  const section = document.querySelector("#section-content");
+  if (!section) return;
+
+  syncingAudioSettings = true;
+  section.querySelectorAll("audio[data-task-audio]").forEach((audio) => {
+    if (audio !== sourceAudio) applyAudioSettings(audio);
+  });
+  syncingAudioSettings = false;
+}
+
+function bindAudioSettingsControls() {
+  const section = document.querySelector("#section-content");
+  if (!section) return;
+
+  section.querySelectorAll("audio[data-task-audio]").forEach((audio) => {
+    applyAudioSettings(audio);
+    audio.addEventListener("volumechange", () => {
+      if (syncingAudioSettings) return;
+
+      const volume = normalizedVolume(audio.volume);
+      audioSettings = {
+        ...(volume === null ? {} : { volume }),
+        muted: audio.muted,
+      };
+      saveAudioSettings();
+      applyAudioSettingsToRenderedAudio(audio);
+    });
+  });
 }
 
 function bindTaskAudioControls() {
@@ -880,6 +1010,7 @@ function shouldRenderTaskAudio(task, taskIndex) {
 }
 
 function renderTaskTypeContent() {
+  const audioPlaybackState = captureAudioPlaybackState();
   document.querySelector("#section-content").innerHTML = tasksForTaskType()
     .map(
       (task, taskIndex) => `
@@ -904,6 +1035,8 @@ function renderTaskTypeContent() {
     .join("");
 
   bindTaskAudioControls();
+  bindAudioSettingsControls();
+  restoreAudioPlaybackState(audioPlaybackState);
   document.querySelectorAll('input[type="radio"][data-question]').forEach((input) => {
     input.addEventListener("change", () => updateResponse(input.dataset.question, input.value));
   });
