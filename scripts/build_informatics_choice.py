@@ -323,6 +323,39 @@ def primary_booklet_text(text: str) -> str:
     return text[: min(cut_points)]
 
 
+def normalize_key_text(text: str) -> str:
+    """Normalise older Informatics answer-key layouts to the modern form.
+
+    Two legacy formats need rewriting before the generic parser sees them:
+    - 2013/2014 keys prefix every row with the subject word, e.g.
+      ``Informatika 1 D`` instead of ``1. D``.
+    - 2019/2020 keys label subparts inline as ``26. A: 100`` followed by a
+      bare ``B: 20`` line, instead of ``26.1.`` / ``26.2.``.
+    """
+    # Drop the leading subject word so the number starts the line.
+    text = re.sub(r"(?im)^([ \t]*)Informatika[ \t]+(?=\d)", r"\1", text)
+
+    lines = text.splitlines()
+    rewritten: list[str] = []
+    parent: str | None = None
+    for line in lines:
+        labelled = re.match(r"^([ \t]*)(\d{1,3})\.[ \t]*([A-Ha-h])[ \t]*:[ \t]*(.*)$", line)
+        if labelled:
+            parent = labelled.group(2)
+            sub = ord(labelled.group(3).upper()) - ord("A") + 1
+            rewritten.append(f"{labelled.group(1)}{parent}.{sub}. {labelled.group(4)}")
+            continue
+        if parent is not None:
+            continuation = re.match(r"^([ \t]*)([A-Ha-h])[ \t]*:[ \t]*(.*)$", line)
+            if continuation:
+                sub = ord(continuation.group(2).upper()) - ord("A") + 1
+                rewritten.append(f"{continuation.group(1)}{parent}.{sub}. {continuation.group(3)}")
+                continue
+            parent = None
+        rewritten.append(line)
+    return "\n".join(rewritten)
+
+
 def sorted_page_lines(page: PdfPage) -> list[PdfLine]:
     return sorted(page.lines, key=lambda line: (line.y_min, line.x_min))
 
@@ -1621,7 +1654,7 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
         paper_contents = combine_pdf_contents([archive.read(name) for name in paper_names])
         key_contents = [archive.read(name) for name in key_names]
         key_texts = [
-            primary_booklet_text(extracted)
+            normalize_key_text(primary_booklet_text(extracted))
             for contents in key_contents
             for extracted in (
                 pdf_text(contents, "-raw"),
@@ -1639,6 +1672,25 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
 
     if not answers and not open_answers:
         raise ValueError("Could not parse any Informatics answers")
+
+    # A few legacy archives (e.g. 2020 summer) only carry the multiple-choice
+    # answers on an OCR-mangled optical sheet, leaving the printed key without
+    # questions 1-18. Skip such exams instead of shipping a handful of
+    # mis-detected ABCD answers.
+    choice_section = next(
+        (section for section in sections if section.task_id == "visestruki-izbor"),
+        None,
+    )
+    if choice_section:
+        expected_choice = {
+            question for question in choice_section.numbers if "." not in question
+        }
+        covered_choice = expected_choice & set(answers)
+        if expected_choice and len(covered_choice) < 0.6 * len(expected_choice):
+            raise ValueError(
+                "Unreliable multiple-choice answers "
+                f"({len(covered_choice)}/{len(expected_choice)} parsed)"
+            )
 
     destination = PAPER_ROOT / identifier / "paper.pdf"
     write_if_changed(destination, paper_contents)

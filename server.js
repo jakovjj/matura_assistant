@@ -18,7 +18,7 @@ const config = {
     process.env.NODE_ENV === "production" ||
     /^https:\/\//i.test(process.env.PUBLIC_BASE_URL || ""),
   essayModel: process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
-  aiExplanationModel: process.env.OPENAI_AI_EXPLANATION_MODEL || "gpt-4.1-mini",
+  aiExplanationModel: process.env.OPENAI_AI_EXPLANATION_MODEL || "gpt-4.1",
   aiFreeExplanations: readPositiveNumber(process.env.AI_FREE_EXPLANATIONS, 3),
   aiUnlimitedEmails: new Set(
     String(process.env.AI_UNLIMITED_EMAILS || "jakov@jandric.com")
@@ -75,6 +75,8 @@ const croatianWritingIndex = {
 };
 const generalGradingSystemPrompt = loadPromptFile("general-grading-system.txt");
 const aiExplanationSystemPrompt = loadPromptFile("ai-explanation-system.txt");
+// Opcionalni dodaci po predmetu: prompts/ai-explanation-<slug>.txt (npr. -fizika.txt).
+const aiExplanationSubjectPrompts = loadAiExplanationSubjectPrompts();
 const essayScoreSchema = {
   type: "object",
   additionalProperties: false,
@@ -385,6 +387,16 @@ async function handleRequest(request, response) {
 
   if (url.pathname === "/api/ai-explanation/report") {
     await handleAiExplanationReport(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/news") {
+    await handleNews(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/news/image") {
+    await handleNewsImage(request, response, url);
     return;
   }
 
@@ -1216,6 +1228,9 @@ async function handleAiExplanation(request, response) {
   const question = stringOrEmpty(body?.question);
   const correctAnswer = normalizeCorrectAnswer(body?.correctAnswer);
   const image = normalizeEssayImage(body?.image);
+  const contextImages = Array.isArray(body?.contextImages)
+    ? body.contextImages.map(normalizeEssayImage).filter(Boolean).slice(0, 3)
+    : [];
   if (!solver || !examId || !question || !correctAnswer) {
     sendJson(response, 400, { error: "Nedostaju podaci o zadatku." });
     return;
@@ -1277,6 +1292,7 @@ async function handleAiExplanation(request, response) {
         correctAnswer,
         question,
         image,
+        contextImages,
         signal: clientSignal,
       })) {
         if (clientSignal.aborted) return;
@@ -1486,10 +1502,21 @@ function writeNdjson(response, event) {
 }
 
 function buildAiExplanationSystemPrompt(subject, correctAnswer) {
-  return aiExplanationSystemPrompt
-    .replaceAll("{{subject}}", subject)
-    .replaceAll("{{correctAnswer}}", correctAnswer)
-    .trim();
+  const fill = (text) =>
+    text.replaceAll("{{subject}}", subject).replaceAll("{{correctAnswer}}", correctAnswer);
+  const base = fill(aiExplanationSystemPrompt).trim();
+  const slug = aiSubjectSlug(subject);
+  const extra = slug ? aiExplanationSubjectPrompts[slug] : "";
+  if (!extra) return base;
+  return `${base}\n\nPosebne upute za predmet ${subject}:\n${fill(extra).trim()}`;
+}
+
+function aiSubjectSlug(subject) {
+  return (
+    { fizika: "fizika", "hrvatski jezik": "hrvatski" }[
+      String(subject || "").trim().toLowerCase()
+    ] || ""
+  );
 }
 
 function buildAiExplanationUserPrompt({ subject, correctAnswer, question }) {
@@ -1501,35 +1528,63 @@ function buildAiExplanationUserPrompt({ subject, correctAnswer, question }) {
   ].join("\n");
 }
 
-async function* streamOpenAiExplanation({ subject, correctAnswer, question, image, signal }) {
+async function* streamOpenAiExplanation({
+  subject,
+  correctAnswer,
+  question,
+  image,
+  contextImages = [],
+  signal,
+}) {
+  const userContent = [
+    { type: "input_text", text: buildAiExplanationUserPrompt({ subject, correctAnswer, question }) },
+    { type: "input_image", image_url: image.dataUrl, detail: "high" },
+  ];
+  if (contextImages.length) {
+    userContent.push({
+      type: "input_text",
+      text: "Sljedeće slike su polazni tekst na koji se zadatak odnosi (za razumijevanje):",
+    });
+    for (const contextImage of contextImages) {
+      userContent.push({ type: "input_image", image_url: contextImage.dataUrl, detail: "high" });
+    }
+  }
+
+  // gpt-5 i o-modeli su reasoning modeli: ne podržavaju temperature, a tokeni za
+  // razmišljanje troše max_output_tokens, pa im dajemo nisko zalaganje i više tokena.
+  const isReasoningModel = /^(gpt-5|o\d)/i.test(config.aiExplanationModel);
+  const requestBody = {
+    model: config.aiExplanationModel,
+    stream: true,
+    max_output_tokens: isReasoningModel ? 2200 : 900,
+    input: [
+      {
+        role: "system",
+        content: [
+          { type: "input_text", text: buildAiExplanationSystemPrompt(subject, correctAnswer) },
+        ],
+      },
+      {
+        role: "user",
+        content: userContent,
+      },
+    ],
+  };
+  if (isReasoningModel) {
+    // "minimal" je najbrže zalaganje (manje čekanja prije nego krene tekst).
+    requestBody.reasoning = { effort: "minimal" };
+  } else {
+    requestBody.temperature = 0.2;
+  }
+
   const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
-    body: JSON.stringify({
-      model: config.aiExplanationModel,
-      stream: true,
-      max_output_tokens: 600,
-      temperature: 0.2,
-      input: [
-        {
-          role: "system",
-          content: [
-            { type: "input_text", text: buildAiExplanationSystemPrompt(subject, correctAnswer) },
-          ],
-        },
-        {
-          role: "user",
-          content: [
-            { type: "input_text", text: buildAiExplanationUserPrompt({ subject, correctAnswer, question }) },
-            { type: "input_image", image_url: image.dataUrl, detail: "high" },
-          ],
-        },
-      ],
-    }),
+    body: JSON.stringify(requestBody),
     headers: {
       Authorization: `Bearer ${config.openAiApiKey}`,
       "Content-Type": "application/json",
     },
     method: "POST",
-    signal: abortSignalWithTimeout(signal, 60_000),
+    signal: abortSignalWithTimeout(signal, 90_000),
   });
 
   if (!openAiResponse.ok || !openAiResponse.body) {
@@ -1715,6 +1770,196 @@ async function serveStaticFile(request, response, url) {
   }
 
   fs.createReadStream(filePath).pipe(response);
+}
+
+// ---- Vijesti o maturi sa srednja.hr (homepage scroller) ----
+// Prikazujemo samo naslov + datum + sličicu + link na izvornik, uz jasnu
+// atribuciju "Izvor: srednja.hr". Sadržaj se kešira na serveru kako ne bismo
+// opterećivali njihov poslužitelj, a slike posredujemo s naše domene.
+const NEWS_ORIGIN = "https://www.srednja.hr";
+const NEWS_SOURCE_URL = `${NEWS_ORIGIN}/matura`;
+const NEWS_CACHE_TTL_MS = 45 * 60 * 1000;
+const NEWS_MAX_ITEMS = 12;
+const NEWS_FETCH_TIMEOUT_MS = 8000;
+const NEWS_USER_AGENT =
+  "MaturkoBot/1.0 (+https://asistent-za-mature; prikaz naslova s atribucijom)";
+const NEWS_IMAGE_TTL_MS = 24 * 60 * 60 * 1000;
+const NEWS_IMAGE_CACHE_MAX = 60;
+const NEWS_IMAGE_MAX_BYTES = 3 * 1024 * 1024;
+
+const newsCache = { items: [], fetchedAt: 0, pending: null };
+const newsImageCache = new Map(); // url -> { buffer, contentType, fetchedAt }
+
+async function handleNews(request, response) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "GET" });
+    return;
+  }
+
+  let items = newsCache.items;
+  try {
+    items = await getMaturaNews(responseAbortSignal(response));
+  } catch (error) {
+    console.warn("Dohvaćanje vijesti nije uspjelo:", error.message);
+    items = newsCache.items; // posluži zadnje poznate vijesti, ako ih ima
+  }
+
+  sendJson(
+    response,
+    200,
+    { source: "srednja.hr", sourceUrl: NEWS_SOURCE_URL, items },
+    { "Cache-Control": "public, max-age=900" },
+  );
+}
+
+async function getMaturaNews(signal) {
+  const now = Date.now();
+  if (newsCache.items.length && now - newsCache.fetchedAt < NEWS_CACHE_TTL_MS) {
+    return newsCache.items;
+  }
+  if (newsCache.pending) return newsCache.pending;
+
+  newsCache.pending = fetchMaturaNews(signal)
+    .then((items) => {
+      if (items.length) {
+        newsCache.items = items;
+        newsCache.fetchedAt = Date.now();
+      }
+      return newsCache.items;
+    })
+    .finally(() => {
+      newsCache.pending = null;
+    });
+
+  return newsCache.pending;
+}
+
+async function fetchMaturaNews(signal) {
+  const response = await fetch(NEWS_SOURCE_URL, {
+    headers: { "User-Agent": NEWS_USER_AGENT, Accept: "text/html" },
+    signal: abortSignalWithTimeout(signal, NEWS_FETCH_TIMEOUT_MS),
+    redirect: "follow",
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status} za ${NEWS_SOURCE_URL}`);
+  const html = await response.text();
+
+  const items = [];
+  const seen = new Set();
+  const articleRe = /<article class="news-item[^"]*">([\s\S]*?)<\/article>/g;
+  let match;
+  while ((match = articleRe.exec(html)) && items.length < NEWS_MAX_ITEMS) {
+    const block = match[1];
+    const hrefMatch = block.match(/href="(\/matura\/vijesti\/[^"]+?)"/);
+    if (!hrefMatch) continue;
+
+    const titleMatch = block.match(
+      /class="news-item-title">[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/,
+    );
+    const title = titleMatch ? decodeHtmlText(titleMatch[1]) : "";
+    if (!title) continue;
+
+    const url = NEWS_ORIGIN + decodeHtmlText(hrefMatch[1]);
+    if (seen.has(url)) continue;
+    seen.add(url);
+
+    const imgMatch = block.match(/<img[^>]+src="(\/data\/images\/[^"]+?)"/);
+    const imageSource = imgMatch ? NEWS_ORIGIN + decodeHtmlText(imgMatch[1]) : "";
+    const dateMatch = block.match(/class="date-published">([^<]+)</);
+    const timeMatch = block.match(/class="time-published">([^<]+)</);
+
+    items.push({
+      title,
+      url,
+      date: dateMatch ? dateMatch[1].trim() : "",
+      time: timeMatch ? timeMatch[1].trim() : "",
+      image: imageSource ? `/api/news/image?u=${encodeURIComponent(imageSource)}` : "",
+    });
+  }
+
+  return items;
+}
+
+async function handleNewsImage(request, response, url) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "GET" });
+    return;
+  }
+
+  const target = url.searchParams.get("u") || "";
+  if (!isAllowedNewsImage(target)) {
+    sendJson(response, 400, { error: "Nedozvoljen izvor slike." });
+    return;
+  }
+
+  try {
+    const image = await getNewsImage(target, responseAbortSignal(response));
+    response.writeHead(200, {
+      "Cache-Control": "public, max-age=86400",
+      "Content-Length": image.buffer.length,
+      "Content-Type": image.contentType,
+    });
+    response.end(request.method === "HEAD" ? undefined : image.buffer);
+  } catch (error) {
+    console.warn("Dohvaćanje slike vijesti nije uspjelo:", error.message);
+    response.writeHead(502);
+    response.end();
+  }
+}
+
+function isAllowedNewsImage(rawUrl) {
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return false;
+  }
+  return (
+    parsed.protocol === "https:" &&
+    parsed.hostname === "www.srednja.hr" &&
+    parsed.pathname.startsWith("/data/images/")
+  );
+}
+
+async function getNewsImage(target, signal) {
+  const cached = newsImageCache.get(target);
+  if (cached && Date.now() - cached.fetchedAt < NEWS_IMAGE_TTL_MS) {
+    return cached;
+  }
+
+  const response = await fetch(target, {
+    headers: { "User-Agent": NEWS_USER_AGENT, Accept: "image/*" },
+    signal: abortSignalWithTimeout(signal, NEWS_FETCH_TIMEOUT_MS),
+    redirect: "follow",
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+  const contentType = response.headers.get("content-type") || "image/jpeg";
+  if (!contentType.startsWith("image/")) throw new Error("Odgovor nije slika.");
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (buffer.length > NEWS_IMAGE_MAX_BYTES) throw new Error("Slika je prevelika.");
+
+  const entry = { buffer, contentType, fetchedAt: Date.now() };
+  newsImageCache.set(target, entry);
+  if (newsImageCache.size > NEWS_IMAGE_CACHE_MAX) {
+    const oldestKey = newsImageCache.keys().next().value;
+    newsImageCache.delete(oldestKey);
+  }
+  return entry;
+}
+
+function decodeHtmlText(value) {
+  return String(value || "")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'")
+    .replace(/&#x27;/gi, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function sendJson(response, statusCode, payload, headers = {}) {
@@ -3793,9 +4038,12 @@ function isPublicPath(pathname) {
     "/geografija.html",
     "/geography-choice.js",
     "/history-choice.js",
+    "/home-news.js",
     "/hrvatski.html",
     "/hrvatski-pisanje.html",
     "/index.html",
+    "/informatics-choice.js",
+    "/informatika.html",
     "/kemija.html",
     "/likovna.html",
     "/lucide-icons.js",
@@ -3887,4 +4135,27 @@ function loadPromptFile(filename) {
   const prompt = fs.readFileSync(promptPath, "utf8").trim();
   if (!prompt) throw new Error(`Prompt file is empty: ${promptPath}`);
   return prompt;
+}
+
+// Učita sve prompts/ai-explanation-<slug>.txt (osim baznog) u mapu slug -> tekst.
+function loadAiExplanationSubjectPrompts() {
+  const result = {};
+  let entries;
+  try {
+    entries = fs.readdirSync(path.join(rootDir, "prompts"));
+  } catch {
+    return result;
+  }
+  for (const name of entries) {
+    if (name === "ai-explanation-system.txt") continue;
+    const match = /^ai-explanation-(.+)\.txt$/.exec(name);
+    if (!match) continue;
+    try {
+      const text = fs.readFileSync(path.join(rootDir, "prompts", name), "utf8").trim();
+      if (text) result[match[1]] = text;
+    } catch {
+      // Preskoči prompt koji se ne može pročitati.
+    }
+  }
+  return result;
 }

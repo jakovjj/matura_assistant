@@ -735,6 +735,7 @@ function aiExplainContext(question) {
     question: number,
     correctAnswer: correctAnswers(number),
     sourceImage: questionData?.sourceImage || null,
+    contextImages: Array.isArray(questionData?.contextImages) ? questionData.contextImages : [],
   };
 }
 

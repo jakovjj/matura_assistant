@@ -38,6 +38,7 @@ EXCLUDED_SUBJECTS = {
     "Geografija",
     "Glazbena umjetnost",
     "Hrvatski jezik",
+    "Informatika",
     "Kemija",
     "Matematika",
     "Njemački jezik",

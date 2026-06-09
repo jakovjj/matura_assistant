@@ -785,6 +785,7 @@ function bindResponseListeners() {
     button.addEventListener("click", () => toggleOpenSolution(button));
   });
   selfCheck.bind(document.querySelector("#task-content-panel"), toggleSelfCheck);
+  window.AsistentAI?.bind(document.querySelector("#task-content-panel"), aiExplainContext);
 }
 
 function toggleSelfCheck(question) {
@@ -935,12 +936,34 @@ function renderQuestion(question) {
           .map((option) => renderChoice(question, option, answer))
           .join("")}
       </div>
-      ${selfCheck.renderButton(question, {
-        hidden: simulation.active || checked,
-      })}
+      <div class="solver-inline-actions">
+        ${selfCheck.renderButton(question, {
+          hidden: simulation.active || checked,
+        })}
+        ${simulation.active || checked ? "" : aiExplainButton(question)}
+      </div>
       ${renderFeedback(question, answer)}
     </fieldset>
   `;
+}
+
+function aiExplainButton(question) {
+  return window.AsistentAI?.renderButton(question) || "";
+}
+
+// Kontekst koji asistent treba: slika zadatka (za OCR), broj zadatka i točan odgovor.
+function aiExplainContext(question) {
+  const number = String(question);
+  const questionData = questionByNumber.get(number);
+  return {
+    subject: "Fizika",
+    solver: "physics-choice",
+    examId: solverExam.id,
+    question: number,
+    correctAnswer: correctAnswers(number),
+    sourceImage: questionData?.sourceImage || null,
+    contextImages: [],
+  };
 }
 
 function renderChoice(question, option, answer) {

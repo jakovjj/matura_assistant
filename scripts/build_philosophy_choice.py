@@ -116,25 +116,30 @@ ENTRY_RE = re.compile(
     r"^\s*(?:Filozofija\s+)?(?P<number>\d{1,3}(?:[\.,]\d{1,2})?)(?:\.|\s+)(?P<answer>.*)$",
     flags=re.IGNORECASE,
 )
-PAPER_QUESTION_RE = re.compile(r"(?m)^\s*(?P<number>\d{1,3}(?:\.\d{1,2})?)\.\s+")
+# The trailing separator deliberately stays on the same line as the number; a
+# greedy ``\s+`` here would swallow blank lines plus the next heading's leading
+# space, leaving ``finditer`` unable to re-anchor ``^`` on a heading that follows
+# blank lines (which previously dropped e.g. task 16 in several Filozofija exams).
+PAPER_QUESTION_RE = re.compile(r"(?m)^[^\S\n]*(?P<number>\d{1,3}(?:\.\d{1,2})?)\.[^\S\n]+")
 PAPER_HEADING_RE = re.compile(r"(?im)^\s*(?P<roman>[IVX]+)\.\s+(?P<label>Zadat[^\n]+)")
-ANSWER_LETTER_RE = re.compile(r"^\s*(?P<answer>[A-Da-d])(?:\s*$|[\.)]\s*|\s+)")
+ANSWER_LETTER_RE = re.compile(r"^\s*(?P<answer>[A-Fa-f])(?:\s*$|[\.)]\s*|\s+)")
 POINTS_RE = re.compile(r"\((?P<points>\d+)\s+bod(?:ova|a)?\)", flags=re.IGNORECASE)
 SIMPLE_ANSWER_LINE_RE = re.compile(
     r"^\s*(?:Filozofija\s+)?(?P<question>\d{1,3}(?:[\.,]\d{1,2})?)\s*[\.)]?\s+"
-    r"(?P<answer>[A-Da-d])\s*$",
+    r"(?P<answer>[A-Fa-f])\s*$",
     flags=re.IGNORECASE,
 )
 SIMPLE_ANSWER_PAIR_RE = re.compile(
     r"(?<![\w.])(?P<question>\d{1,3}(?:[\.,]\d{1,2})?)\s*[\.)]?\s+"
-    r"(?P<answer>[A-Da-d])(?=\s|$)"
+    r"(?P<answer>[A-Fa-f])(?=\s|$)"
 )
 TRAILING_DECIMAL_ANSWER_RE = re.compile(
-    r"(?P<question>\d{1,3}\.\d{1,2})\.\s+(?P<answer>[A-Da-d])\s*$"
+    r"(?P<question>\d{1,3}\.\d{1,2})\.\s+(?P<answer>[A-Fa-f])\s*$"
 )
 MATCHING_ASSIGNMENT_RE = re.compile(
-    r"(?<!\d)(?P<item>\d{1,2})\s*[.\-:]?\s*(?P<answer>[A-Da-d])(?=\s*[,;/]|\s*$)"
+    r"(?<!\d)(?P<item>\d{1,2})\s*[.\-:]?\s*(?P<answer>[A-Fa-f])\.?(?=\s*[,;/\n]|\s*$)"
 )
+MATCHING_OPTION_RE = re.compile(r"(?m)^\s*(?P<letter>[A-F])\.\s+\S")
 MODEL_ANSWER_HEADING_RE = re.compile(
     r"(?im)^\s*MODEL[^\n]*TO[ČC]N[^\n]*ODGOVORA:?\s*$"
 )
@@ -142,7 +147,7 @@ TWO_COLUMN_CLOSED_ROW_RE = re.compile(
     r"^\s*(?P<leftQuestion>\d{1,3}(?:\.\d{1,2})?)\.\s+"
     r"(?P<leftAnswer>.*?)\s{2,}"
     r"(?P<rightQuestion>\d{1,3}\.\d{1,2})\.\s+"
-    r"(?P<rightAnswer>[A-Da-d])\s*$"
+    r"(?P<rightAnswer>[A-Fa-f])\s*$"
 )
 PDF_TRAILER_ID_RE = re.compile(
     rb"/ID\s*\[\s*\((?:\\.|[^\\)])*\)\s*\((?:\\.|[^\\)])*\)\s*\]"
@@ -1539,18 +1544,58 @@ def is_matching_item(question: dict[str, Any]) -> bool:
     )
 
 
-def group_matching_questions(tasks: list[dict[str, Any]]) -> None:
+def matching_target_labels(
+    paper_text: str,
+    sections: list[PaperSection],
+    number: str,
+    next_number: str | None,
+    answer_letters: set[str],
+) -> list[str]:
+    """Return the contiguous set of option letters (A, B, C, …) for a matching task.
+
+    Option letters are read from the paper block between this task heading and the
+    next one so distractor options that never appear as a correct answer stay
+    selectable. The result is always wide enough to include every letter that is
+    actually a correct answer, even if the paper block cannot be located.
+    """
+    section = section_for_question(sections, number)
+    block = paper_text[(section.start if section else 0) : (section.end if section else len(paper_text))]
+    start = re.search(rf"(?m)^\s*{re.escape(number)}\.\s", block)
+    if start:
+        block = block[start.end() :]
+        if next_number:
+            end = re.search(rf"(?m)^\s*{re.escape(next_number)}\.\s", block)
+            if end:
+                block = block[: end.start()]
+        paper_letters = {match.group("letter") for match in MATCHING_OPTION_RE.finditer(block)}
+    else:
+        paper_letters = set()
+
+    candidates = paper_letters | {letter for letter in answer_letters if letter}
+    if not candidates:
+        return ["A", "B", "C", "D", "E"]
+    return [chr(code) for code in range(ord("A"), ord(max(candidates)) + 1)]
+
+
+def group_matching_questions(
+    tasks: list[dict[str, Any]],
+    paper_text: str,
+    sections: list[PaperSection],
+    answers: dict[str, list[str]],
+) -> None:
     """Collapse per-row povezivanje questions into a single matching question.
 
-    Each numbered row (e.g. 11.2, 11.3, 11.4) becomes an item of one matching
+    Each numbered row (e.g. 11.1, 11.2, …) becomes an item of one matching
     question keyed by its parent number, mirroring the likovna layout. The shared
-    table crop already stored as ``contextImages`` becomes the question image.
+    table crop already stored as ``contextImages`` becomes the question image, and
+    the selectable options are read from the paper so distractors are included.
     """
     for task in tasks:
         if task["id"] != "povezivanje":
             continue
         result: list[dict[str, Any]] = []
         groups: dict[str, dict[str, Any]] = {}
+        order: list[str] = []
         for question in task["questions"]:
             if not is_matching_item(question):
                 result.append(question)
@@ -1562,18 +1607,29 @@ def group_matching_questions(tasks: list[dict[str, Any]]) -> None:
                     "number": parent,
                     "type": "matching",
                     "itemLabels": [],
-                    "targetLabels": list(question["options"]),
+                    "targetLabels": [],
                     "scoredItems": [],
                     "maxPoints": 0,
                 }
                 groups[parent] = matching
                 result.append(matching)
+                order.append(parent)
             matching["itemLabels"].append(item)
             matching["scoredItems"].append(item)
             matching["maxPoints"] = len(matching["scoredItems"])
             context_images = question.get("contextImages")
             if context_images and "sourceImage" not in matching:
                 matching["sourceImage"] = context_images[0]
+
+        for index, parent in enumerate(order):
+            matching = groups[parent]
+            next_number = order[index + 1] if index + 1 < len(order) else None
+            answer_letters = {
+                (answers.get(f"{parent}.{item}") or [""])[0] for item in matching["itemLabels"]
+            }
+            matching["targetLabels"] = matching_target_labels(
+                paper_text, sections, parent, next_number, answer_letters
+            )
         task["questions"] = result
 
 
@@ -1658,7 +1714,7 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     )
     attach_manual_solution_images(tasks, solution_images)
 
-    group_matching_questions(tasks)
+    group_matching_questions(tasks, paper_text, sections, answers)
     tasks = merge_open_tasks(tasks)
 
     closed_questions = sorted(answers, key=question_sort_key)

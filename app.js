@@ -61,6 +61,10 @@ const solverDataSources = {
     globalName: "ASISTENT_ZA_MATURE_ART_CHOICE",
     src: "./data/art-choice.js?v=20260608-art-choice",
   },
+  informaticsChoice: {
+    globalName: "ASISTENT_ZA_MATURE_INFORMATICS_CHOICE",
+    src: "./data/informatics-choice.js?v=20260609-informatics-choice",
+  },
   politicsChoice: {
     globalName: "ASISTENT_ZA_MATURE_POLITICS_CHOICE",
     src: "./data/politics-choice.js?v=20260604-politics-choice",
@@ -81,7 +85,6 @@ const mandatorySubjects = [
 
 const temporarilyUnavailableSubjects = new Set([
   "Biologija",
-  "Informatika",
   "Logika",
   "Njemački jezik",
   "Talijanski jezik",
@@ -367,6 +370,11 @@ const solverDefinitions = {
     page: "./likovna.html",
     storagePrefix: "art-choice",
   },
+  informaticsChoice: {
+    idForTerm: (exam, term) => `informatika-${exam.year}-${slugPart(term)}`,
+    page: "./informatika.html",
+    storagePrefix: "informatics-choice",
+  },
   politicsChoice: {
     idForTerm: (exam, term) => `politika-i-gospodarstvo-${exam.year}-${slugPart(term)}`,
     page: "./politika.html",
@@ -551,6 +559,10 @@ function artChoiceIdForTerm(exam, term) {
   return solverIdForTerm("artChoice", exam, term);
 }
 
+function informaticsChoiceIdForTerm(exam, term) {
+  return solverIdForTerm("informaticsChoice", exam, term);
+}
+
 function politicsChoiceIdForTerm(exam, term) {
   return solverIdForTerm("politicsChoice", exam, term);
 }
@@ -617,6 +629,10 @@ function sociologyChoiceStorageKeys(choiceExam) {
 
 function artChoiceStorageKeys(choiceExam) {
   return solverStorageKeys("artChoice", choiceExam);
+}
+
+function informaticsChoiceStorageKeys(choiceExam) {
+  return solverStorageKeys("informaticsChoice", choiceExam);
 }
 
 function politicsChoiceStorageKeys(choiceExam) {
@@ -1106,6 +1122,10 @@ function artChoiceUrl(choiceExam, simulation = false) {
   return solverUrl("artChoice", choiceExam, simulation);
 }
 
+function informaticsChoiceUrl(choiceExam, simulation = false) {
+  return solverUrl("informaticsChoice", choiceExam, simulation);
+}
+
 function politicsChoiceUrl(choiceExam, simulation = false) {
   return solverUrl("politicsChoice", choiceExam, simulation);
 }
@@ -1168,6 +1188,10 @@ function sociologyChoiceExamForArchive(exam) {
 
 function artChoiceExamForArchive(exam) {
   return solverExamForArchive("artChoice", exam);
+}
+
+function informaticsChoiceExamForArchive(exam) {
+  return solverExamForArchive("informaticsChoice", exam);
 }
 
 function politicsChoiceExamForArchive(exam) {
@@ -1540,6 +1564,24 @@ function interactiveParts(exam) {
         },
         choiceExam,
         artChoiceUrl,
+      ),
+    ];
+  }
+
+  if (exam.subject === "Informatika") {
+    const choiceExam = informaticsChoiceExamForArchive(exam);
+    return [
+      linkedPart(
+        exam,
+        {
+          id: "informatika",
+          label: "Ispit",
+          description: "ABCD zadatci provjeravaju se automatski, a zadatci kratkoga i produženoga odgovora ručno prema službenim rješenjima.",
+          durationMinutes: singleExamDuration(exam),
+          requiresManualChecking: true,
+        },
+        choiceExam,
+        informaticsChoiceUrl,
       ),
     ];
   }
@@ -2068,6 +2110,49 @@ function artProgress(exam) {
   };
 }
 
+function informaticsProgress(exam) {
+  const choiceExam = informaticsChoiceExamForArchive(exam);
+  if (!choiceExam) return null;
+
+  const knownClosed = new Set((choiceExam.questions || []).map(String));
+  const knownOpen = new Set((choiceExam.openQuestions || []).map(String));
+  const stored = readMergedStorageObjects(informaticsChoiceStorageKeys(choiceExam));
+  const closedResponses =
+    stored.closedResponses && typeof stored.closedResponses === "object"
+      ? stored.closedResponses
+      : {};
+  const openResponses =
+    stored.openResponses && typeof stored.openResponses === "object"
+      ? stored.openResponses
+      : {};
+  const openScores =
+    stored.openScores && typeof stored.openScores === "object"
+      ? stored.openScores
+      : {};
+  const answeredClosed = Object.entries(closedResponses).filter(
+    ([question, answer]) =>
+      knownClosed.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+  const answeredOpen = new Set();
+  Object.entries(openResponses).forEach(([question, answer]) => {
+    if (knownOpen.has(question) && typeof answer === "string" && answer.trim()) {
+      answeredOpen.add(question);
+    }
+  });
+  Object.entries(openScores).forEach(([question, score]) => {
+    const value = score && typeof score === "object" ? score.points : score;
+    if (knownOpen.has(question) && value !== "" && value != null && Number.isInteger(Number(value))) {
+      answeredOpen.add(question);
+    }
+  });
+
+  return {
+    answered: answeredClosed + answeredOpen.size,
+    id: choiceExam.id,
+    total: knownClosed.size + knownOpen.size,
+  };
+}
+
 function readPoliticsChoiceResponses(choiceExam) {
   return readMergedStorageObjects(
     politicsChoiceStorageKeys(choiceExam),
@@ -2121,6 +2206,7 @@ function abcdChoiceProgress(exam) {
     || exam.subject === "Filozofija"
     || exam.subject === "Sociologija"
     || exam.subject === "Likovna umjetnost"
+    || exam.subject === "Informatika"
     || exam.subject === "Politika i gospodarstvo"
   ) return null;
 
@@ -2157,6 +2243,7 @@ function examProgress(exam) {
     philosophyProgress(exam),
     sociologyProgress(exam),
     artProgress(exam),
+    informaticsProgress(exam),
     politicsProgress(exam),
     abcdChoiceProgress(exam),
   ].filter(Boolean);
@@ -2481,6 +2568,7 @@ function solverKeysForSubject(subject) {
   if (subject === "Filozofija") return ["philosophyChoice"];
   if (subject === "Sociologija") return ["sociologyChoice"];
   if (subject === "Likovna umjetnost") return ["artChoice"];
+  if (subject === "Informatika") return ["informaticsChoice"];
   if (subject === "Politika i gospodarstvo") return ["politicsChoice"];
 
   if (modernForeignLanguageSubjects.has(subject)) {

@@ -46,7 +46,7 @@
     <link rel="canonical" href="https://matura.com.hr/" />
     <link rel="sitemap" type="application/xml" href="https://matura.com.hr/sitemap.xml" />
     <link rel="icon" type="image/webp" href="./assets/asistent_za_maturu.webp" />
-    <link rel="stylesheet" href="./styles.css?v=20260608-footer-coffee" />
+    <link rel="stylesheet" href="./styles.css?v=20260609-carousel-smooth" />
     <script id="seo-structured-data" type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -147,6 +147,58 @@
 
       <section class="workspace-section" id="predmeti" aria-label="Vježba mature">
         <div class="container" id="app-root"></div>
+      </section>
+
+      <section
+        class="home-news"
+        data-home-news
+        aria-labelledby="home-news-title"
+        hidden
+      >
+        <div class="container">
+          <div class="home-news__head">
+            <div>
+              <h2 id="home-news-title">Vijesti o maturi</h2>
+              <p>Najnovije objave o državnoj maturi sa srednja.hr.</p>
+            </div>
+            <a
+              class="home-news__source"
+              href="https://www.srednja.hr/matura"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Izvor: srednja.hr
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M6 3h7v7M13 3 5 11M3 6v7h7" />
+              </svg>
+            </a>
+          </div>
+          <div class="home-news__viewport">
+            <button
+              class="home-news__nav home-news__nav--prev"
+              type="button"
+              aria-label="Prethodne vijesti"
+              data-home-news-prev
+              hidden
+            >
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="M10 3 5 8l5 5" />
+              </svg>
+            </button>
+            <ul class="home-news__track" data-home-news-track></ul>
+            <button
+              class="home-news__nav home-news__nav--next"
+              type="button"
+              aria-label="Sljedeće vijesti"
+              data-home-news-next
+              hidden
+            >
+              <svg aria-hidden="true" viewBox="0 0 16 16">
+                <path d="m6 3 5 5-5 5" />
+              </svg>
+            </button>
+          </div>
+        </div>
       </section>
 
       <section
@@ -295,6 +347,7 @@
     <script src="./app.js?v=20260608-art-choice"></script>
     <script src="./feedback.js?v=20260606-feedback-modal"></script>
     <script src="./auth-client.js?v=20260605-auth-ui"></script>
+    <script src="./home-news.js?v=20260609-carousel-smooth"></script>
     <script>
       (() => {
         const contact = document.querySelector("[data-contact-email]");

@@ -22,7 +22,7 @@
             <p>Interaktivni ispiti za vježbu državne mature.</p>
             <a
               class="footer-coffee"
-              href="https://www.paypal.com/paypalme/itsjakovj"
+              href="https://buymeacoffee.com/jakovjj"
               target="_blank"
               rel="noreferrer"
             >

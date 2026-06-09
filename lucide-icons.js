@@ -48,6 +48,10 @@
     "viewBox": "0 0 24 24",
     "content": "<circle cx=\"12\" cy=\"12\" r=\"10\" />\n    <path d=\"M12 6v6l4 2\" />"
   },
+  "triangle-alert": {
+    "viewBox": "0 0 24 24",
+    "content": "<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\" />\n    <path d=\"M12 9v4\" />\n    <path d=\"M12 17h.01\" />"
+  },
   "cookie": {
     "viewBox": "0 0 24 24",
     "content": "<path d=\"M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5\" />\n    <path d=\"M8.5 8.5v.01\" />\n    <path d=\"M16 15.5v.01\" />\n    <path d=\"M12 12v.01\" />\n    <path d=\"M11 17v.01\" />\n    <path d=\"M7 14v.01\" />"

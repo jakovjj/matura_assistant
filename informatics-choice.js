@@ -1,10 +1,10 @@
-const data = window.ASISTENT_ZA_MATURE_PHILOSOPHY_CHOICE;
+const data = window.ASISTENT_ZA_MATURE_INFORMATICS_CHOICE;
 
 if (!data || !Array.isArray(data.exams)) {
-  throw new Error("Nedostaje generirani indeks interaktivnih zadataka iz Filozofije.");
+  throw new Error("Nedostaje generirani indeks interaktivnih zadataka iz Informatike.");
 }
 
-const app = document.querySelector("#philosophy-app");
+const app = document.querySelector("#informatics-app");
 
 const termLabels = {
   "ljetni rok": "Ljetni rok",
@@ -117,21 +117,21 @@ function formatTerm(term) {
   return termLabels[normalizeTerm(term)] || term;
 }
 
-function historyExamIdForTerm(exam, term) {
-  return `filozofija-${exam.year}-${slugPart(term)}`;
+function informaticsExamIdForTerm(exam, term) {
+  return `informatika-${exam.year}-${slugPart(term)}`;
 }
 
-function historyStorageKeyForId(id) {
-  return `asistent-za-mature:philosophy-choice:${id}`;
+function informaticsStorageKeyForId(id) {
+  return `asistent-za-mature:informatics-choice:${id}`;
 }
 
-function historyStorageKeys(exam) {
+function informaticsStorageKeys(exam) {
   const ids = [
     exam.id,
-    ...(legacyTermAliases[exam.term] || []).map((term) => historyExamIdForTerm(exam, term)),
+    ...(legacyTermAliases[exam.term] || []).map((term) => informaticsExamIdForTerm(exam, term)),
   ];
 
-  return [...new Set(ids)].map(historyStorageKeyForId);
+  return [...new Set(ids)].map(informaticsStorageKeyForId);
 }
 
 function buildExamMap(items) {
@@ -139,7 +139,7 @@ function buildExamMap(items) {
   for (const exam of items) {
     map.set(exam.id, exam);
     for (const legacyTerm of legacyTermAliases[exam.term] || []) {
-      map.set(historyExamIdForTerm(exam, legacyTerm), exam);
+      map.set(informaticsExamIdForTerm(exam, legacyTerm), exam);
     }
   }
   return map;
@@ -150,7 +150,7 @@ const exams = data.exams.map((exam) => {
   return {
     ...exam,
     term,
-    id: historyExamIdForTerm(exam, term),
+    id: informaticsExamIdForTerm(exam, term),
   };
 });
 const examsById = buildExamMap(exams);
@@ -160,15 +160,19 @@ function sourceTasks(exam = solverExam) {
 }
 
 function questionSortKey(question) {
-  const [whole, decimal = "0"] = String(question.number || question).split(".");
-  return [Number(whole) || 0, Number(decimal) || 0];
+  const match = String(question.number || question).match(/^(\d+)(?:\.(\d+|[A-Z]))?$/);
+  if (!match) return [9999, 9999, String(question.number || question)];
+  const suffix = match[2] || "";
+  return [Number(match[1]) || 0, /^\d+$/.test(suffix) ? Number(suffix) : 0, suffix];
 }
 
 function sortedQuestions(questions) {
   return [...questions].sort((left, right) => {
-    const [leftWhole, leftDecimal] = questionSortKey(left);
-    const [rightWhole, rightDecimal] = questionSortKey(right);
-    return leftWhole - rightWhole || leftDecimal - rightDecimal;
+    const [leftWhole, leftDecimal, leftSuffix] = questionSortKey(left);
+    const [rightWhole, rightDecimal, rightSuffix] = questionSortKey(right);
+    return leftWhole - rightWhole
+      || leftDecimal - rightDecimal
+      || String(leftSuffix).localeCompare(String(rightSuffix), "hr");
   });
 }
 
@@ -219,7 +223,7 @@ function matchingItemId(questionNumber, itemLabel) {
 }
 
 function parentQuestionId(question) {
-  const match = String(question).match(/^(\d+)\.(?:\d+|[A-Z]+)$/);
+  const match = String(question).match(/^(\d+)\.[A-Z]$/);
   return match ? match[1] : String(question);
 }
 
@@ -298,11 +302,11 @@ function examUrl(exam, taskTypeId = defaultTaskTypeId) {
     params.set("vrsta", normalizedTaskTypeId);
   }
   if (simulation.active) params.set("nacin", "simulacija");
-  return `./filozofija.html?${params.toString()}`;
+  return `./informatika.html?${params.toString()}`;
 }
 
-function historySubjectUrl() {
-  return "./?predmet=Filozofija";
+function informaticsSubjectUrl() {
+  return "./?predmet=Informatika";
 }
 
 function correctAnswers(question) {
@@ -355,7 +359,7 @@ function loadState(exam) {
   };
 
   try {
-    for (const key of historyStorageKeys(exam).reverse()) {
+    for (const key of informaticsStorageKeys(exam).reverse()) {
       const stored = JSON.parse(localStorage.getItem(key) || "{}");
       if (!stored || typeof stored !== "object" || Array.isArray(stored)) continue;
 
@@ -396,7 +400,7 @@ function saveState() {
 
   try {
     localStorage.setItem(
-      historyStorageKeyForId(solverExam.id),
+      informaticsStorageKeyForId(solverExam.id),
       JSON.stringify({
         closedResponses,
         openResponses,
@@ -505,8 +509,8 @@ function renderMissingExam() {
   app.innerHTML = `
     <div class="empty-state">
       <h2>Ispit nije pronađen</h2>
-      <p>Odabrani ispit iz Filozofije nije dostupan.</p>
-      <a class="start-link" href="${historySubjectUrl()}">Vrati se na Filozofiju</a>
+      <p>Odabrani ispit iz Informatike nije dostupan.</p>
+      <a class="start-link" href="${informaticsSubjectUrl()}">Vrati se na Informatiku</a>
     </div>
   `;
 }
@@ -528,9 +532,9 @@ function renderSolver(exam, taskTypeId) {
 
   app.innerHTML = `
     ${renderSolverHeader({
-      subject: "Filozofija",
+      subject: "Informatika",
       exam,
-      backHref: historySubjectUrl(),
+      backHref: informaticsSubjectUrl(),
       backLabel: "← Odaberi drugi ispit",
       paperUrl: exam.paperUrl,
       archiveUrl: exam.archiveUrl,
@@ -846,7 +850,9 @@ function renderSourceQuestion(question) {
 }
 
 function renderQuestionFallback(question, number) {
-  if (question.type === "open") return renderOpenPrompt(question);
+  if (question.type === "open") {
+    return `<p class="history-open-question__prompt">Pronađi zadatak u službenoj PDF knjižici i ručno dodijeli bodove.</p>`;
+  }
   return `
     <p class="history-open-question__prompt">
       Pronađi ${escapeHtml(number)}. zadatak u službenoj PDF knjižici.
@@ -857,6 +863,9 @@ function renderQuestionFallback(question, number) {
 function bindResponseListeners() {
   document.querySelectorAll('input[type="radio"][data-question]').forEach((input) => {
     input.addEventListener("change", () => updateClosedResponse(input.dataset.question, input.value));
+  });
+  document.querySelectorAll('input[type="checkbox"][data-multi-question]').forEach((input) => {
+    input.addEventListener("change", () => updateMultiChoiceResponse(input.dataset.multiQuestion));
   });
   document.querySelectorAll("select[data-matching-question][data-matching-item]").forEach((select) => {
     select.addEventListener("change", () =>
@@ -1039,76 +1048,8 @@ function renderQuestionResponse(question, number) {
   if (isExcludedQuestion(question)) return window.renderExcludedExamTaskNotice();
   if (question.type === "open") return renderOpenQuestionResponse(question, number);
   if (question.type === "matching") return renderMatchingQuestionResponse(question, number);
+  if (question.type === "multi-choice") return renderMultiChoiceQuestionResponse(question, number);
   return renderClosedQuestionResponse(number);
-}
-
-function renderMatchingQuestionResponse(question, number) {
-  const checkedClass = matchingItemIds(question).every((itemId) => closedResponses[itemId])
-    ? " response-question--answered"
-    : "";
-
-  return `
-    <fieldset class="physics-inline-response art-matching-response art-matching-response--compact ${checkedClass}">
-      <legend>Povezivanje u ${escapeHtml(number)}. zadatku</legend>
-      <div class="art-matching-response__grid">
-        ${(question.itemLabels || [])
-          .map((item) => renderMatchingRow(question, item))
-          .join("")}
-      </div>
-      ${selfCheck.renderButton(number, {
-        hidden: simulation.active || checked,
-      })}
-      ${renderMatchingFeedback(question)}
-    </fieldset>
-  `;
-}
-
-function matchingItemIds(question) {
-  return (question.scoredItems || []).map((item) => matchingItemId(question.number, item));
-}
-
-function renderMatchingRow(question, item) {
-  const itemId = matchingItemId(question.number, item);
-  const selected = closedResponses[itemId] || "";
-  const isScored = correctAnswers(itemId).length > 0;
-  const isResolved = isChecked(itemId);
-  const isCorrect = isScored && isCorrectAnswer(itemId, selected);
-  let resultClass = "";
-  if (isResolved && isCorrect) resultClass = " art-matching-response__row--correct";
-  if (isResolved && isScored && !isCorrect) resultClass = " art-matching-response__row--wrong";
-  if (isResolved && !isScored && selected) resultClass = " art-matching-response__row--unused";
-
-  return `
-    <label class="art-matching-response__row${resultClass}">
-      <span class="art-matching-response__item">${escapeHtml(item)}</span>
-      <select
-        data-matching-question="${escapeHtml(question.number)}"
-        data-matching-item="${escapeHtml(item)}"
-        ${simulation.inputDisabledAttribute()}
-      >
-        <option value="">-</option>
-        ${(question.targetLabels || ["A", "B", "C", "D", "E"])
-          .map((target) => `
-            <option value="${escapeHtml(target)}" ${selected === target ? "selected" : ""}>
-              ${escapeHtml(target)}
-            </option>
-          `)
-          .join("")}
-      </select>
-    </label>
-  `;
-}
-
-function renderMatchingFeedback(question) {
-  if (!isChecked(question.number)) return "";
-  const wrongItems = matchingItemIds(question).filter(
-    (itemId) => !isCorrectAnswer(itemId, closedResponses[itemId]),
-  );
-  if (!wrongItems.length) return `<small class="response-feedback">Točno.</small>`;
-  const correct = matchingItemIds(question)
-    .map((itemId) => `${itemId.split(".").pop()}-${correctAnswers(itemId)[0]}`)
-    .join(", ");
-  return `<small class="response-feedback">Točno povezivanje: ${escapeHtml(correct)}.</small>`;
 }
 
 function renderClosedQuestionResponse(question) {
@@ -1157,12 +1098,128 @@ function renderChoice(question, option, answer) {
   `;
 }
 
+function renderMultiChoiceQuestionResponse(question, number) {
+  const answer = closedResponses[number] || "";
+  const selected = selectedAnswers(answer);
+  const resultClass = isChecked(number)
+    ? isCorrectAnswer(number, answer)
+      ? " response-question--correct"
+      : " response-question--wrong"
+    : "";
+
+  return `
+    <fieldset class="physics-inline-response ${resultClass}">
+      <legend>Odgovor na ${escapeHtml(number)}. zadatak</legend>
+      <div class="choice-list">
+        ${(question.options || ["A", "B", "C", "D"])
+          .map((option) => renderMultiChoiceOption(number, option, selected))
+          .join("")}
+      </div>
+      ${selfCheck.renderButton(number, {
+        hidden: simulation.active || checked,
+      })}
+      ${renderClosedFeedback(number, answer)}
+    </fieldset>
+  `;
+}
+
+function renderMultiChoiceOption(question, option, selected) {
+  const isSelected = selected.includes(option);
+  const correct = correctAnswers(question).includes(option);
+  let resultClass = "";
+  if (isChecked(question) && correct) resultClass = " answer-choice--correct";
+  if (isChecked(question) && isSelected && !correct) resultClass = " answer-choice--wrong";
+
+  return `
+    <label class="answer-choice${resultClass}">
+      <input
+        data-multi-question="${escapeHtml(question)}"
+        type="checkbox"
+        name="answer-${escapeHtml(question)}-${option}"
+        value="${option}"
+        ${isSelected ? "checked" : ""}
+        ${simulation.inputDisabledAttribute()}
+      >
+      <span>${option}</span>
+    </label>
+  `;
+}
+
+function renderMatchingQuestionResponse(question, number) {
+  const checkedClass = matchingItemIds(question).every((itemId) => closedResponses[itemId])
+    ? " response-question--answered"
+    : "";
+
+  return `
+    <fieldset class="physics-inline-response art-matching-response ${checkedClass}">
+      <legend>Povezivanje u ${escapeHtml(number)}. zadatku</legend>
+      <div class="art-matching-response__grid">
+        ${(question.itemLabels || ["A", "B", "C", "D", "E", "F"])
+          .map((item) => renderMatchingRow(question, item))
+          .join("")}
+      </div>
+      ${selfCheck.renderButton(number, {
+        hidden: simulation.active || checked,
+      })}
+      ${renderMatchingFeedback(question)}
+    </fieldset>
+  `;
+}
+
+function matchingItemIds(question) {
+  return (question.scoredItems || []).map((item) => matchingItemId(question.number, item));
+}
+
+function renderMatchingRow(question, item) {
+  const itemId = matchingItemId(question.number, item);
+  const selected = closedResponses[itemId] || "";
+  const isScored = correctAnswers(itemId).length > 0;
+  const isResolved = isChecked(itemId);
+  const isCorrect = isScored && isCorrectAnswer(itemId, selected);
+  let resultClass = "";
+  if (isResolved && isCorrect) resultClass = " art-matching-response__row--correct";
+  if (isResolved && isScored && !isCorrect) resultClass = " art-matching-response__row--wrong";
+  if (isResolved && !isScored && selected) resultClass = " art-matching-response__row--unused";
+
+  return `
+    <label class="art-matching-response__row${resultClass}">
+      <span class="art-matching-response__item">${escapeHtml(item)}</span>
+      <select
+        data-matching-question="${escapeHtml(question.number)}"
+        data-matching-item="${escapeHtml(item)}"
+        ${simulation.inputDisabledAttribute()}
+      >
+        <option value="">-</option>
+        ${(question.targetLabels || ["1", "2", "3", "4"])
+          .map((target) => `
+            <option value="${escapeHtml(target)}" ${selected === target ? "selected" : ""}>
+              ${escapeHtml(target)}
+            </option>
+          `)
+          .join("")}
+      </select>
+    </label>
+  `;
+}
+
+function renderMatchingFeedback(question) {
+  if (!isChecked(question.number)) return "";
+  const wrongItems = matchingItemIds(question).filter(
+    (itemId) => !isCorrectAnswer(itemId, closedResponses[itemId]),
+  );
+  if (!wrongItems.length) return `<small class="response-feedback">Točno.</small>`;
+  const correct = matchingItemIds(question)
+    .map((itemId) => `${itemId.split(".")[1]}-${correctAnswers(itemId)[0]}`)
+    .join(", ");
+  return `<small class="response-feedback">Točno povezivanje: ${escapeHtml(correct)}.</small>`;
+}
+
 function renderClosedFeedback(question, answer) {
   if (!isChecked(question)) return "";
   const answers = correctAnswers(question);
-  if (answers.includes(answer)) return `<small class="response-feedback">Točno.</small>`;
+  if (isCorrectAnswer(question, answer)) return `<small class="response-feedback">Točno.</small>`;
   const label = answers.length > 1 ? "Točni odgovori" : "Točan odgovor";
-  return `<small class="response-feedback">${label}: ${answers.join(" ili ")}.</small>`;
+  return `<small class="response-feedback">${label}: ${escapeHtml(answers.join(", "))}.</small>`;
 }
 
 function renderOpenQuestionResponse(question, number) {
@@ -1194,7 +1251,9 @@ function renderOpenSolution(question, number) {
   if (!solutionHtml) {
     return `
       <div class="physics-open-solution">
-        <p>Službeno rješenje nije pronađeno u ključu za odgovore.</p>
+        <div class="physics-open-solution__controls">
+          ${renderOpenScoreInput(number)}
+        </div>
       </div>
     `;
   }
@@ -1253,22 +1312,6 @@ function renderOpenScoreInput(number) {
   `;
 }
 
-function renderOpenPrompt(question) {
-  const prompt = String(question.prompt || "").trim();
-  if (!prompt) {
-    return `<p class="history-open-question__prompt">Pronađi zadatak u službenoj PDF knjižici i upiši odgovor.</p>`;
-  }
-
-  return `
-    <div class="history-open-question__prompt">
-      ${prompt
-        .split("\n")
-        .map((line) => `<p>${escapeHtml(line)}</p>`)
-        .join("")}
-    </div>
-  `;
-}
-
 function renderCroppedImage(source, alt, options = {}) {
   return window.renderSourceImageCrop(source, alt, options);
 }
@@ -1292,12 +1335,41 @@ function updateClosedResponse(question, answer) {
   if (wasChecked || wasSelfChecked) renderTaskTypeContent();
 }
 
+function updateMultiChoiceResponse(question) {
+  if (simulation.finished) return;
+
+  const selected = [...document.querySelectorAll("[data-multi-question]")]
+    .filter((input) => input.dataset.multiQuestion === question && input.checked)
+    .map((input) => input.value)
+    .sort()
+    .join(",");
+  updateClosedResponse(question, selected);
+}
+
 function updateMatchingResponse(question, item, answer) {
   if (simulation.finished) return;
 
-  // Unlike likovna, philosophy matching options (A–E) may be reused across rows,
-  // so each row is scored independently without clearing other selections.
-  updateClosedResponse(matchingItemId(question, item), String(answer || "").trim());
+  const itemId = matchingItemId(question, item);
+  const normalizedAnswer = String(answer || "").trim();
+  if (normalizedAnswer) {
+    const matchingQuestion = questionByNumber.get(String(question));
+    for (const candidate of matchingQuestion?.itemLabels || []) {
+      const candidateId = matchingItemId(question, candidate);
+      if (candidateId !== itemId && closedResponses[candidateId] === normalizedAnswer) {
+        delete closedResponses[candidateId];
+        document.querySelectorAll("select[data-matching-question][data-matching-item]").forEach((select) => {
+          if (
+            select.dataset.matchingQuestion === question
+            && select.dataset.matchingItem === candidate
+            && select.value === normalizedAnswer
+          ) {
+            select.value = "";
+          }
+        });
+      }
+    }
+  }
+  updateClosedResponse(itemId, normalizedAnswer);
 }
 
 function updateOpenScore(question, value, input) {
@@ -1389,8 +1461,8 @@ function recordSubmittedSimulation() {
 
   simulationRecorded = true;
   window.AsistentProfile.recordSimulationAttempt({
-    solver: "philosophy-choice",
-    subject: "Filozofija",
+    solver: "informatics-choice",
+    subject: "Informatika",
     part: "Ispit",
     examId: solverExam.id,
     year: solverExam.year,
@@ -1437,10 +1509,10 @@ function closeResultsDialogOnEscape(event) {
   closeResultsDialog();
 }
 
-function startHistoryPage() {
+function startInformaticsPage() {
   const id = selectedExamId();
   if (!id) {
-    window.location.replace(historySubjectUrl());
+    window.location.replace(informaticsSubjectUrl());
     return;
   }
 
@@ -1450,7 +1522,7 @@ function startHistoryPage() {
 }
 
 if (!simulation.active && window.AsistentProfile?.ready) {
-  window.AsistentProfile.ready.finally(startHistoryPage);
+  window.AsistentProfile.ready.finally(startInformaticsPage);
 } else {
-  startHistoryPage();
+  startInformaticsPage();
 }

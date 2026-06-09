@@ -1,4 +1,4 @@
-// AI maturni asistent: objašnjenja rješenja za zadatke višestrukoga izbora.
+// Asistent za maturu: objašnjenja rješenja za zadatke višestrukoga izbora.
 // Zasad se prikazuje samo kad URL ima ?beta=1. Solver poziva renderButton()
 // uz svaki zadatak i bind() da poveže gumbe s kontekstom (slika, odgovori).
 (() => {
@@ -56,8 +56,7 @@
         <img class="ai-login-modal__logo" src="${LOGO_SRC}" alt="" width="56" height="56" />
         <h2>Prijavi se za objašnjenje</h2>
         <p>
-          Da bi maturni asistent objasnio rješenje ovog zadatka, prvo se prijavi.
-          Svaki prijavljeni korisnik ima nekoliko besplatnih objašnjenja.
+          Objašnjenja Asistenta za maturu dostupna su samo prijavljenim korisnicima.
         </p>
         <a class="primary-button ai-login-modal__action" href="${escapeHtml(loginHref)}">Prijavi se</a>
       </div>
@@ -93,18 +92,18 @@
           <div class="ai-drawer__brand">
             <img class="ai-drawer__logo" src="${LOGO_SRC}" alt="" width="40" height="40" />
             <div class="ai-drawer__heading">
-              <strong>Maturni asistent</strong>
+              <strong>Asistent za maturu</strong>
               <span class="ai-drawer__subtitle" data-ai-subtitle></span>
             </div>
           </div>
           <button class="ai-drawer__close" type="button" data-ai-close aria-label="Zatvori objašnjenje">&times;</button>
         </header>
-        <div class="ai-drawer__badge" data-ai-badge hidden>
-          <span aria-hidden="true">✓</span> Potvrđeno točno rješenje
-        </div>
         <div class="ai-drawer__body" data-ai-body></div>
         <footer class="ai-drawer__footer">
-          <button class="ai-drawer__report" type="button" data-ai-report>Prijavi loše objašnjenje</button>
+          <button class="ai-drawer__report" type="button" data-ai-report>
+            ${window.renderLucideIcon ? window.renderLucideIcon("triangle-alert", "ai-drawer__report-icon") : ""}
+            <span>Prijavi loše objašnjenje</span>
+          </button>
           <span class="ai-drawer__report-status" data-ai-report-status></span>
         </footer>
       </div>
@@ -128,9 +127,7 @@
 
     element.querySelector("[data-ai-subtitle]").textContent =
       `${context.subject} · zadatak ${context.question}`;
-    element.querySelector("[data-ai-body]").innerHTML =
-      `<p class="ai-drawer__loading">Pripremam objašnjenje…</p>`;
-    element.querySelector("[data-ai-badge]").hidden = true;
+    element.querySelector("[data-ai-body]").innerHTML = thinkingHtml();
     element.querySelector("[data-ai-report-status]").textContent = "";
     const reportButton = element.querySelector("[data-ai-report]");
     reportButton.disabled = false;
@@ -150,10 +147,17 @@
     document.body.classList.remove("ai-drawer-open");
   }
 
-  function setBodyText(text) {
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function thinkingHtml() {
+    return `<div class="ai-thinking" role="status" aria-label="Asistent razmišlja"><span></span><span></span><span></span></div>`;
+  }
+
+  function setBodyHtml(html) {
     const body = drawer?.querySelector("[data-ai-body]");
-    if (!body) return;
-    body.textContent = text;
+    if (body) body.innerHTML = html;
   }
 
   function setBodyMessage(message, tone = "") {
@@ -162,9 +166,23 @@
     body.innerHTML = `<p class="ai-drawer__message${tone ? ` ai-drawer__message--${tone}` : ""}">${escapeHtml(message)}</p>`;
   }
 
-  function showVerifiedBadge(verified) {
-    const badge = drawer?.querySelector("[data-ai-badge]");
-    if (badge) badge.hidden = !verified;
+  // Klasa boje za podebljanu oznaku na početku retka: točno -> zeleno, netočno
+  // ili oznaka slova (npr. "A:") -> crveno.
+  function boldClass(inner) {
+    const value = inner.trim();
+    if (/^neto[čc]no/i.test(value)) return "ai-wrong";
+    if (/^to[čc]no/i.test(value)) return "ai-correct";
+    if (/^[A-D]\s*[:.)]/.test(value)) return "ai-wrong";
+    return "";
+  }
+
+  function renderExplanationHtml(text) {
+    return escapeHtml(text)
+      .replace(/\*\*([^*]+)\*\*/g, (match, inner) => {
+        const cls = boldClass(inner);
+        return `<strong${cls ? ` class="${cls}"` : ""}>${inner}</strong>`;
+      })
+      .replace(/\n/g, "<br>");
   }
 
   function showRemaining(remaining, unlimited) {
@@ -239,6 +257,17 @@
     }
     if (controller.signal.aborted) return;
 
+    // Polazni tekst (ako postoji) šaljemo kao dodatne slike za bolje razumijevanje.
+    const contextImages = [];
+    for (const source of (context.contextImages || []).slice(0, 3)) {
+      try {
+        contextImages.push({ dataUrl: await cropToDataUrl(source) });
+      } catch {
+        // Preskoči kontekstnu sliku koja se ne može izrezati.
+      }
+      if (controller.signal.aborted) return;
+    }
+
     let response;
     try {
       response = await fetch(ENDPOINT, {
@@ -253,6 +282,7 @@
           question: context.question,
           correctAnswer: context.correctAnswer,
           image: imageDataUrl ? { dataUrl: imageDataUrl } : null,
+          contextImages,
         }),
       });
     } catch (error) {
@@ -287,25 +317,30 @@
     const decoder = new TextDecoder();
     let buffer = "";
     let text = "";
-    let started = false;
+    let revealed = false;
+    let errored = false;
+
+    // Tri točkice (razmišljanje) drže se barem 1.5 s prije prikaza teksta.
+    const thinking = sleep(1500);
+    thinking.then(() => {
+      if (!errored && !controller.signal.aborted) {
+        revealed = true;
+        setBodyHtml(renderExplanationHtml(text));
+      }
+    });
 
     const handleEvent = (event) => {
       if (event.type === "meta") {
-        showVerifiedBadge(event.verified);
         showRemaining(event.remaining, event.unlimited);
       } else if (event.type === "delta") {
-        if (!started) {
-          started = true;
-          setBodyText("");
-        }
         text += event.text || "";
-        setBodyText(text);
+        if (revealed) setBodyHtml(renderExplanationHtml(text));
       } else if (event.type === "done") {
-        showVerifiedBadge(event.verified);
         if (Object.prototype.hasOwnProperty.call(event, "remaining")) {
           showRemaining(event.remaining, event.unlimited);
         }
       } else if (event.type === "error") {
+        errored = true;
         setBodyMessage(event.error || "Objašnjenje nije uspjelo.", "error");
       }
     };
@@ -329,8 +364,13 @@
       }
     } catch (error) {
       if (controller.signal.aborted) return;
-      if (!started) setBodyMessage("Objašnjenje je prekinuto. Pokušaj ponovno.", "error");
+      errored = true;
+      if (!text) setBodyMessage("Objašnjenje je prekinuto. Pokušaj ponovno.", "error");
     }
+
+    await thinking;
+    if (controller.signal.aborted || errored) return;
+    setBodyHtml(renderExplanationHtml(text));
   }
 
   async function reportCurrentExplanation() {
@@ -388,7 +428,7 @@
           type="button"
           data-ai-explain="${escapeHtml(question)}"
           aria-label="Objašnjenje rješenja zadatka ${escapeHtml(question)}"
-          title="Objašnjenje rješenja (asistent)"
+          title="Objašnjenje rješenja (Asistent za maturu)"
         >
           <img class="ai-explain-button__logo" src="${LOGO_SRC}" alt="" width="22" height="22" />
         </button>
