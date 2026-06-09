@@ -30,6 +30,17 @@ const pickerState = {
 };
 
 const audioSettingsStorageKey = "asistent-za-mature:english-listening:audio-settings";
+const audioPlaybackRates = [1, 1.5];
+
+const audioIcons = {
+  play: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.79-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14Z"/></svg>',
+  pause:
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
+  volume:
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 9v6h4l5 5V4L8 9H4Z"/><path d="M16.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M19 6a8 8 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  muted:
+    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 9v6h4l5 5V4L8 9H4Z"/><path d="m16 9 5 5m0-5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+};
 
 let solverExam;
 let responses = {};
@@ -134,6 +145,11 @@ function normalizedVolume(value) {
   return Math.min(1, Math.max(0, volume));
 }
 
+function normalizedPlaybackRate(value) {
+  const playbackRate = Number(value);
+  return audioPlaybackRates.includes(playbackRate) ? playbackRate : 1;
+}
+
 function loadAudioSettings() {
   try {
     const stored = JSON.parse(localStorage.getItem(audioSettingsStorageKey) || "{}");
@@ -143,6 +159,7 @@ function loadAudioSettings() {
     return {
       ...(volume === null ? {} : { volume }),
       ...(typeof stored.muted === "boolean" ? { muted: stored.muted } : {}),
+      playbackRate: normalizedPlaybackRate(stored.playbackRate),
     };
   } catch {
     return {};
@@ -812,15 +829,7 @@ function renderTaskAudioBlock(task) {
         <strong>${escapeHtml(activeEntry.label)}</strong>
         <small>${escapeHtml(track.sourceName)}</small>
       </div>
-      <audio
-        controls
-        preload="metadata"
-        src="${escapeHtml(track.url)}"
-        data-task-audio="${task.number}"
-        data-audio-current-index="${activeEntry.audioIndex}"
-      >
-        Vaš preglednik ne podržava reprodukciju audiosnimke.
-      </audio>
+      ${renderAudioPlayer(track, task.number, activeEntry.audioIndex)}
       ${
         entries.length > 1
           ? `<div class="audio-track-list audio-track-list--compact" aria-label="Odabir audiosnimke za zadatak">
@@ -829,6 +838,62 @@ function renderTaskAudioBlock(task) {
           : ""
       }
     </div>
+  `;
+}
+
+function renderAudioPlayer(track, taskNumber, audioIndex) {
+  const accelerated = normalizedPlaybackRate(audioSettings.playbackRate) === 1.5;
+
+  return `
+    <div class="audio-player" data-audio-player>
+      <button class="audio-player__button audio-player__play" type="button" data-audio-play aria-label="Pokreni snimku">
+        <span class="audio-player__icon" data-audio-play-symbol>${audioIcons.play}</span>
+      </button>
+      <input
+        class="audio-player__range audio-player__seek"
+        type="range"
+        min="0"
+        max="1000"
+        step="1"
+        value="0"
+        data-audio-seek
+        aria-label="Položaj snimke"
+      >
+      <span class="audio-player__time" data-audio-time>0:00 / --:--</span>
+      <button
+        class="audio-player__rate${accelerated ? " is-active" : ""}"
+        type="button"
+        data-audio-rate-toggle
+        title="Brzina reprodukcije"
+        aria-label="${accelerated ? "Isključi ubrzanje 1.5x" : "Uključi ubrzanje 1.5x"}"
+        aria-pressed="${accelerated ? "true" : "false"}"
+      >
+        <span data-audio-rate-label>${accelerated ? "1.5×" : "1×"}</span>
+      </button>
+      <div class="audio-player__volume-group">
+        <button class="audio-player__button audio-player__mute" type="button" data-audio-mute aria-label="Isključi zvuk">
+          <span class="audio-player__icon" data-audio-volume-symbol>${audioIcons.volume}</span>
+        </button>
+        <input
+          class="audio-player__range audio-player__volume"
+          type="range"
+          min="0"
+          max="1"
+          step="0.01"
+          value="1"
+          data-audio-volume
+          aria-label="Glasnoća"
+        >
+      </div>
+    </div>
+    <audio
+      preload="metadata"
+      src="${escapeHtml(track.url)}"
+      data-task-audio="${taskNumber}"
+      data-audio-current-index="${audioIndex}"
+    >
+      Vaš preglednik ne podržava reprodukciju audiosnimke.
+    </audio>
   `;
 }
 
@@ -867,6 +932,7 @@ function restoreAudioPlaybackState(state) {
     audio.playbackRate = saved.playbackRate;
     audio.volume = saved.volume;
     audio.muted = saved.muted;
+    updateAudioPlayerControls(audio);
 
     const restoreTime = () => {
       if (Number.isFinite(saved.currentTime)) {
@@ -879,6 +945,7 @@ function restoreAudioPlaybackState(state) {
       const shouldResume = saved.wasPlaying && !saved.resumed;
       saved.resumed = saved.resumed || shouldResume;
       if (shouldResume) audio.play()?.catch?.(() => {});
+      updateAudioPlayerControls(audio);
     };
 
     if (audio.readyState >= 1) restoreTime();
@@ -890,6 +957,7 @@ function applyAudioSettings(audio) {
   const volume = normalizedVolume(audioSettings.volume);
   if (volume !== null) audio.volume = volume;
   if (typeof audioSettings.muted === "boolean") audio.muted = audioSettings.muted;
+  audio.playbackRate = normalizedPlaybackRate(audioSettings.playbackRate);
 }
 
 function applyAudioSettingsToRenderedAudio(sourceAudio) {
@@ -899,8 +967,139 @@ function applyAudioSettingsToRenderedAudio(sourceAudio) {
   syncingAudioSettings = true;
   section.querySelectorAll("audio[data-task-audio]").forEach((audio) => {
     if (audio !== sourceAudio) applyAudioSettings(audio);
+    updateAudioPlayerControls(audio);
   });
   syncingAudioSettings = false;
+}
+
+function audioPlayerForAudio(audio) {
+  const player = audio.previousElementSibling;
+  return player?.matches?.("[data-audio-player]") ? player : null;
+}
+
+function formatAudioTime(value) {
+  if (!Number.isFinite(value)) return "--:--";
+  const totalSeconds = Math.max(0, Math.floor(value));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = String(totalSeconds % 60).padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function setAudioRangeFill(input, percent) {
+  if (!input) return;
+  input.style.setProperty("--audio-progress", `${Math.min(100, Math.max(0, percent))}%`);
+}
+
+function updateAudioPlayerControls(audio) {
+  const player = audioPlayerForAudio(audio);
+  if (!player) return;
+
+  const playButton = player.querySelector("[data-audio-play]");
+  const playSymbol = player.querySelector("[data-audio-play-symbol]");
+  if (playButton && playSymbol) {
+    const playing = !audio.paused && !audio.ended;
+    playSymbol.innerHTML = playing ? audioIcons.pause : audioIcons.play;
+    playButton.classList.toggle("is-playing", playing);
+    playButton.setAttribute("aria-label", playing ? "Pauziraj snimku" : "Pokreni snimku");
+  }
+
+  const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+  const progress = duration ? (audio.currentTime / duration) * 100 : 0;
+  const seek = player.querySelector("[data-audio-seek]");
+  if (seek && document.activeElement !== seek) {
+    seek.value = duration ? String(Math.round((audio.currentTime / duration) * 1000)) : "0";
+  }
+  setAudioRangeFill(seek, progress);
+
+  const time = player.querySelector("[data-audio-time]");
+  if (time) {
+    time.textContent = `${formatAudioTime(audio.currentTime)} / ${formatAudioTime(audio.duration)}`;
+  }
+
+  const accelerated = normalizedPlaybackRate(audio.playbackRate) === 1.5;
+  const rateButton = player.querySelector("[data-audio-rate-toggle]");
+  if (rateButton) {
+    rateButton.classList.toggle("is-active", accelerated);
+    rateButton.setAttribute("aria-pressed", accelerated ? "true" : "false");
+    rateButton.setAttribute(
+      "aria-label",
+      accelerated ? "Isključi ubrzanje 1.5x" : "Uključi ubrzanje 1.5x",
+    );
+    const rateLabel = rateButton.querySelector("[data-audio-rate-label]");
+    if (rateLabel) rateLabel.textContent = accelerated ? "1.5×" : "1×";
+  }
+
+  const muted = audio.muted || audio.volume === 0;
+  const muteButton = player.querySelector("[data-audio-mute]");
+  const volumeSymbol = player.querySelector("[data-audio-volume-symbol]");
+  if (muteButton && volumeSymbol) {
+    muteButton.setAttribute("aria-label", muted ? "Uključi zvuk" : "Isključi zvuk");
+    muteButton.classList.toggle("is-muted", muted);
+    volumeSymbol.innerHTML = muted ? audioIcons.muted : audioIcons.volume;
+  }
+
+  const volumeInput = player.querySelector("[data-audio-volume]");
+  if (volumeInput && document.activeElement !== volumeInput) {
+    const volume = muted ? 0 : normalizedVolume(audio.volume);
+    volumeInput.value = String(volume ?? 1);
+  }
+  setAudioRangeFill(volumeInput, Number(volumeInput?.value || 0) * 100);
+}
+
+function bindCustomAudioPlayer(audio) {
+  const player = audioPlayerForAudio(audio);
+  if (!player) return;
+
+  player.querySelector("[data-audio-play]")?.addEventListener("click", () => {
+    if (audio.paused || audio.ended) audio.play()?.catch?.(() => {});
+    else audio.pause();
+    updateAudioPlayerControls(audio);
+  });
+
+  player.querySelector("[data-audio-seek]")?.addEventListener("input", (event) => {
+    const duration = Number.isFinite(audio.duration) ? audio.duration : 0;
+    if (duration) audio.currentTime = (Number(event.target.value) / 1000) * duration;
+    updateAudioPlayerControls(audio);
+  });
+
+  player.querySelector("[data-audio-mute]")?.addEventListener("click", () => {
+    audio.muted = !audio.muted;
+    updateAudioPlayerControls(audio);
+  });
+
+  player.querySelector("[data-audio-volume]")?.addEventListener("input", (event) => {
+    const volume = normalizedVolume(event.target.value);
+    if (volume === null) return;
+
+    audio.volume = volume;
+    audio.muted = volume === 0;
+    updateAudioPlayerControls(audio);
+  });
+
+  player.querySelector("[data-audio-rate-toggle]")?.addEventListener("click", () => {
+    const currentRate = normalizedPlaybackRate(audioSettings.playbackRate);
+    audioSettings = {
+      ...audioSettings,
+      playbackRate: currentRate === 1.5 ? 1 : 1.5,
+    };
+    saveAudioSettings();
+    applyAudioSettingsToRenderedAudio();
+  });
+
+  [
+    "durationchange",
+    "ended",
+    "loadedmetadata",
+    "pause",
+    "play",
+    "ratechange",
+    "timeupdate",
+    "volumechange",
+  ].forEach((eventName) => {
+    audio.addEventListener(eventName, () => updateAudioPlayerControls(audio));
+  });
+
+  updateAudioPlayerControls(audio);
 }
 
 function bindAudioSettingsControls() {
@@ -909,11 +1108,13 @@ function bindAudioSettingsControls() {
 
   section.querySelectorAll("audio[data-task-audio]").forEach((audio) => {
     applyAudioSettings(audio);
+    bindCustomAudioPlayer(audio);
     audio.addEventListener("volumechange", () => {
       if (syncingAudioSettings) return;
 
       const volume = normalizedVolume(audio.volume);
       audioSettings = {
+        ...audioSettings,
         ...(volume === null ? {} : { volume }),
         muted: audio.muted,
       };

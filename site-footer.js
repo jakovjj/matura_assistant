@@ -27,9 +27,10 @@
               rel="noreferrer"
             >
               <svg aria-hidden="true" viewBox="0 0 24 24">
-                <path
-                  d="M5 5.5h11v8a5 5 0 0 1-5 5H10a5 5 0 0 1-5-5v-8Zm11 2h1.5a2.5 2.5 0 0 1 0 5H16m-9 8h10"
-                />
+                <path d="M10 2v2" />
+                <path d="M14 2v2" />
+                <path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1" />
+                <path d="M6 2v2" />
               </svg>
               <span>Kupite mi kavu</span>
             </a>

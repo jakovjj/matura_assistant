@@ -18,6 +18,16 @@ const config = {
     process.env.NODE_ENV === "production" ||
     /^https:\/\//i.test(process.env.PUBLIC_BASE_URL || ""),
   essayModel: process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
+  aiExplanationModel: process.env.OPENAI_AI_EXPLANATION_MODEL || "gpt-4.1-mini",
+  aiFreeExplanations: readPositiveNumber(process.env.AI_FREE_EXPLANATIONS, 3),
+  aiUnlimitedEmails: new Set(
+    String(process.env.AI_UNLIMITED_EMAILS || "jakov@jandric.com")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  ),
+  aiExplanationDir: path.resolve(rootDir, process.env.AI_EXPLANATION_DIR || "var/ai-explanations"),
+  aiReportFile: path.resolve(rootDir, process.env.AI_REPORT_FILE || "var/feedback/reports.txt"),
   host: process.env.HOST || "0.0.0.0",
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
@@ -32,6 +42,13 @@ const config = {
   feedbackTextFile: path.resolve(rootDir, process.env.FEEDBACK_TEXT_FILE || "var/feedback/messages.txt"),
   legacyStoreFile: path.resolve(rootDir, process.env.AUTH_STORE_FILE || "var/auth-store.json"),
   userLoginsTextFile: path.resolve(rootDir, process.env.USER_LOGINS_TEXT_FILE || "var/users/logins.txt"),
+  pageviewsFile: path.resolve(rootDir, process.env.PAGEVIEWS_FILE || "var/pageviews.json"),
+  pageviewVisitorsFile: path.resolve(
+    rootDir,
+    process.env.PAGEVIEW_VISITORS_FILE || "var/pageviews-visitors.json",
+  ),
+  visitorCookieName: process.env.VISITOR_COOKIE_NAME || "azm_vid",
+  visitorTtlMs: readPositiveNumber(process.env.VISITOR_TTL_DAYS, 365) * 24 * 60 * 60 * 1000,
 };
 
 const rateLimit = {
@@ -43,6 +60,10 @@ const rateLimit = {
     max: Number(process.env.AUTH_IP_LIMIT_PER_HOUR || 80),
     windowMs: 60 * 60 * 1000,
   }),
+  pageview: createRateLimiter({
+    max: Number(process.env.PAGEVIEW_IP_LIMIT_PER_MINUTE || 60),
+    windowMs: 60 * 1000,
+  }),
 };
 const englishEssayIndex = {
   file: path.join(rootDir, "data", "english-essay.js"),
@@ -53,6 +74,7 @@ const croatianWritingIndex = {
   prefix: "window.ASISTENT_ZA_MATURE_CROATIAN_WRITING=",
 };
 const generalGradingSystemPrompt = loadPromptFile("general-grading-system.txt");
+const aiExplanationSystemPrompt = loadPromptFile("ai-explanation-system.txt");
 const essayScoreSchema = {
   type: "object",
   additionalProperties: false,
@@ -246,6 +268,12 @@ let store = {
   users: {},
 };
 let database;
+// Brojači pregleda (svi pogledi, uključujući ponovljene) i skupovi jedinstvenih
+// posjetitelja (hash kolačića po predmetu/stranici) iz kojih izvodimo "users".
+let pageviewViews = { total: 0, subjects: {}, pages: {} };
+let pageviewVisitors = { total: new Set(), subjects: {}, pages: {} };
+let pageviewsDirty = false;
+const PAGEVIEW_MAX_DISTINCT = 200;
 
 main().catch((error) => {
   console.error("Ne mogu pokrenuti server:", error);
@@ -258,6 +286,8 @@ async function main() {
   await migrateLegacyStore();
   pruneExpiredRecords();
   await persistStore();
+  loadPageviews();
+  startPageviewFlushLoop();
 
   if (!config.authSecret) {
     if (process.env.NODE_ENV === "production") {
@@ -333,6 +363,11 @@ async function handleRequest(request, response) {
     return;
   }
 
+  if (url.pathname === "/api/pageview") {
+    await handlePageview(request, response);
+    return;
+  }
+
   if (
     url.pathname === "/api/english-essay/grade" ||
     url.pathname === "/api/english-essay/ocr" ||
@@ -340,6 +375,16 @@ async function handleRequest(request, response) {
     url.pathname === "/api/croatian-writing/ocr"
   ) {
     handleWritingPreviewOnlyApi(response);
+    return;
+  }
+
+  if (url.pathname === "/api/ai-explanation") {
+    await handleAiExplanation(request, response);
+    return;
+  }
+
+  if (url.pathname === "/api/ai-explanation/report") {
+    await handleAiExplanationReport(request, response);
     return;
   }
 
@@ -427,6 +472,209 @@ async function handleFeedback(request, response) {
   }
 
   sendJson(response, 201, { ok: true });
+}
+
+async function handlePageview(request, response) {
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
+    return;
+  }
+
+  // Limit služi samo za zaustavljanje očitih botova/floodova; inače brojimo svaki pogled.
+  if (!rateLimit.pageview.check(clientIp(request) || "unknown")) {
+    sendJson(response, 429, { ok: false });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request, 4 * 1024);
+  } catch {
+    sendJson(response, 400, { error: "Zahtjev nema ispravan JSON zapis." });
+    return;
+  }
+
+  const headers = {};
+  const visitor = resolveVisitor(request);
+  if (visitor.setCookie) headers["Set-Cookie"] = visitor.setCookie;
+
+  recordPageview(
+    visitor.hash,
+    normalizePageviewSubject(body?.subject),
+    normalizePageviewPage(body?.page),
+  );
+  sendJson(response, 202, { ok: true }, headers);
+}
+
+// Jedinstvenog posjetitelja prepoznajemo po first-party kolačiću (bez prijave).
+// Ako ga nema, dodjeljujemo novi i postavljamo ga. Pohranjujemo samo hash.
+function resolveVisitor(request) {
+  const cookies = parseCookies(request.headers.cookie || "");
+  let visitorId = cookies[config.visitorCookieName];
+  let setCookie = null;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(visitorId || "")) {
+    visitorId = crypto.randomUUID();
+    setCookie = cookie(config.visitorCookieName, visitorId, Math.floor(config.visitorTtlMs / 1000), "/");
+  }
+
+  return {
+    hash: crypto.createHash("sha256").update(visitorId).digest("hex").slice(0, 16),
+    setCookie,
+  };
+}
+
+function normalizePageviewSubject(value) {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/[ -]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 60);
+}
+
+function normalizePageviewPage(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim().slice(0, 60);
+  return /^[a-z0-9._-]+$/i.test(trimmed) ? trimmed : "";
+}
+
+function recordPageview(visitorHash, subject, page) {
+  if (!subject && !page) return;
+
+  pageviewViews.total += 1;
+  pageviewVisitors.total.add(visitorHash);
+  bumpPageviewKey(pageviewViews.subjects, pageviewVisitors.subjects, subject, visitorHash);
+  bumpPageviewKey(pageviewViews.pages, pageviewVisitors.pages, page, visitorHash);
+  pageviewsDirty = true;
+}
+
+function bumpPageviewKey(views, visitorSets, key, visitorHash) {
+  if (!key) return;
+  // Postojeće ključeve uvijek pratimo; nove ignoriramo nakon limita da datoteke ostanu čiste.
+  if (!(key in views) && Object.keys(views).length >= PAGEVIEW_MAX_DISTINCT) return;
+  views[key] = (views[key] || 0) + 1;
+  (visitorSets[key] || (visitorSets[key] = new Set())).add(visitorHash);
+}
+
+function loadPageviews() {
+  loadPageviewVisitors();
+
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(config.pageviewsFile, "utf8"));
+  } catch {
+    return; // Nema datoteke ili je neispravna; krećemo od nule (skupovi su već učitani).
+  }
+
+  pageviewViews = {
+    total: pageviewViewCount(parsed?.total),
+    subjects: loadPageviewViewBucket(parsed?.subjects),
+    pages: loadPageviewViewBucket(parsed?.pages),
+  };
+}
+
+function loadPageviewVisitors() {
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(config.pageviewVisitorsFile, "utf8"));
+  } catch {
+    return;
+  }
+
+  pageviewVisitors = {
+    total: toVisitorSet(parsed?.total),
+    subjects: loadVisitorSetBucket(parsed?.subjects),
+    pages: loadVisitorSetBucket(parsed?.pages),
+  };
+}
+
+function pageviewViewCount(value) {
+  if (Number.isFinite(value)) return value; // stariji format: broj
+  if (Number.isFinite(value?.views)) return value.views; // noviji format: { views, users }
+  return 0;
+}
+
+function loadPageviewViewBucket(bucket) {
+  if (!bucket || typeof bucket !== "object" || Array.isArray(bucket)) return {};
+  const result = {};
+  for (const [key, value] of Object.entries(bucket)) {
+    const views = pageviewViewCount(value);
+    if (views) result[key] = views;
+  }
+  return result;
+}
+
+function loadVisitorSetBucket(bucket) {
+  if (!bucket || typeof bucket !== "object" || Array.isArray(bucket)) return {};
+  const result = {};
+  for (const [key, value] of Object.entries(bucket)) {
+    result[key] = toVisitorSet(value);
+  }
+  return result;
+}
+
+function toVisitorSet(value) {
+  return new Set(Array.isArray(value) ? value.filter((item) => typeof item === "string") : []);
+}
+
+function pageviewsSnapshot() {
+  return {
+    updatedAt: new Date().toISOString(),
+    total: { views: pageviewViews.total, users: pageviewVisitors.total.size },
+    subjects: mergePageviewBuckets(pageviewViews.subjects, pageviewVisitors.subjects),
+    pages: mergePageviewBuckets(pageviewViews.pages, pageviewVisitors.pages),
+  };
+}
+
+function mergePageviewBuckets(views, visitorSets) {
+  const keys = [...new Set([...Object.keys(views), ...Object.keys(visitorSets)])].sort();
+  const result = {};
+  for (const key of keys) {
+    result[key] = { views: views[key] || 0, users: visitorSets[key]?.size || 0 };
+  }
+  return result;
+}
+
+function visitorIndexSnapshot() {
+  const toArrays = (bucket) =>
+    Object.fromEntries(Object.entries(bucket).map(([key, set]) => [key, [...set]]));
+  return {
+    total: [...pageviewVisitors.total],
+    subjects: toArrays(pageviewVisitors.subjects),
+    pages: toArrays(pageviewVisitors.pages),
+  };
+}
+
+function startPageviewFlushLoop() {
+  const flush = () => {
+    if (!pageviewsDirty) return;
+    pageviewsDirty = false;
+    try {
+      fs.mkdirSync(path.dirname(config.pageviewsFile), { recursive: true, mode: 0o700 });
+      fs.writeFileSync(config.pageviewsFile, `${JSON.stringify(pageviewsSnapshot(), null, 2)}\n`, {
+        encoding: "utf8",
+        mode: 0o600,
+      });
+      fs.mkdirSync(path.dirname(config.pageviewVisitorsFile), { recursive: true, mode: 0o700 });
+      fs.writeFileSync(config.pageviewVisitorsFile, `${JSON.stringify(visitorIndexSnapshot())}\n`, {
+        encoding: "utf8",
+        mode: 0o600,
+      });
+    } catch (error) {
+      pageviewsDirty = true;
+      console.error("Spremanje brojača pregleda nije uspjelo:", error.message);
+    }
+  };
+
+  const timer = setInterval(flush, 10 * 1000);
+  timer.unref?.();
+  for (const signal of ["SIGINT", "SIGTERM"]) {
+    process.once(signal, () => {
+      flush();
+      process.exit(0);
+    });
+  }
+  process.once("exit", flush);
 }
 
 function handleGoogleLogin(request, response, url) {
@@ -928,6 +1176,399 @@ async function handleCroatianWritingOcr(request, response) {
     sendJson(response, 502, {
       error: "OpenAI OCR nije uspio. Provjeri API ključ i pokušaj ponovno.",
     });
+  }
+}
+
+async function handleAiExplanation(request, response) {
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
+    return;
+  }
+
+  const session = currentSession(request);
+  const user = session ? store.users[session.userId] : null;
+  if (!session || !user) {
+    sendJson(response, 401, {
+      authRequired: true,
+      error: "Prijavi se da bi dobio objašnjenje rješenja.",
+    });
+    return;
+  }
+
+  if (!config.openAiApiKey) {
+    sendJson(response, 503, {
+      error: "AI asistent još nije konfiguriran. Dodaj OPENAI_API_KEY u .env.",
+    });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request, 12 * 1024 * 1024);
+  } catch {
+    sendJson(response, 400, { error: "Zahtjev nema ispravan JSON zapis." });
+    return;
+  }
+
+  const subject = stringOrEmpty(body?.subject) || "Hrvatski jezik";
+  const solver = normalizeAiSolver(body?.solver);
+  const examId = stringOrEmpty(body?.examId);
+  const question = stringOrEmpty(body?.question);
+  const correctAnswer = normalizeCorrectAnswer(body?.correctAnswer);
+  const image = normalizeEssayImage(body?.image);
+  if (!solver || !examId || !question || !correctAnswer) {
+    sendJson(response, 400, { error: "Nedostaju podaci o zadatku." });
+    return;
+  }
+
+  const key = `${solver}|${examId}|${question}`;
+  const unlimited = userAiUnlimited(user);
+  if (!user.aiUnlocked || typeof user.aiUnlocked !== "object" || Array.isArray(user.aiUnlocked)) {
+    user.aiUnlocked = {};
+  }
+  const alreadyUnlocked = Boolean(user.aiUnlocked[key]);
+  const usedCount = Object.keys(user.aiUnlocked).length;
+  if (!alreadyUnlocked && !unlimited && usedCount >= config.aiFreeExplanations) {
+    sendJson(response, 403, {
+      code: "quota_exceeded",
+      remaining: 0,
+      error: "Potrošio si sva besplatna objašnjenja.",
+    });
+    return;
+  }
+
+  const cached = readAiExplanationCache(solver, examId, question);
+  if (!cached && !image) {
+    sendJson(response, 400, { error: "Nedostaje slika zadatka za objašnjenje." });
+    return;
+  }
+
+  const remaining = unlimited
+    ? null
+    : Math.max(0, config.aiFreeExplanations - usedCount - (alreadyUnlocked ? 0 : 1));
+
+  const clientSignal = responseAbortSignal(response);
+  response.writeHead(200, {
+    "Cache-Control": "no-store",
+    "Content-Type": "application/x-ndjson; charset=UTF-8",
+    "X-Accel-Buffering": "no",
+  });
+  writeNdjson(response, {
+    type: "meta",
+    cached: Boolean(cached),
+    verified: Boolean(cached?.verified),
+    unlimited,
+    remaining,
+  });
+
+  try {
+    let fullText = "";
+    if (cached) {
+      // Već spremljeno objašnjenje: pravimo se da ga generiramo iznova.
+      for (const chunk of chunkExplanation(cached.explanation)) {
+        if (clientSignal.aborted) return;
+        writeNdjson(response, { type: "delta", text: chunk });
+        await sleep(14);
+      }
+      fullText = cached.explanation;
+    } else {
+      for await (const delta of streamOpenAiExplanation({
+        subject,
+        correctAnswer,
+        question,
+        image,
+        signal: clientSignal,
+      })) {
+        if (clientSignal.aborted) return;
+        fullText += delta;
+        writeNdjson(response, { type: "delta", text: delta });
+      }
+      if (!fullText.trim()) throw new Error("OpenAI nije vratio tekst objašnjenja.");
+      writeAiExplanationCache(solver, examId, question, {
+        subject,
+        correctAnswer,
+        explanation: fullText.trim(),
+        model: config.aiExplanationModel,
+      });
+    }
+
+    if (clientSignal.aborted) return;
+
+    if (!alreadyUnlocked) {
+      user.aiUnlocked[key] = new Date().toISOString();
+      user.updatedAt = new Date().toISOString();
+      await persistStore();
+    }
+
+    writeNdjson(response, {
+      type: "done",
+      verified: Boolean(cached?.verified),
+      remaining,
+    });
+    response.end();
+  } catch (error) {
+    if (clientSignal.aborted) {
+      if (!response.writableEnded) response.end();
+      return;
+    }
+    console.error("AI objašnjenje nije uspjelo:", error.message);
+    writeNdjson(response, {
+      type: "error",
+      error: "Objašnjenje nije uspjelo. Pokušaj ponovno za koji trenutak.",
+    });
+    response.end();
+  }
+}
+
+async function handleAiExplanationReport(request, response) {
+  if (request.method !== "POST") {
+    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
+    return;
+  }
+
+  if (!rateLimit.feedback.check(clientIp(request) || "unknown")) {
+    sendJson(response, 429, {
+      error: "Poslano je previše prijava. Pričekaj nekoliko minuta i pokušaj ponovno.",
+    });
+    return;
+  }
+
+  const session = currentSession(request);
+  const user = session ? store.users[session.userId] : null;
+  if (!session || !user) {
+    sendJson(response, 401, { error: "Prijava je potrebna." });
+    return;
+  }
+
+  let body;
+  try {
+    body = await readJsonBody(request, 64 * 1024);
+  } catch {
+    sendJson(response, 400, { error: "Zahtjev nema ispravan JSON zapis." });
+    return;
+  }
+
+  const record = {
+    submittedAt: new Date().toISOString(),
+    email: reportText(user.email),
+    subject: stringOrEmpty(body?.subject),
+    solver: normalizeAiSolver(body?.solver),
+    examId: stringOrEmpty(body?.examId),
+    question: stringOrEmpty(body?.question),
+    correctAnswer: normalizeCorrectAnswer(body?.correctAnswer),
+    reason: normalizeFeedbackText(body?.reason, 2000),
+    explanation: normalizeFeedbackText(body?.explanation, 4000),
+  };
+  if (!record.solver || !record.examId || !record.question) {
+    sendJson(response, 400, { error: "Nedostaju podaci o zadatku." });
+    return;
+  }
+
+  try {
+    await fsp.mkdir(path.dirname(config.aiReportFile), { recursive: true });
+    await fsp.appendFile(config.aiReportFile, formatAiReportRecord(record), {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+  } catch (error) {
+    console.error("Spremanje prijave AI objašnjenja nije uspjelo:", error.message);
+    sendJson(response, 500, { error: "Prijavu nije moguće spremiti." });
+    return;
+  }
+
+  sendJson(response, 201, { ok: true });
+}
+
+function formatAiReportRecord(record) {
+  const lines = [
+    "================================================================================",
+    `Prijava lošeg objašnjenja: ${formatFeedbackTimestamp(record.submittedAt)}`,
+    `Korisnik: ${record.email || "-"}`,
+    `Predmet: ${record.subject || "-"}`,
+    `Rješavač: ${record.solver || "-"}`,
+    `Ispit: ${record.examId || "-"}`,
+    `Zadatak: ${record.question || "-"}`,
+    `Točan odgovor: ${record.correctAnswer || "-"}`,
+    "",
+    "Razlog korisnika:",
+    record.reason || "-",
+    "",
+    "Prijavljeno objašnjenje:",
+    record.explanation || "-",
+    "",
+  ];
+  return `${lines.join("\n")}\n`;
+}
+
+function normalizeAiSolver(value) {
+  const solver = String(value || "").trim().toLowerCase();
+  return /^[a-z][a-z0-9-]{1,40}$/.test(solver) ? solver : "";
+}
+
+function normalizeCorrectAnswer(value) {
+  const list = Array.isArray(value) ? value : [value];
+  const letters = list
+    .map((item) => String(item || "").trim().toUpperCase())
+    .filter((item) => /^[A-Z0-9]{1,3}$/.test(item));
+  return [...new Set(letters)].slice(0, 6).join(" i ");
+}
+
+function userAiUnlimited(user) {
+  return config.aiUnlimitedEmails.has(String(user?.email || "").trim().toLowerCase());
+}
+
+function aiExplanationCacheFile(solver, examId, question) {
+  const safe = (value) =>
+    String(value)
+      .replace(/[^a-z0-9._-]+/gi, "_")
+      .replace(/\.\.+/g, "_")
+      .replace(/^[._]+|[._]+$/g, "")
+      .slice(0, 120) || "_";
+  return path.join(config.aiExplanationDir, safe(solver), safe(examId), `${safe(question)}.json`);
+}
+
+function readAiExplanationCache(solver, examId, question) {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(aiExplanationCacheFile(solver, examId, question), "utf8"));
+    const explanation = String(parsed?.explanation || "").trim();
+    if (!explanation) return null;
+    return { explanation, verified: parsed?.verified === true, model: stringOrEmpty(parsed?.model) };
+  } catch {
+    return null;
+  }
+}
+
+function writeAiExplanationCache(solver, examId, question, record) {
+  const file = aiExplanationCacheFile(solver, examId, question);
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+    let existing = {};
+    try {
+      existing = JSON.parse(fs.readFileSync(file, "utf8")) || {};
+    } catch {
+      existing = {};
+    }
+    const payload = {
+      solver,
+      examId,
+      question,
+      subject: record.subject,
+      correctAnswer: record.correctAnswer,
+      model: record.model,
+      createdAt: existing.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      // Ručna verifikacija (postavi "verified": true u ovoj datoteci) se čuva.
+      verified: existing.verified === true,
+      explanation: record.explanation,
+    };
+    fs.writeFileSync(file, `${JSON.stringify(payload, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  } catch (error) {
+    console.error("Spremanje AI objašnjenja nije uspjelo:", error.message);
+  }
+}
+
+function chunkExplanation(text) {
+  const tokens = String(text).match(/\S+\s*/g) || [];
+  const chunks = [];
+  for (let index = 0; index < tokens.length; index += 4) {
+    chunks.push(tokens.slice(index, index + 4).join(""));
+  }
+  return chunks.length ? chunks : [String(text)];
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function writeNdjson(response, event) {
+  if (response.writableEnded) return;
+  response.write(`${JSON.stringify(event)}\n`);
+}
+
+function buildAiExplanationSystemPrompt(subject, correctAnswer) {
+  return aiExplanationSystemPrompt
+    .replaceAll("{{subject}}", subject)
+    .replaceAll("{{correctAnswer}}", correctAnswer)
+    .trim();
+}
+
+function buildAiExplanationUserPrompt({ subject, correctAnswer, question }) {
+  return [
+    `Predmet: ${subject}.`,
+    `Zadatak broj: ${question}.`,
+    `Točan odgovor: ${correctAnswer}.`,
+    "Na priloženoj slici je tekst zadatka i ponuđeni odgovori. Objasni rješenje prema uputama.",
+  ].join("\n");
+}
+
+async function* streamOpenAiExplanation({ subject, correctAnswer, question, image, signal }) {
+  const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
+    body: JSON.stringify({
+      model: config.aiExplanationModel,
+      stream: true,
+      max_output_tokens: 600,
+      temperature: 0.2,
+      input: [
+        {
+          role: "system",
+          content: [
+            { type: "input_text", text: buildAiExplanationSystemPrompt(subject, correctAnswer) },
+          ],
+        },
+        {
+          role: "user",
+          content: [
+            { type: "input_text", text: buildAiExplanationUserPrompt({ subject, correctAnswer, question }) },
+            { type: "input_image", image_url: image.dataUrl, detail: "high" },
+          ],
+        },
+      ],
+    }),
+    headers: {
+      Authorization: `Bearer ${config.openAiApiKey}`,
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+    signal: abortSignalWithTimeout(signal, 60_000),
+  });
+
+  if (!openAiResponse.ok || !openAiResponse.body) {
+    const payload = await openAiResponse.json().catch(() => ({}));
+    const message = payload?.error?.message || `HTTP ${openAiResponse.status}`;
+    throw new Error(`OpenAI response error: ${message}`);
+  }
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for await (const chunk of openAiResponse.body) {
+    buffer += decoder.decode(chunk, { stream: true });
+    let newlineIndex;
+    while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+      const line = buffer.slice(0, newlineIndex).trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      if (!line.startsWith("data:")) continue;
+      const data = line.slice(5).trim();
+      if (!data || data === "[DONE]") continue;
+
+      let event;
+      try {
+        event = JSON.parse(data);
+      } catch {
+        continue;
+      }
+
+      if (event.type === "response.output_text.delta" && typeof event.delta === "string") {
+        yield event.delta;
+      } else if (
+        event.type === "response.failed" ||
+        event.type === "response.error" ||
+        event.type === "error"
+      ) {
+        const message =
+          event?.response?.error?.message || event?.error?.message || event?.message || "stream error";
+        throw new Error(`OpenAI streaming error: ${message}`);
+      }
+    }
   }
 }
 
@@ -2754,6 +3395,13 @@ async function initializeDatabase() {
       key_hint TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS ai_unlocks (
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      unlock_key TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      PRIMARY KEY (user_id, unlock_key)
+    );
   `);
 }
 
@@ -2771,8 +3419,14 @@ function loadStore() {
       lastLoginAt: row.last_login_at,
       practiceProgress: [],
       simulationAttempts: [],
+      aiUnlocked: {},
       updatedAt: row.updated_at,
     };
+  }
+
+  for (const row of database.prepare("SELECT * FROM ai_unlocks").all()) {
+    const user = users[row.user_id];
+    if (user) user.aiUnlocked[row.unlock_key] = row.created_at;
   }
 
   for (const row of database.prepare("SELECT * FROM agent_keys").all()) {
@@ -2946,6 +3600,9 @@ function persistStore() {
       user_id, provider, version, algorithm, ciphertext, iv, tag, key_hint, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
+  const insertAiUnlock = database.prepare(`
+    INSERT INTO ai_unlocks (user_id, unlock_key, created_at) VALUES (?, ?, ?)
+  `);
 
   database.exec("BEGIN IMMEDIATE");
   try {
@@ -2953,6 +3610,7 @@ function persistStore() {
       DELETE FROM simulation_attempts;
       DELETE FROM practice_progress;
       DELETE FROM agent_keys;
+      DELETE FROM ai_unlocks;
       DELETE FROM sessions;
       DELETE FROM users;
     `);
@@ -3015,6 +3673,10 @@ function persistStore() {
           JSON.stringify(item.value),
           item.updatedAt,
         );
+      }
+
+      for (const [unlockKey, createdAt] of Object.entries(user.aiUnlocked || {}).slice(0, 2000)) {
+        insertAiUnlock.run(user.id, unlockKey, createdAt);
       }
     }
 
@@ -3107,8 +3769,10 @@ function isPublicPath(pathname) {
   const publicFiles = new Set([
     "/abcd-choice.js",
     "/abcd.html",
+    "/ai-assistant.js",
     "/analytics.js",
     "/app.js",
+    "/art-choice.js",
     "/asistent_za_maturu.png",
     "/auth-client.js",
     "/chemistry-choice.js",
@@ -3123,6 +3787,7 @@ function isPublicPath(pathname) {
     "/engleski-slusanje.html",
     "/exam-simulation.js",
     "/feedback.js",
+    "/filozofija.html",
     "/fizika-abcd.html",
     "/fizika.html",
     "/geografija.html",
@@ -3132,9 +3797,11 @@ function isPublicPath(pathname) {
     "/hrvatski-pisanje.html",
     "/index.html",
     "/kemija.html",
+    "/likovna.html",
     "/lucide-icons.js",
     "/matematika.html",
     "/math-choice.js",
+    "/philosophy-choice.js",
     "/physics-choice.js",
     "/politics-choice.js",
     "/politika.html",
@@ -3154,6 +3821,7 @@ function isPublicPath(pathname) {
     "/site-notice.txt",
     "/solver-header.js",
     "/solver-self-check.js",
+    "/source-image-viewer.js",
     "/styles.css",
     "/llms.txt",
   ]);

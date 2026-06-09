@@ -708,15 +708,6 @@ function bindResponseListeners() {
     input.addEventListener("change", () => updateClosedResponse(input.dataset.question, input.value));
   });
 
-  document.querySelectorAll("[data-open-question]").forEach((input) => {
-    input.addEventListener("input", () => {
-      updateOpenResponse(input.dataset.openQuestion, input.value);
-      const container = input.closest(".history-open-question");
-      const scoreInput = container?.querySelector("[data-open-score]");
-      if (scoreInput) scoreInput.value = "";
-      container?.classList.remove("history-open-question--reviewed");
-    });
-  });
   document.querySelectorAll("[data-open-score]").forEach((input) => {
     input.addEventListener("input", () => updateOpenScore(input.dataset.openScore, input.value, input));
   });
@@ -906,7 +897,6 @@ function renderClosedFeedback(question, answer) {
 }
 
 function renderOpenQuestionResponse(question, number) {
-  const answer = openResponses[number] || "";
   const maximum = maxPointsForOpenQuestion(number);
   const resultClass = hasOpenScore(number) ? " history-open-question--reviewed" : "";
 
@@ -916,14 +906,6 @@ function renderOpenQuestionResponse(question, number) {
         <h4>${escapeHtml(number)}.</h4>
         <span>${maximum} ${maximum === 1 ? "bod" : "bodova"}</span>
       </div>
-      <label class="history-open-question__field">
-        <span>Odgovor</span>
-        <textarea
-          data-open-question="${escapeHtml(number)}"
-          rows="${maximum > 1 ? 8 : 3}"
-          ${simulation.inputDisabledAttribute()}
-        >${escapeHtml(answer)}</textarea>
-      </label>
       ${renderOpenSolution(question, number)}
     </div>
   `;
@@ -1021,20 +1003,6 @@ function updateClosedResponse(question, answer) {
   renderSolverSummary();
   renderQuickSelect();
   if (wasChecked || wasSelfChecked) renderTaskTypeContent();
-}
-
-function updateOpenResponse(question, answer) {
-  if (simulation.finished) return;
-
-  checked = false;
-  const normalizedAnswer = String(answer || "").trim();
-  if (normalizedAnswer) openResponses[question] = String(answer);
-  else delete openResponses[question];
-  delete openScores[question];
-  saveState();
-  renderTaskTypeNavigation();
-  renderSolverSummary();
-  renderQuickSelect();
 }
 
 function updateOpenScore(question, value, input) {

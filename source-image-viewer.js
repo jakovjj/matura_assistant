@@ -97,6 +97,11 @@
       const displayWidth = options.constrainWidth
         ? `width: min(100%, ${Math.min(820, Math.max(260, Math.ceil(Number(crop.width))))}px); `
         : "";
+      // Crops are rendered at SOURCE_RENDER_DPI (144); cap their displayed width
+      // to the equivalent ~96 DPI screen size so narrow columns (e.g. a tall
+      // source-text passage) are never upscaled to fill the panel.
+      const naturalWidth = Math.max(1, Math.round((Number(crop.width) * 96) / 144));
+      const naturalWidthStyle = `--crop-natural: ${naturalWidth}px; `;
       const compactStyle = options.compact ? "min-width: 0; " : "";
       const loading = options.loading === "eager" ? "eager" : "lazy";
       const imageHtml = segments.length
@@ -118,7 +123,7 @@
         <figure class="${figureClass}">
           <div
             class="${cropBaseClass}${cropClass}${segmentedClass}"
-            style="${displayWidth}${compactStyle}aspect-ratio: ${crop.width} / ${displayedHeight}"
+            style="${naturalWidthStyle}${displayWidth}${compactStyle}aspect-ratio: ${crop.width} / ${displayedHeight}"
           >
             ${imageHtml}
             ${overlayHtml}

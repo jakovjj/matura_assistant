@@ -33,6 +33,7 @@ TERM_ALIASES = {
 }
 EXCLUDED_SUBJECTS = {
     "Engleski jezik",
+    "Filozofija",
     "Fizika",
     "Geografija",
     "Glazbena umjetnost",

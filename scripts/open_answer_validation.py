@@ -13,6 +13,7 @@ from typing import Any, Iterable
 ROOT = Path(__file__).resolve().parents[1]
 INDEXES = (
     ("data/psychology-choice.js", "window.ASISTENT_ZA_MATURE_PSYCHOLOGY_CHOICE="),
+    ("data/philosophy-choice.js", "window.ASISTENT_ZA_MATURE_PHILOSOPHY_CHOICE="),
     ("data/sociology-choice.js", "window.ASISTENT_ZA_MATURE_SOCIOLOGY_CHOICE="),
     ("data/geography-choice.js", "window.ASISTENT_ZA_MATURE_GEOGRAPHY_CHOICE="),
     ("data/history-choice.js", "window.ASISTENT_ZA_MATURE_HISTORY_CHOICE="),
@@ -536,7 +537,7 @@ def _is_trailing_metadata(line: str) -> bool:
             (
                 r"^\s*(?:Izvor:|Prilagođeno prema:|https?://|www\.|NCVVO\b|Nacionalni centar\b|"
                 r"OIB:|Mati[čc]ni broj\b|DM\s+\d{4}\b|"
-                r"(?:Psihologija|Sociologija|Geografija|Povijest)\s+\d{4}\b)"
+                r"(?:Psihologija|Filozofija|Sociologija|Geografija|Povijest)\s+\d{4}\b)"
             ),
             line,
             flags=re.IGNORECASE,

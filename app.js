@@ -49,9 +49,17 @@ const solverDataSources = {
     globalName: "ASISTENT_ZA_MATURE_PSYCHOLOGY_CHOICE",
     src: "./data/psychology-choice.js?v=20260605-psychology-choice",
   },
+  philosophyChoice: {
+    globalName: "ASISTENT_ZA_MATURE_PHILOSOPHY_CHOICE",
+    src: "./data/philosophy-choice.js?v=20260609-philosophy-choice",
+  },
   sociologyChoice: {
     globalName: "ASISTENT_ZA_MATURE_SOCIOLOGY_CHOICE",
     src: "./data/sociology-choice.js?v=20260608-sociology-choice",
+  },
+  artChoice: {
+    globalName: "ASISTENT_ZA_MATURE_ART_CHOICE",
+    src: "./data/art-choice.js?v=20260608-art-choice",
   },
   politicsChoice: {
     globalName: "ASISTENT_ZA_MATURE_POLITICS_CHOICE",
@@ -73,9 +81,7 @@ const mandatorySubjects = [
 
 const temporarilyUnavailableSubjects = new Set([
   "Biologija",
-  "Filozofija",
   "Informatika",
-  "Likovna umjetnost",
   "Logika",
   "Njemački jezik",
   "Talijanski jezik",
@@ -346,10 +352,20 @@ const solverDefinitions = {
     page: "./psihologija.html",
     storagePrefix: "psychology-choice",
   },
+  philosophyChoice: {
+    idForTerm: (exam, term) => `filozofija-${exam.year}-${slugPart(term)}`,
+    page: "./filozofija.html",
+    storagePrefix: "philosophy-choice",
+  },
   sociologyChoice: {
     idForTerm: (exam, term) => `sociologija-${exam.year}-${slugPart(term)}`,
     page: "./sociologija.html",
     storagePrefix: "sociology-choice",
+  },
+  artChoice: {
+    idForTerm: (exam, term) => `likovna-umjetnost-${exam.year}-${slugPart(term)}`,
+    page: "./likovna.html",
+    storagePrefix: "art-choice",
   },
   politicsChoice: {
     idForTerm: (exam, term) => `politika-i-gospodarstvo-${exam.year}-${slugPart(term)}`,
@@ -523,8 +539,16 @@ function psychologyChoiceIdForTerm(exam, term) {
   return solverIdForTerm("psychologyChoice", exam, term);
 }
 
+function philosophyChoiceIdForTerm(exam, term) {
+  return solverIdForTerm("philosophyChoice", exam, term);
+}
+
 function sociologyChoiceIdForTerm(exam, term) {
   return solverIdForTerm("sociologyChoice", exam, term);
+}
+
+function artChoiceIdForTerm(exam, term) {
+  return solverIdForTerm("artChoice", exam, term);
 }
 
 function politicsChoiceIdForTerm(exam, term) {
@@ -583,8 +607,16 @@ function psychologyChoiceStorageKeys(choiceExam) {
   return solverStorageKeys("psychologyChoice", choiceExam);
 }
 
+function philosophyChoiceStorageKeys(choiceExam) {
+  return solverStorageKeys("philosophyChoice", choiceExam);
+}
+
 function sociologyChoiceStorageKeys(choiceExam) {
   return solverStorageKeys("sociologyChoice", choiceExam);
+}
+
+function artChoiceStorageKeys(choiceExam) {
+  return solverStorageKeys("artChoice", choiceExam);
 }
 
 function politicsChoiceStorageKeys(choiceExam) {
@@ -1062,8 +1094,16 @@ function psychologyChoiceUrl(choiceExam, simulation = false) {
   return solverUrl("psychologyChoice", choiceExam, simulation);
 }
 
+function philosophyChoiceUrl(choiceExam, simulation = false) {
+  return solverUrl("philosophyChoice", choiceExam, simulation);
+}
+
 function sociologyChoiceUrl(choiceExam, simulation = false) {
   return solverUrl("sociologyChoice", choiceExam, simulation);
+}
+
+function artChoiceUrl(choiceExam, simulation = false) {
+  return solverUrl("artChoice", choiceExam, simulation);
 }
 
 function politicsChoiceUrl(choiceExam, simulation = false) {
@@ -1118,8 +1158,16 @@ function psychologyChoiceExamForArchive(exam) {
   return solverExamForArchive("psychologyChoice", exam);
 }
 
+function philosophyChoiceExamForArchive(exam) {
+  return solverExamForArchive("philosophyChoice", exam);
+}
+
 function sociologyChoiceExamForArchive(exam) {
   return solverExamForArchive("sociologyChoice", exam);
+}
+
+function artChoiceExamForArchive(exam) {
+  return solverExamForArchive("artChoice", exam);
 }
 
 function politicsChoiceExamForArchive(exam) {
@@ -1442,6 +1490,24 @@ function interactiveParts(exam) {
     ];
   }
 
+  if (exam.subject === "Filozofija") {
+    const choiceExam = philosophyChoiceExamForArchive(exam);
+    return [
+      linkedPart(
+        exam,
+        {
+          id: "filozofija",
+          label: "Ispit",
+          description: "Zadatci zatvorenoga tipa i otvoreni zadatci iz ispitne knjižice.",
+          durationMinutes: singleExamDuration(exam),
+          usesAiChecking: true,
+        },
+        choiceExam,
+        philosophyChoiceUrl,
+      ),
+    ];
+  }
+
   if (exam.subject === "Sociologija") {
     const choiceExam = sociologyChoiceExamForArchive(exam);
     return [
@@ -1456,6 +1522,24 @@ function interactiveParts(exam) {
         },
         choiceExam,
         sociologyChoiceUrl,
+      ),
+    ];
+  }
+
+  if (exam.subject === "Likovna umjetnost") {
+    const choiceExam = artChoiceExamForArchive(exam);
+    return [
+      linkedPart(
+        exam,
+        {
+          id: "likovna",
+          label: "Ispitna knjižica 1",
+          description: "ABCD zadatci i zadatci povezivanja provjeravaju se automatski, a otvoreni i crtački zadatci ručno prema službenim rješenjima kada su dostupna.",
+          durationMinutes: singleExamDuration(exam),
+          requiresManualChecking: true,
+        },
+        choiceExam,
+        artChoiceUrl,
       ),
     ];
   }
@@ -1879,6 +1963,37 @@ function psychologyProgress(exam) {
   };
 }
 
+function philosophyProgress(exam) {
+  const choiceExam = philosophyChoiceExamForArchive(exam);
+  if (!choiceExam) return null;
+
+  const knownClosed = new Set((choiceExam.questions || []).map(String));
+  const knownOpen = new Set((choiceExam.openQuestions || []).map(String));
+  const stored = readMergedStorageObjects(philosophyChoiceStorageKeys(choiceExam));
+  const closedResponses =
+    stored.closedResponses && typeof stored.closedResponses === "object"
+      ? stored.closedResponses
+      : {};
+  const openResponses =
+    stored.openResponses && typeof stored.openResponses === "object"
+      ? stored.openResponses
+      : {};
+  const answeredClosed = Object.entries(closedResponses).filter(
+    ([question, answer]) =>
+      knownClosed.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+  const answeredOpen = Object.entries(openResponses).filter(
+    ([question, answer]) =>
+      knownOpen.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+
+  return {
+    answered: answeredClosed + answeredOpen,
+    id: choiceExam.id,
+    total: knownClosed.size + knownOpen.size,
+  };
+}
+
 function sociologyProgress(exam) {
   const choiceExam = sociologyChoiceExamForArchive(exam);
   if (!choiceExam) return null;
@@ -1905,6 +2020,49 @@ function sociologyProgress(exam) {
 
   return {
     answered: answeredClosed + answeredOpen,
+    id: choiceExam.id,
+    total: knownClosed.size + knownOpen.size,
+  };
+}
+
+function artProgress(exam) {
+  const choiceExam = artChoiceExamForArchive(exam);
+  if (!choiceExam) return null;
+
+  const knownClosed = new Set((choiceExam.questions || []).map(String));
+  const knownOpen = new Set((choiceExam.openQuestions || []).map(String));
+  const stored = readMergedStorageObjects(artChoiceStorageKeys(choiceExam));
+  const closedResponses =
+    stored.closedResponses && typeof stored.closedResponses === "object"
+      ? stored.closedResponses
+      : {};
+  const openResponses =
+    stored.openResponses && typeof stored.openResponses === "object"
+      ? stored.openResponses
+      : {};
+  const openScores =
+    stored.openScores && typeof stored.openScores === "object"
+      ? stored.openScores
+      : {};
+  const answeredClosed = Object.entries(closedResponses).filter(
+    ([question, answer]) =>
+      knownClosed.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+  const answeredOpen = new Set();
+  Object.entries(openResponses).forEach(([question, answer]) => {
+    if (knownOpen.has(question) && typeof answer === "string" && answer.trim()) {
+      answeredOpen.add(question);
+    }
+  });
+  Object.entries(openScores).forEach(([question, score]) => {
+    const value = score && typeof score === "object" ? score.points : score;
+    if (knownOpen.has(question) && value !== "" && value != null && Number.isInteger(Number(value))) {
+      answeredOpen.add(question);
+    }
+  });
+
+  return {
+    answered: answeredClosed + answeredOpen.size,
     id: choiceExam.id,
     total: knownClosed.size + knownOpen.size,
   };
@@ -1960,7 +2118,9 @@ function abcdChoiceProgress(exam) {
     || exam.subject === "Povijest"
     || exam.subject === "Geografija"
     || exam.subject === "Psihologija"
+    || exam.subject === "Filozofija"
     || exam.subject === "Sociologija"
+    || exam.subject === "Likovna umjetnost"
     || exam.subject === "Politika i gospodarstvo"
   ) return null;
 
@@ -1994,7 +2154,9 @@ function examProgress(exam) {
     historyProgress(exam),
     geographyProgress(exam),
     psychologyProgress(exam),
+    philosophyProgress(exam),
     sociologyProgress(exam),
+    artProgress(exam),
     politicsProgress(exam),
     abcdChoiceProgress(exam),
   ].filter(Boolean);
@@ -2316,7 +2478,9 @@ function solverKeysForSubject(subject) {
   if (subject === "Povijest") return ["historyChoice"];
   if (subject === "Geografija") return ["geographyChoice"];
   if (subject === "Psihologija") return ["psychologyChoice"];
+  if (subject === "Filozofija") return ["philosophyChoice"];
   if (subject === "Sociologija") return ["sociologyChoice"];
+  if (subject === "Likovna umjetnost") return ["artChoice"];
   if (subject === "Politika i gospodarstvo") return ["politicsChoice"];
 
   if (modernForeignLanguageSubjects.has(subject)) {

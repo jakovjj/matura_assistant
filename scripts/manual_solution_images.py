@@ -45,8 +45,12 @@ def build_manual_solution_images(
     question_sort_key: Callable[[str], tuple[int, int]],
     render_dpi: int,
     required_message: str,
+    wanted_questions: set[str] | None = None,
+    group_aware: bool = False,
 ) -> dict[str, list[dict[str, Any]]]:
-    wanted_questions = set(open_answers)
+    wanted_questions = (
+        set(wanted_questions) if wanted_questions is not None else set(open_answers)
+    )
     if not wanted_questions or not key_documents:
         return {}
 
@@ -69,7 +73,10 @@ def build_manual_solution_images(
         key=lambda item: len(item[2]),
     )
     solution_contents, pages, markers = selected
-    missing = sorted(wanted_questions - markers.keys(), key=question_sort_key)
+    # Questions that carry an official model answer must be located; image-only
+    # subitems (such as drawing tasks) may legitimately have no detectable label.
+    required = (set(open_answers) & wanted_questions)
+    missing = sorted(required - markers.keys(), key=question_sort_key)
     if missing:
         raise ValueError(
             "Could not locate official solution crops for open questions: "
@@ -79,7 +86,12 @@ def build_manual_solution_images(
     destination.mkdir(parents=True, exist_ok=True)
     solution_pdf = destination / "solutions.pdf"
     _write_if_changed(solution_pdf, solution_contents)
-    crops = _solution_crops(pages, markers, open_answers, question_sort_key)
+    all_markers = (
+        _collect_all_markers(pages, parse_question_token) if group_aware else None
+    )
+    crops = _solution_crops(
+        pages, markers, all_markers, open_answers, question_sort_key
+    )
     images = _render_solution_pages(
         solution_pdf,
         destination,
@@ -106,20 +118,15 @@ def attach_manual_solution_images(
                 question["solutionImages"] = images
 
 
-def _find_solution_markers(
+def _iter_numbered_lines(
     pages: list[Any],
-    wanted_questions: set[str],
-    open_answers: dict[str, dict[str, Any]],
     parse_question_token: Callable[[str], str],
-    question_sort_key: Callable[[str], tuple[int, int]],
-) -> dict[str, SolutionMarker]:
-    direct: dict[str, list[SolutionMarker]] = {}
+):
     ordered_lines = [
         (page, line)
         for page in pages
         for line in sorted(page.lines, key=lambda item: (item.y_min, item.x_min))
     ]
-
     for page, line in ordered_lines:
         number_text = line.first_word.strip()
         match = re.fullmatch(
@@ -134,6 +141,41 @@ def _find_solution_markers(
             number = parse_question_token(match.group("number"))
         except (TypeError, ValueError):
             continue
+        yield number, page, line
+
+
+def _collect_all_markers(
+    pages: list[Any],
+    parse_question_token: Callable[[str], str],
+) -> dict[str, SolutionMarker]:
+    """Every numbered row in the key, including unscored parent headings.
+
+    Parent headings (such as ``28.`` above ``28.1``) and sibling rows act as
+    vertical boundaries so a question's crop never bleeds into a neighbour.
+    """
+    markers: dict[str, SolutionMarker] = {}
+    for number, page, line in _iter_numbered_lines(pages, parse_question_token):
+        markers.setdefault(
+            number, SolutionMarker(number=number, page=page, y_min=line.y_min)
+        )
+    return markers
+
+
+def _find_solution_markers(
+    pages: list[Any],
+    wanted_questions: set[str],
+    open_answers: dict[str, dict[str, Any]],
+    parse_question_token: Callable[[str], str],
+    question_sort_key: Callable[[str], tuple[int, int]],
+) -> dict[str, SolutionMarker]:
+    direct: dict[str, list[SolutionMarker]] = {}
+    ordered_lines = [
+        (page, line)
+        for page in pages
+        for line in sorted(page.lines, key=lambda item: (item.y_min, item.x_min))
+    ]
+
+    for number, page, line in _iter_numbered_lines(pages, parse_question_token):
         if number in wanted_questions:
             direct.setdefault(number, []).append(
                 SolutionMarker(number=number, page=page, y_min=line.y_min)
@@ -201,6 +243,7 @@ def _find_marker_from_answer_text(
 def _solution_crops(
     pages: list[Any],
     markers: dict[str, SolutionMarker],
+    all_markers: dict[str, SolutionMarker] | None,
     open_answers: dict[str, dict[str, Any]],
     question_sort_key: Callable[[str], tuple[int, int]],
 ) -> dict[str, list[SolutionCrop]]:
@@ -210,12 +253,47 @@ def _solution_crops(
         for page in pages
         for line in sorted(page.lines, key=lambda item: (item.y_min, item.x_min))
     ]
-    ordered_questions = sorted(markers, key=question_sort_key)
+    wanted = set(markers)
+    # Without group awareness, boundaries are the wanted markers themselves,
+    # which reproduces the original next-open-question cropping exactly.
+    boundary_markers = all_markers if all_markers is not None else markers
+    ordered_boundary = sorted(boundary_markers, key=question_sort_key)
+    boundary_position = {
+        number: (boundary_markers[number].page.number, boundary_markers[number].y_min)
+        for number in boundary_markers
+    }
     crops: dict[str, list[SolutionCrop]] = {}
 
-    for index, number in enumerate(ordered_questions):
+    for number in sorted(markers, key=question_sort_key):
         marker = markers[number]
-        next_marker = markers.get(ordered_questions[index + 1]) if index + 1 < len(ordered_questions) else None
+        own_position = (marker.page.number, marker.y_min)
+
+        # The crop ends at the next boundary row, so a question never reaches
+        # into the following question's (or heading's) cell.
+        next_marker = None
+        for candidate in ordered_boundary:
+            if boundary_position[candidate] > own_position:
+                next_marker = boundary_markers[candidate]
+                break
+
+        # The first subitem of a group absorbs its unscored parent heading
+        # row, because the shared example/solution image sits in that cell
+        # while the subitem label is centred lower inside it.
+        start_marker = marker
+        parent = _parent_number(number)
+        if (
+            all_markers is not None
+            and parent
+            and parent in all_markers
+            and parent not in wanted
+            and boundary_position[parent] < own_position
+            and not any(
+                boundary_position[parent] < boundary_position[candidate] < own_position
+                for candidate in ordered_boundary
+            )
+        ):
+            start_marker = all_markers[parent]
+
         answer_end = None if next_marker else _find_answer_end(
             ordered_lines,
             marker,
@@ -230,9 +308,9 @@ def _solution_crops(
         )
         question_crops: list[SolutionCrop] = []
 
-        for page_number in range(marker.page.number, end_page_number + 1):
+        for page_number in range(start_marker.page.number, end_page_number + 1):
             page = pages_by_number[page_number]
-            y_min = marker.y_min - 6 if page_number == marker.page.number else 36
+            y_min = start_marker.y_min - 6 if page_number == start_marker.page.number else 36
             y_max = (
                 next_marker.y_min - 6
                 if next_marker and page_number == next_marker.page.number
@@ -255,6 +333,13 @@ def _solution_crops(
         crops[number] = question_crops
 
     return crops
+
+
+def _parent_number(number: str) -> str | None:
+    text = str(number)
+    if "." in text:
+        return text.split(".")[0]
+    return None
 
 
 def _find_answer_end(

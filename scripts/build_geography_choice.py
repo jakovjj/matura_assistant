@@ -1232,6 +1232,52 @@ def region_is_blank_or_rules_only(
     )
 
 
+def region_is_answer_ruling_only(
+    image: Image.Image,
+    box: tuple[int, int, int, int],
+) -> bool:
+    """Return True when a crop is just empty answer-writing space.
+
+    The signature of answer ruling is several thin, full-width horizontal
+    lines (each <=8px tall) separated by whitespace, with almost no other ink
+    apart from a points label or page footer. We count the dark pixels that do
+    NOT belong to such thin rules: real content (prompt text, tables, maps,
+    figures) leaves tens of thousands of those, while an answer page leaves
+    only a few hundred. This lets us discard the blank writing pages of
+    extended-answer tasks without touching crops that carry actual content.
+    """
+    x_min, y_min, x_max, y_max = box
+    width = x_max - x_min
+    height = y_max - y_min
+    if width <= 0 or height <= 0:
+        return True
+
+    row_counts = row_dark_counts(image, box, SOURCE_LINE_ONLY_PIXEL_THRESHOLD)
+    total_dark = sum(row_counts)
+    if total_dark <= max(60, int(width * height * 0.00035)):
+        return True
+
+    long_row_threshold = max(80, int(width * 0.42))
+    thin_rule_dark = 0
+    rule_groups = 0
+    index = 0
+    row_count = len(row_counts)
+    while index < row_count:
+        if row_counts[index] >= long_row_threshold:
+            end = index
+            while end < row_count and row_counts[end] >= long_row_threshold:
+                end += 1
+            if end - index <= 8:  # thin line, not a solid/filled figure block
+                rule_groups += 1
+                thin_rule_dark += sum(row_counts[index:end])
+            index = end
+        else:
+            index += 1
+
+    other_dark = total_dark - thin_rule_dark
+    return rule_groups >= 3 and other_dark <= max(3500, int(width * 3))
+
+
 def trim_trailing_answer_rule_lines(
     visible_lines: list[PdfLine],
     y_min: int,
@@ -1415,6 +1461,18 @@ def render_source_pages(
                     scale_y,
                 )
                 if x_max <= x_min or y_max <= y_min:
+                    continue
+                # Drop continuation crops that are nothing but blank answer
+                # ruling (and an optional points label/footer). These are the
+                # empty writing pages of extended-answer tasks: pure wasted
+                # vertical space the user cannot interact with. We only ever
+                # drop a secondary crop (index > 0) so a question never loses
+                # its primary prompt image, even short-answer prompts that sit
+                # right above a couple of ruling lines.
+                crop_index = int(key.rsplit(":", 1)[1])
+                if crop_index > 0 and region_is_answer_ruling_only(
+                    page_image, (x_min, y_min, x_max, y_max)
+                ):
                     continue
                 source_images[key] = source_image_metadata(
                     page_image,

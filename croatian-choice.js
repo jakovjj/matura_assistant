@@ -717,6 +717,25 @@ function bindResponseListeners() {
     input.addEventListener("change", () => updateResponse(input.dataset.question, input.value));
   });
   selfCheck.bind(document.querySelector("#task-content-panel"), toggleSelfCheck);
+  window.AsistentAI?.bind(document.querySelector("#task-content-panel"), aiExplainContext);
+}
+
+function aiExplainButton(question) {
+  return window.AsistentAI?.renderButton(question) || "";
+}
+
+// Kontekst koji asistent treba: slika zadatka (za OCR), broj zadatka i točan odgovor.
+function aiExplainContext(question) {
+  const number = String(question);
+  const questionData = questionByNumber.get(number);
+  return {
+    subject: "Hrvatski jezik",
+    solver: "croatian-choice",
+    examId: solverExam.id,
+    question: number,
+    correctAnswer: correctAnswers(number),
+    sourceImage: questionData?.sourceImage || null,
+  };
 }
 
 function toggleSelfCheck(question) {
@@ -981,9 +1000,12 @@ function renderQuestion(question) {
           .map((option) => renderChoice(question, option, answer))
           .join("")}
       </div>
-      ${selfCheck.renderButton(question, {
-        hidden: simulation.active || checked,
-      })}
+      <div class="solver-inline-actions">
+        ${selfCheck.renderButton(question, {
+          hidden: simulation.active || checked,
+        })}
+        ${simulation.active || checked ? "" : aiExplainButton(question)}
+      </div>
       ${renderFeedback(question, answer)}
     </fieldset>
   `;

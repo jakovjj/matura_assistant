@@ -197,6 +197,34 @@
     if (method) track("login", { method });
   }
 
+  function recordPageview() {
+    const context = pageContext();
+    const payload = JSON.stringify({
+      subject: context.azm_subject || "",
+      page: pageName(),
+    });
+
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon("/api/pageview", new Blob([payload], { type: "application/json" }));
+        return;
+      }
+    } catch {
+      // Pad na fetch ako sendBeacon nije dostupan ili baci iznimku.
+    }
+
+    try {
+      fetch("/api/pageview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+        keepalive: true,
+      }).catch(() => {});
+    } catch {
+      // Brojač pregleda nikad ne smije srušiti stranicu.
+    }
+  }
+
   function loadGoogleAnalytics() {
     if (document.querySelector(`[data-ga4-tag="${measurementId}"]`)) return;
 
@@ -253,6 +281,7 @@
     track,
   };
 
+  recordPageview();
   document.addEventListener("click", trackClick);
   document.addEventListener("play", (event) => {
     if (event.target instanceof HTMLAudioElement) track("audio_play");
