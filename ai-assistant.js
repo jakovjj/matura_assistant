@@ -1,6 +1,8 @@
 // Asistent za maturu: objašnjenja rješenja za zadatke višestrukoga izbora.
-// Zasad se prikazuje samo kad URL ima ?beta=1. Solver poziva renderButton()
-// uz svaki zadatak i bind() da poveže gumbe s kontekstom (slika, odgovori).
+// Predmeti koji su službeno dostupni pozivaju renderButton()/bind() s
+// { official: true }; ostali se prikazuju samo kad URL ima ?beta=1. Solver
+// poziva renderButton() uz svaki zadatak i bind() da poveže gumbe s kontekstom
+// (slika, odgovori).
 (() => {
   const LOGO_SRC = "./assets/asistent_za_maturu.webp";
   const ENDPOINT = "/api/ai-explanation";
@@ -9,11 +11,44 @@
 
   const betaEnabled = new URLSearchParams(window.location.search).get("beta") === "1";
 
+  // Asistent je vidljiv ako je predmet službeno objavljen (official) ili je
+  // uključen beta način preko ?beta=1.
+  function isAvailable(options) {
+    return betaEnabled || (options && options.official === true);
+  }
+
+  const KATEX_VERSION = "0.16.11";
+
   let authPromise = null;
+  let katexPromise = null;
   let drawer = null;
   let activeController = null;
   let currentContext = null;
   let reported = false;
+
+  // KaTeX se vendora lokalno i učitava lijeno tek kad se prvi put otvori
+  // asistent, da ne opterećuje učitavanje samoga rješavača. Ako učitavanje
+  // padne, render se vraća na čisti tekst (formule ostaju čitljive kao izvor).
+  function ensureKatex() {
+    if (katexPromise) return katexPromise;
+    katexPromise = new Promise((resolve) => {
+      if (window.katex) {
+        resolve(window.katex);
+        return;
+      }
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = `./vendor/katex/katex.min.css?v=${KATEX_VERSION}`;
+      document.head.append(link);
+
+      const script = document.createElement("script");
+      script.src = `./vendor/katex/katex.min.js?v=${KATEX_VERSION}`;
+      script.onload = () => resolve(window.katex || null);
+      script.onerror = () => resolve(null);
+      document.head.append(script);
+    });
+    return katexPromise;
+  }
 
   function escapeHtml(value) {
     return String(value)
@@ -105,6 +140,9 @@
             <span>Prijavi loše objašnjenje</span>
           </button>
           <span class="ai-drawer__report-status" data-ai-report-status></span>
+          <p class="ai-drawer__disclaimer">
+            Objašnjenje je generirano koristeći umjetnu inteligenciju te može sadržavati greške.
+          </p>
         </footer>
       </div>
     `;
@@ -122,6 +160,7 @@
 
   function openDrawer(context) {
     const element = ensureDrawer();
+    ensureKatex();
     currentContext = context;
     reported = false;
 
@@ -176,13 +215,77 @@
     return "";
   }
 
-  function renderExplanationHtml(text) {
-    return escapeHtml(text)
+  // Obični (ne-matematički) odsječak: escape + **podebljano** + prijelomi.
+  function renderTextSegment(segment) {
+    return escapeHtml(segment)
       .replace(/\*\*([^*]+)\*\*/g, (match, inner) => {
         const cls = boldClass(inner);
         return `<strong${cls ? ` class="${cls}"` : ""}>${inner}</strong>`;
       })
       .replace(/\n/g, "<br>");
+  }
+
+  // Redoslijed je bitan: dulji graničnici ($$, \[ , \]) moraju biti ispred
+  // kraćih ($) da se kod jednake pozicije odabere blokovska formula.
+  const MATH_DELIMITERS = [
+    { open: "$$", close: "$$", display: true },
+    { open: "\\[", close: "\\]", display: true },
+    { open: "\\(", close: "\\)", display: false },
+    { open: "$", close: "$", display: false },
+  ];
+
+  function renderMath(tex, displayMode) {
+    if (!window.katex) return null;
+    try {
+      return window.katex.renderToString(tex.trim(), {
+        displayMode,
+        throwOnError: false,
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  // Tekst se dijeli na matematičke ($...$, $$...$$, \(...\), \[...\]) i obične
+  // odsječke. Nezatvoren graničnik (tijekom streaminga) prikazuje se kao tekst
+  // dok ne stigne zatvarač, pa se tada prerenderira kao formula.
+  function renderExplanationHtml(text) {
+    let out = "";
+    let index = 0;
+    while (index < text.length) {
+      let match = null;
+      for (const delimiter of MATH_DELIMITERS) {
+        const start = text.indexOf(delimiter.open, index);
+        if (start !== -1 && (match === null || start < match.start)) {
+          match = { start, delimiter };
+        }
+      }
+
+      if (!match) {
+        out += renderTextSegment(text.slice(index));
+        break;
+      }
+
+      out += renderTextSegment(text.slice(index, match.start));
+
+      const contentStart = match.start + match.delimiter.open.length;
+      const closeIndex = text.indexOf(match.delimiter.close, contentStart);
+      if (closeIndex === -1) {
+        out += renderTextSegment(text.slice(match.start));
+        break;
+      }
+
+      const tex = text.slice(contentStart, closeIndex);
+      const rendered = renderMath(tex, match.delimiter.display);
+      out +=
+        rendered != null
+          ? rendered
+          : renderTextSegment(
+              text.slice(match.start, closeIndex + match.delimiter.close.length),
+            );
+      index = closeIndex + match.delimiter.close.length;
+    }
+    return out;
   }
 
   function showRemaining(remaining, unlimited) {
@@ -320,9 +423,10 @@
     let revealed = false;
     let errored = false;
 
-    // Tri točkice (razmišljanje) drže se barem 1.5 s prije prikaza teksta.
-    const thinking = sleep(1500);
-    thinking.then(() => {
+    // Tri točkice (razmišljanje) drže se barem 1.5 s prije prikaza teksta, a
+    // KaTeX mora biti učitan da se formule odmah prikažu ispravno renderirane.
+    const ready = Promise.all([sleep(1500), ensureKatex()]);
+    ready.then(() => {
       if (!errored && !controller.signal.aborted) {
         revealed = true;
         setBodyHtml(renderExplanationHtml(text));
@@ -368,7 +472,7 @@
       if (!text) setBodyMessage("Objašnjenje je prekinuto. Pokušaj ponovno.", "error");
     }
 
-    await thinking;
+    await ready;
     if (controller.signal.aborted || errored) return;
     setBodyHtml(renderExplanationHtml(text));
   }
@@ -417,11 +521,11 @@
   }
 
   window.AsistentAI = {
-    enabled() {
-      return betaEnabled;
+    enabled(options) {
+      return isAvailable(options);
     },
-    renderButton(question) {
-      if (!betaEnabled) return "";
+    renderButton(question, options) {
+      if (!isAvailable(options)) return "";
       return `
         <button
           class="ai-explain-button"
@@ -434,8 +538,8 @@
         </button>
       `;
     },
-    bind(root, getContext) {
-      if (!betaEnabled || !root || typeof getContext !== "function") return;
+    bind(root, getContext, options) {
+      if (!isAvailable(options) || !root || typeof getContext !== "function") return;
       root.querySelectorAll("[data-ai-explain]").forEach((button) => {
         button.addEventListener("click", () => {
           const context = getContext(button.dataset.aiExplain);

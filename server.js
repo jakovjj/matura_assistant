@@ -28,6 +28,10 @@ const config = {
   ),
   aiExplanationDir: path.resolve(rootDir, process.env.AI_EXPLANATION_DIR || "var/ai-explanations"),
   aiReportFile: path.resolve(rootDir, process.env.AI_REPORT_FILE || "var/feedback/reports.txt"),
+  aiGenerationLogFile: path.resolve(
+    rootDir,
+    process.env.AI_GENERATION_LOG || "var/feedback/ai-generations.log",
+  ),
   host: process.env.HOST || "0.0.0.0",
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
@@ -1310,6 +1314,21 @@ async function handleAiExplanation(request, response) {
 
     if (clientSignal.aborted) return;
 
+    // Tko je što generirao: zapisujemo svaki uspješni dohvat objašnjenja
+    // (svjež poziv modela ili ponovni prikaz iz spremišta).
+    await logAiGeneration({
+      email: user.email,
+      userId: user.id,
+      subject,
+      solver,
+      examId,
+      question,
+      correctAnswer,
+      cached: Boolean(cached),
+      fresh: !cached,
+      model: config.aiExplanationModel,
+    });
+
     if (!alreadyUnlocked) {
       user.aiUnlocked[key] = new Date().toISOString();
       user.updatedAt = new Date().toISOString();
@@ -1414,6 +1433,33 @@ function formatAiReportRecord(record) {
     "",
   ];
   return `${lines.join("\n")}\n`;
+}
+
+// Dnevnik generiranja: jedan NDJSON redak po dohvatu objašnjenja, da znamo
+// tko je što tražio. Best-effort — neuspjeh zapisa ne smije srušiti odgovor.
+async function logAiGeneration(record) {
+  const line = JSON.stringify({
+    at: new Date().toISOString(),
+    email: String(record.email || "").trim() || null,
+    userId: record.userId || null,
+    subject: record.subject || null,
+    solver: record.solver || null,
+    examId: record.examId || null,
+    question: record.question || null,
+    correctAnswer: record.correctAnswer || null,
+    cached: Boolean(record.cached),
+    fresh: Boolean(record.fresh),
+    model: record.model || null,
+  });
+  try {
+    await fsp.mkdir(path.dirname(config.aiGenerationLogFile), { recursive: true });
+    await fsp.appendFile(config.aiGenerationLogFile, `${line}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+  } catch (error) {
+    console.error("Zapis dnevnika AI generiranja nije uspio:", error.message);
+  }
 }
 
 function normalizeAiSolver(value) {
@@ -2088,6 +2134,7 @@ function writeUserLoginReport() {
     lines.push(`   Kreiran: ${formatFeedbackTimestamp(user.createdAt)}`);
     lines.push(`   Zadnja prijava: ${formatFeedbackTimestamp(user.lastLoginAt)}`);
     lines.push(`   Zadnja aktivnost: ${formatFeedbackTimestamp(user.updatedAt)}`);
+    lines.push(`   AI korištenja: ${aiUnlockCount(user)}`);
   });
 
   fs.mkdirSync(path.dirname(config.userLoginsTextFile), { recursive: true, mode: 0o700 });
@@ -2095,6 +2142,13 @@ function writeUserLoginReport() {
     encoding: "utf8",
     mode: 0o600,
   });
+}
+
+// Broj otključanih (= korištenih) zadataka po korisniku iz njegove aiUnlocked mape.
+function aiUnlockCount(user) {
+  const unlocked = user && user.aiUnlocked;
+  if (!unlocked || typeof unlocked !== "object" || Array.isArray(unlocked)) return 0;
+  return Object.keys(unlocked).length;
 }
 
 function compareUsersForReport(left, right) {
@@ -4002,6 +4056,8 @@ function contentType(filePath) {
       ".svg": "image/svg+xml",
       ".txt": "text/plain; charset=UTF-8",
       ".webp": "image/webp",
+      ".woff": "font/woff",
+      ".woff2": "font/woff2",
       ".xml": "application/xml; charset=UTF-8",
       ".zip": "application/zip",
     }[ext] || "application/octet-stream"
@@ -4054,6 +4110,7 @@ function isPublicPath(pathname) {
     "/politics-choice.js",
     "/politika.html",
     "/povijest.html",
+    "/pretplata.html",
     "/prijava.html",
     "/profil.html",
     "/profile-page.js",
@@ -4080,7 +4137,8 @@ function isPublicPath(pathname) {
     pathname.startsWith("/data/") ||
     pathname.startsWith("/files/") ||
     pathname.startsWith("/ispiti/") ||
-    pathname.startsWith("/predmeti/")
+    pathname.startsWith("/predmeti/") ||
+    pathname.startsWith("/vendor/")
   );
 }
 
@@ -4094,7 +4152,11 @@ function isGeneratedSeoDirectoryPath(pathname) {
 
 function cacheHeaderFor(filePath) {
   const relativePath = path.relative(rootDir, filePath).replaceAll(path.sep, "/");
-  if (relativePath.startsWith("files/") || relativePath.startsWith("assets/")) {
+  if (
+    relativePath.startsWith("files/") ||
+    relativePath.startsWith("assets/") ||
+    relativePath.startsWith("vendor/")
+  ) {
     return "public, max-age=86400";
   }
   return "no-cache";

@@ -8,4 +8,10 @@ files/ncvvo/
 files/interactive/english-listening/**/audio/
 scripts/__pycache__/
 *.pyc
+
+# Agent-authored project docs / instructions (keep local, out of the repo)
 AGENTS.md
+ARCHITECTURE.md
+
+# Hidden subscription page (work in progress, not public yet)
+pretplata.html

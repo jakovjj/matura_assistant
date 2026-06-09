@@ -785,7 +785,9 @@ function bindResponseListeners() {
     button.addEventListener("click", () => toggleOpenSolution(button));
   });
   selfCheck.bind(document.querySelector("#task-content-panel"), toggleSelfCheck);
-  window.AsistentAI?.bind(document.querySelector("#task-content-panel"), aiExplainContext);
+  window.AsistentAI?.bind(document.querySelector("#task-content-panel"), aiExplainContext, {
+    official: true,
+  });
 }
 
 function toggleSelfCheck(question) {
@@ -948,7 +950,7 @@ function renderQuestion(question) {
 }
 
 function aiExplainButton(question) {
-  return window.AsistentAI?.renderButton(question) || "";
+  return window.AsistentAI?.renderButton(question, { official: true }) || "";
 }
 
 // Kontekst koji asistent treba: slika zadatka (za OCR), broj zadatka i točan odgovor.

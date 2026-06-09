@@ -7378,6 +7378,19 @@ body.solver-page {
   line-height: 1.65;
 }
 
+/* Izdvojene (blokovske) LaTeX jednadžbe smiju vodoravno skrolati na uskim
+   ekranima umjesto da razvuku ladicu. Inline formule prate veličinu teksta. */
+.ai-drawer__body .katex {
+  font-size: 1.05em;
+}
+
+.ai-drawer__body .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 0;
+  margin: 0.5em 0;
+}
+
 .ai-drawer__body strong.ai-correct {
   color: #14743a;
 }
@@ -7449,9 +7462,20 @@ body.solver-page {
 .ai-drawer__footer {
   display: flex;
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   padding: 12px 24px 16px;
   border-top: 1px solid var(--line);
+}
+
+.ai-drawer__disclaimer {
+  margin: 0;
+  margin-left: auto;
+  max-width: 40ch;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: right;
 }
 
 .ai-drawer__report {
@@ -7498,5 +7522,12 @@ body.solver-page {
 @media (max-width: 600px) {
   .ai-drawer__inner {
     max-height: 82vh;
+  }
+
+  .ai-drawer__disclaimer {
+    margin-left: 0;
+    max-width: none;
+    flex-basis: 100%;
+    text-align: left;
   }
 }

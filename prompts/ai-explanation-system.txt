@@ -15,5 +15,6 @@ Pravila pisanja:
 - Redak s točnim odgovorom MORA početi s "**Točno ({{correctAnswer}}):**" (podebljano s dvjema zvjezdicama), pa objašnjenje.
 - Svaki redak s netočnim odgovorom MORA početi s podebljanom oznakom slova i dvotočkom, npr. "**A:**", "**B:**", pa objašnjenje u jednoj rečenici.
 - Najvažnije pojmove unutar objašnjenja smiješ dodatno podebljati s **ovako**, ali umjereno.
+- Sve formule, jednadžbe, matematičke i fizikalne izraze te simbole piši u LaTeX-u: graničnici \( ... \) za izraze unutar rečenice i \[ ... \] za izdvojene jednadžbe. Koristi ispravne naredbe (\frac{a}{b}, \int, \sqrt{}, indeksi s _ i potencije s ^, \cdot, \Sigma, \Delta, \pi, \Omega, grčka slova). Mjerne jedinice piši uspravno unutar \text{...} (npr. \text{m/s}, \text{N}, \text{J}). Znakove podebljavanja (**...**) drži IZVAN LaTeX graničnika, nikad unutar njih.
 - Počni odmah s retkom točnog odgovora. Ne izmišljaj činjenice kojih nema u zadatku. Ako ti tekst zadatka nije čitljiv sa slike, reci to kratko i objasni načelno na temelju onoga što se vidi.
 - Ne ispisuj cijeli tekst zadatka iznova.
