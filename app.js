@@ -2591,13 +2591,20 @@ function solverDataReady(keys) {
   return keys.every((key) => Array.isArray(solverData(key)?.exams));
 }
 
-function renderDataLoading() {
+function renderDataLoading(currentRoute) {
   cleanupYearNavigation();
+  const isExam = Boolean(currentRoute?.examId);
+  const rowCount = isExam ? 3 : 6;
+  const rows = Array.from(
+    { length: rowCount },
+    () => '<div class="skeleton-block skeleton-block--row"></div>',
+  ).join("");
   appRoot.innerHTML = `
-    <div class="empty-state" aria-live="polite">
-      <h2>Učitavam podatke ispita</h2>
-      <p>Pripremam interaktivne cjeline i spremljeni napredak.</p>
+    <div class="skeleton-loading" aria-hidden="true">
+      <div class="skeleton-block skeleton-block--${isExam ? "title" : "bar"}"></div>
+      ${rows}
     </div>
+    <span class="visually-hidden" role="status">Učitavam podatke ispita…</span>
   `;
 }
 
@@ -2608,7 +2615,7 @@ async function renderApp() {
   const requiredSolverKeys = solverKeysForRoute(currentRoute);
 
   if (!solverDataReady(requiredSolverKeys)) {
-    renderDataLoading();
+    renderDataLoading(currentRoute);
 
     try {
       await ensureSolverData(requiredSolverKeys);

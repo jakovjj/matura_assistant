@@ -480,8 +480,27 @@
     }
   }
 
+  // Drop the skeleton shimmer (see styles.css) once a crop's page image has
+  // painted. The shimmer sits behind the opaque image, so marking the nearest
+  // crop/segment as loaded simply stops the now-hidden animation. Errors also
+  // clear it so a broken image never shimmers forever.
+  function trackCropImage(img) {
+    if (img.dataset.cropTracked) return;
+    img.dataset.cropTracked = "1";
+    const holder = img.closest(".source-crop-segment") || img.closest(CROP_SELECTOR);
+    if (!holder) return;
+    const markLoaded = () => holder.classList.add("source-crop-loaded");
+    if (img.complete && img.naturalWidth > 0) {
+      markLoaded();
+      return;
+    }
+    img.addEventListener("load", markLoaded, { once: true });
+    img.addEventListener("error", markLoaded, { once: true });
+  }
+
   function enhanceCrops(root = document) {
     root.querySelectorAll?.(CROP_SELECTOR).forEach((crop) => {
+      crop.querySelectorAll("img").forEach(trackCropImage);
       if (crop.closest(".source-image-viewer")) return;
       if (crop.querySelector(INTERACTIVE_SELECTOR)) return;
       crop.setAttribute("role", "button");
@@ -489,6 +508,9 @@
       crop.setAttribute("aria-label", "Otvori uvećani prikaz zadatka");
       crop.setAttribute("title", "Otvori uvećani prikaz");
     });
+    if (root.matches?.(CROP_SELECTOR)) {
+      root.querySelectorAll("img").forEach(trackCropImage);
+    }
   }
 
   document.addEventListener("click", cropClicked);

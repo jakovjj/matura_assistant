@@ -5156,6 +5156,343 @@ body.solver-page {
   border-color: var(--blue);
 }
 
+/* Mobilni prikaz nadopunjavanja (vidi croatian-choice.js). Prikazuje se cijeli
+   tekst razlomljen na pune retke; nakon retka s prazninom(ama) idu kontrole.
+   Renderira se samo kad JS detektira uski ekran, pa pravila ne diraju desktop. */
+.croatian-completion-cards {
+  display: grid;
+  gap: 0;
+}
+
+/* Segment punih redaka teksta + kontrole za praznine u zadnjem retku tog segmenta. */
+.croatian-completion-card {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 16px;
+}
+
+.croatian-completion-card__number {
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.croatian-completion-card__status {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.croatian-completion-card__status--empty {
+  color: var(--muted);
+}
+
+.croatian-completion-card__status--correct {
+  color: #15552e;
+  font-weight: 600;
+}
+
+.croatian-completion-card__status--wrong {
+  color: #8a2020;
+  font-weight: 600;
+}
+
+/* Crop punog retka službenog teksta (puna širina, bez horizontalnog scrolla). */
+.croatian-completion-band {
+  overflow: hidden;
+  background: var(--white);
+}
+
+.croatian-completion-band__marker {
+  position: absolute;
+  z-index: 2;
+  background: rgba(46, 93, 172, 0.16);
+  border-bottom: 2px solid var(--blue);
+  pointer-events: none;
+}
+
+/* Blok odgovora za jednu prazninu (dvije u istom retku → dva bloka jedan ispod drugog).
+   Uži je od pune širine teksta (uvučen od rubova) da se jasno odvoji kao panel odgovora. */
+.croatian-completion-row {
+  display: grid;
+  gap: 8px;
+  margin-inline: 18px;
+  padding: 10px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+}
+
+.croatian-completion-row--correct {
+  border-color: #74b486;
+  background: #f3fbf5;
+}
+
+.croatian-completion-row--wrong {
+  border-color: #d69494;
+  background: #fdf4f4;
+}
+
+.croatian-completion-row__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.croatian-completion-card__options {
+  display: grid;
+  gap: 8px;
+}
+
+.croatian-completion-card__option {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 11px 12px;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--line-dark);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.croatian-completion-card__option:focus-visible {
+  outline: 3px solid rgba(46, 93, 172, 0.35);
+  outline-offset: 2px;
+}
+
+.croatian-completion-card__option-letter {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  color: var(--navy);
+  background: var(--soft);
+  border: 1px solid var(--line-dark);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.croatian-completion-card__option-text {
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.croatian-completion-card__option--selected {
+  border-color: var(--blue);
+  background: #edf3f8;
+}
+
+.croatian-completion-card__option--selected .croatian-completion-card__option-letter {
+  color: var(--white);
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.croatian-completion-card__option--correct {
+  border-color: #74b486;
+  background: #e4f6e8;
+}
+
+.croatian-completion-card__option--correct .croatian-completion-card__option-letter {
+  color: var(--white);
+  background: #2f9e54;
+  border-color: #2f9e54;
+}
+
+.croatian-completion-card__option--wrong {
+  border-color: #d69494;
+  background: #fbe7e7;
+}
+
+.croatian-completion-card__option--wrong .croatian-completion-card__option-letter {
+  color: var(--white);
+  background: #c0392b;
+  border-color: #c0392b;
+}
+
+/* Mobilni prikaz nadopunjavanja na engleskom (vidi english-reading.js). Cijeli
+   tekst razlomljen na pune retke; nakon retka s prazninom(ama) idu kontrole.
+   Renderira se samo kad JS detektira uski ekran. */
+.english-completion-cards {
+  display: grid;
+  gap: 0;
+}
+
+.english-completion-card {
+  display: grid;
+  gap: 10px;
+  padding-bottom: 16px;
+}
+
+.english-completion-card__number {
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.english-completion-card__status {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.english-completion-card__status--empty {
+  color: var(--muted);
+}
+
+.english-completion-card__status--correct {
+  color: #15552e;
+  font-weight: 600;
+}
+
+.english-completion-card__status--wrong {
+  color: #8a2020;
+  font-weight: 600;
+}
+
+.english-completion-band {
+  overflow: hidden;
+  background: var(--white);
+}
+
+.english-completion-band__marker {
+  position: absolute;
+  z-index: 2;
+  background: rgba(46, 93, 172, 0.16);
+  border-bottom: 2px solid var(--blue);
+  pointer-events: none;
+}
+
+.english-completion-row {
+  display: grid;
+  gap: 8px;
+  margin-inline: 18px;
+  padding: 10px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+}
+
+.english-completion-row--correct {
+  border-color: #74b486;
+  background: #f3fbf5;
+}
+
+.english-completion-row--wrong {
+  border-color: #d69494;
+  background: #fdf4f4;
+}
+
+.english-completion-row__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.english-completion-card__input {
+  width: 100%;
+  padding: 11px 12px;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--line-dark);
+  font: inherit;
+  font-size: 15px;
+}
+
+.english-completion-card__input:focus-visible {
+  outline: 3px solid rgba(46, 93, 172, 0.35);
+  outline-offset: 2px;
+  border-color: var(--blue);
+}
+
+.english-completion-card__options {
+  display: grid;
+  gap: 8px;
+}
+
+.english-completion-card__option {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  padding: 11px 12px;
+  color: var(--ink);
+  background: var(--white);
+  border: 1px solid var(--line-dark);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.english-completion-card__option:focus-visible {
+  outline: 3px solid rgba(46, 93, 172, 0.35);
+  outline-offset: 2px;
+}
+
+.english-completion-card__option-letter {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  color: var(--navy);
+  background: var(--soft);
+  border: 1px solid var(--line-dark);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.english-completion-card__option-text {
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.english-completion-card__option-note {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.english-completion-card__option--used {
+  color: var(--muted);
+  background: var(--soft);
+}
+
+.english-completion-card__option--selected {
+  border-color: var(--blue);
+  background: #edf3f8;
+}
+
+.english-completion-card__option--selected .english-completion-card__option-letter {
+  color: var(--white);
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.english-completion-card__option--correct {
+  border-color: #74b486;
+  background: #e4f6e8;
+}
+
+.english-completion-card__option--correct .english-completion-card__option-letter {
+  color: var(--white);
+  background: #2f9e54;
+  border-color: #2f9e54;
+}
+
+.english-completion-card__option--wrong {
+  border-color: #d69494;
+  background: #fbe7e7;
+}
+
+.english-completion-card__option--wrong .english-completion-card__option-letter {
+  color: var(--white);
+  background: #c0392b;
+  border-color: #c0392b;
+}
+
 .physics-source-question {
   display: grid;
   grid-template-columns: minmax(34px, max-content) minmax(0, 1fr);
@@ -5369,6 +5706,91 @@ body.solver-page {
   width: 100%;
   flex: 0 0 auto;
   overflow: hidden;
+}
+
+/* Skeleton placeholder for source-image crops.
+   Centralized: every solver renders crops through source-image-viewer.js,
+   which adds .source-crop-loaded once the page image paints. The shimmer
+   sits behind the (opaque) page image, so if JS never runs the image still
+   shows on top — graceful degradation, no per-solver wiring. */
+.physics-source-crop,
+.pdf-source-crop,
+.source-crop-segment {
+  background-image: linear-gradient(100deg, #eef1f5 25%, #f6f8fb 50%, #eef1f5 75%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: source-crop-shimmer 1.3s ease-in-out infinite;
+}
+
+.physics-source-crop.source-crop-loaded,
+.pdf-source-crop.source-crop-loaded,
+.source-crop-segment.source-crop-loaded {
+  background-image: none;
+  animation: none;
+}
+
+@keyframes source-crop-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .physics-source-crop,
+  .pdf-source-crop,
+  .source-crop-segment {
+    animation: none;
+    background-image: none;
+    background-color: #eef1f5;
+  }
+
+  .physics-source-crop.source-crop-loaded,
+  .pdf-source-crop.source-crop-loaded,
+  .source-crop-segment.source-crop-loaded {
+    background-color: var(--white);
+  }
+}
+
+/* Generic content skeleton shown while a route's solver data lazy-loads,
+   replacing the readable "Učitavam…" flash on subject/exam selection.
+   Reuses the source-crop-shimmer keyframes. */
+.skeleton-loading {
+  display: grid;
+  gap: 14px;
+  padding: 8px 0;
+}
+
+.skeleton-block {
+  background-image: linear-gradient(100deg, #eef1f5 25%, #f6f8fb 50%, #eef1f5 75%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: source-crop-shimmer 1.3s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+.skeleton-block--bar {
+  height: 38px;
+  max-width: 280px;
+}
+
+.skeleton-block--title {
+  height: 30px;
+  max-width: 360px;
+}
+
+.skeleton-block--row {
+  height: 64px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-block {
+    animation: none;
+    background-image: none;
+    background-color: #eef1f5;
+  }
 }
 
 .physics-source-crop[role="button"],

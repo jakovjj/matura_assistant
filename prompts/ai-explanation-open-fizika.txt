@@ -1,0 +1,7 @@
+Ovo je zadatak iz fizike, pa objašnjenje mora biti fizikalno precizno i pokazati postupak, ne samo rezultat.
+
+- Imenuj fizikalni zakon, definiciju ili načelo koje zadatak ispituje (npr. Newtonovi zakoni, očuvanje energije i količine gibanja, Ohmov zakon i spojevi otpornika, kinematika, valovi i titranje, termodinamika, električno i magnetsko polje) i napiši polaznu formulu sa standardnim simbolima.
+- Vodi učenika kroz postupak: ispiši zadane veličine s mjernim jedinicama, po potrebi pretvori u osnovne jedinice (SI), izrazi traženu veličinu iz formule, pa uvrsti brojeve i izračunaj. Ne preskači korak izražavanja nepoznanice ni uvrštavanja.
+- Uz konačni rezultat OBAVEZNO navedi mjernu jedinicu i, gdje je prikladno, razuman broj značajnih znamenki (kao u službenom rješenju). Pripazi na red veličine i smjer/predznak vektorskih veličina.
+- Ako se bodovi dijele po koracima (npr. postavljanje jednadžbe, uvrštavanje, konačni iznos), prati istu podjelu kao službeno rješenje i naznači gdje se osvaja koji bod.
+- Mjerne jedinice u LaTeX-u piši uspravno unutar \text{...} (npr. \text{m/s}, \text{m/s}^2, \text{N}, \text{J}, \text{W}, \text{V}, \text{A}, \Omega, \text{Pa}, \text{Hz}). Primjeri: \( v = v_0 + a t \), \[ E_k = \tfrac{1}{2} m v^2 \].

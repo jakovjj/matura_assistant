@@ -887,6 +887,9 @@ function bindResponseListeners() {
     button.addEventListener("click", () => toggleOpenSolution(button));
   });
   selfCheck.bind(document.querySelector("#task-content-panel"), toggleSelfCheck);
+  window.AsistentAI?.bind(document.querySelector("#task-content-panel"), aiExplainContext, {
+    official: true,
+  });
 }
 
 function toggleSelfCheck(question) {
@@ -1043,9 +1046,12 @@ function renderQuestion(question) {
           .map((option) => renderChoice(question, option, answer))
           .join("")}
       </div>
-      ${selfCheck.renderButton(question, {
-        hidden: simulation.active || checked,
-      })}
+      <div class="solver-inline-actions">
+        ${selfCheck.renderButton(question, {
+          hidden: simulation.active || checked,
+        })}
+        ${simulation.active || checked ? "" : aiExplainButton(question)}
+      </div>
       ${renderFeedback(question, answer)}
     </fieldset>
   `;
@@ -1071,6 +1077,43 @@ function renderChoice(question, option, answer) {
       <span>${option}</span>
     </label>
   `;
+}
+
+function aiExplainButton(question) {
+  return window.AsistentAI?.renderButton(question, { official: true }) || "";
+}
+
+// Kontekst koji asistent treba. Za višestruki izbor: slika zadatka (OCR) i točan
+// odgovor. Za otvorene zadatke: slika zadatka, zajednički uvod (ako postoji) i
+// slika službenoga rješenja iz ključa koju model objašnjava korak po korak.
+function aiExplainContext(question) {
+  const number = String(question);
+  const questionData = questionByNumber.get(number);
+
+  if (questionData?.kind === taskTypes.open) {
+    return {
+      subject: "Matematika",
+      solver: "math-choice",
+      examId: solverExam.id,
+      question: number,
+      kind: "open",
+      correctAnswer: [],
+      sourceImage: questionData?.sourceImage || null,
+      solutionImage: questionData?.solutionImage || null,
+      contextImages: questionData?.contextImage ? [questionData.contextImage] : [],
+    };
+  }
+
+  return {
+    subject: "Matematika",
+    solver: "math-choice",
+    examId: solverExam.id,
+    question: number,
+    kind: "choice",
+    correctAnswer: correctAnswers(number),
+    sourceImage: questionData?.sourceImage || null,
+    contextImages: [],
+  };
 }
 
 function renderFeedback(question, answer) {
@@ -1105,6 +1148,7 @@ function renderOpenSolution(question) {
           Otvori rješenje
         </button>
         ${renderOpenScoreInput(question)}
+        ${simulation.active ? "" : aiExplainButton(question.number)}
       </div>
       <div class="physics-open-solution__body" id="${bodyId}" hidden>
         ${solutionImage}

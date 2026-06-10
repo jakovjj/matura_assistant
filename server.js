@@ -79,8 +79,13 @@ const croatianWritingIndex = {
 };
 const generalGradingSystemPrompt = loadPromptFile("general-grading-system.txt");
 const aiExplanationSystemPrompt = loadPromptFile("ai-explanation-system.txt");
+// Zaseban bazni prompt za otvorene zadatke (produženi odgovor): tu nema ABCD
+// točnoga odgovora, nego službeno rješenje iz ključa koje model objašnjava.
+const aiExplanationOpenSystemPrompt = loadPromptFile("ai-explanation-open-system.txt");
 // Opcionalni dodaci po predmetu: prompts/ai-explanation-<slug>.txt (npr. -fizika.txt).
 const aiExplanationSubjectPrompts = loadAiExplanationSubjectPrompts();
+// Opcionalni dodaci po predmetu za otvorene zadatke: ai-explanation-open-<slug>.txt.
+const aiExplanationOpenSubjectPrompts = loadAiExplanationOpenSubjectPrompts();
 const essayScoreSchema = {
   type: "object",
   additionalProperties: false,
@@ -1230,12 +1235,19 @@ async function handleAiExplanation(request, response) {
   const solver = normalizeAiSolver(body?.solver);
   const examId = stringOrEmpty(body?.examId);
   const question = stringOrEmpty(body?.question);
+  const kind = normalizeAiKind(body?.kind);
   const correctAnswer = normalizeCorrectAnswer(body?.correctAnswer);
   const image = normalizeEssayImage(body?.image);
+  // Otvoreni zadatci nemaju ABCD odgovor, nego priloženu sliku službenoga rješenja.
+  const solutionImage = kind === "open" ? normalizeEssayImage(body?.solutionImage) : null;
   const contextImages = Array.isArray(body?.contextImages)
     ? body.contextImages.map(normalizeEssayImage).filter(Boolean).slice(0, 3)
     : [];
-  if (!solver || !examId || !question || !correctAnswer) {
+  if (!solver || !examId || !question) {
+    sendJson(response, 400, { error: "Nedostaju podaci o zadatku." });
+    return;
+  }
+  if (kind !== "open" && !correctAnswer) {
     sendJson(response, 400, { error: "Nedostaju podaci o zadatku." });
     return;
   }
@@ -1259,6 +1271,10 @@ async function handleAiExplanation(request, response) {
   const cached = readAiExplanationCache(solver, examId, question);
   if (!cached && !image) {
     sendJson(response, 400, { error: "Nedostaje slika zadatka za objašnjenje." });
+    return;
+  }
+  if (!cached && kind === "open" && !solutionImage) {
+    sendJson(response, 400, { error: "Nedostaje slika službenoga rješenja za objašnjenje." });
     return;
   }
 
@@ -1295,8 +1311,10 @@ async function handleAiExplanation(request, response) {
         subject,
         correctAnswer,
         question,
+        kind,
         image,
         contextImages,
+        solutionImage,
         signal: clientSignal,
       })) {
         if (clientSignal.aborted) return;
@@ -1307,6 +1325,7 @@ async function handleAiExplanation(request, response) {
       writeAiExplanationCache(solver, examId, question, {
         subject,
         correctAnswer,
+        kind,
         explanation: fullText.trim(),
         model: config.aiExplanationModel,
       });
@@ -1323,6 +1342,7 @@ async function handleAiExplanation(request, response) {
       solver,
       examId,
       question,
+      kind,
       correctAnswer,
       cached: Boolean(cached),
       fresh: !cached,
@@ -1446,6 +1466,7 @@ async function logAiGeneration(record) {
     solver: record.solver || null,
     examId: record.examId || null,
     question: record.question || null,
+    kind: record.kind || "choice",
     correctAnswer: record.correctAnswer || null,
     cached: Boolean(record.cached),
     fresh: Boolean(record.fresh),
@@ -1465,6 +1486,12 @@ async function logAiGeneration(record) {
 function normalizeAiSolver(value) {
   const solver = String(value || "").trim().toLowerCase();
   return /^[a-z][a-z0-9-]{1,40}$/.test(solver) ? solver : "";
+}
+
+// Vrsta zadatka: "open" (produženi odgovor, objašnjava se prema službenom
+// rješenju) ili "choice" (višestruki izbor, prema točnom slovu) — zadano choice.
+function normalizeAiKind(value) {
+  return String(value || "").trim().toLowerCase() === "open" ? "open" : "choice";
 }
 
 function normalizeCorrectAnswer(value) {
@@ -1515,6 +1542,7 @@ function writeAiExplanationCache(solver, examId, question, record) {
       examId,
       question,
       subject: record.subject,
+      kind: record.kind || "choice",
       correctAnswer: record.correctAnswer,
       model: record.model,
       createdAt: existing.createdAt || new Date().toISOString(),
@@ -1547,9 +1575,18 @@ function writeNdjson(response, event) {
   response.write(`${JSON.stringify(event)}\n`);
 }
 
-function buildAiExplanationSystemPrompt(subject, correctAnswer) {
+function buildAiExplanationSystemPrompt(subject, correctAnswer, kind = "choice") {
   const fill = (text) =>
     text.replaceAll("{{subject}}", subject).replaceAll("{{correctAnswer}}", correctAnswer);
+  // Otvoreni zadatci koriste zaseban bazni prompt (a ne ABCD subject dodatke koji
+  // objašnjavaju netočne A/B/C/D); imaju vlastite open dodatke po predmetu.
+  if (kind === "open") {
+    const base = fill(aiExplanationOpenSystemPrompt).trim();
+    const slug = aiSubjectSlug(subject);
+    const extra = slug ? aiExplanationOpenSubjectPrompts[slug] : "";
+    if (!extra) return base;
+    return `${base}\n\nPosebne upute za predmet ${subject}:\n${fill(extra).trim()}`;
+  }
   const base = fill(aiExplanationSystemPrompt).trim();
   const slug = aiSubjectSlug(subject);
   const extra = slug ? aiExplanationSubjectPrompts[slug] : "";
@@ -1559,13 +1596,20 @@ function buildAiExplanationSystemPrompt(subject, correctAnswer) {
 
 function aiSubjectSlug(subject) {
   return (
-    { fizika: "fizika", "hrvatski jezik": "hrvatski" }[
+    { fizika: "fizika", "hrvatski jezik": "hrvatski", matematika: "matematika" }[
       String(subject || "").trim().toLowerCase()
     ] || ""
   );
 }
 
-function buildAiExplanationUserPrompt({ subject, correctAnswer, question }) {
+function buildAiExplanationUserPrompt({ subject, correctAnswer, question, kind = "choice" }) {
+  if (kind === "open") {
+    return [
+      `Predmet: ${subject}.`,
+      `Zadatak broj: ${question}.`,
+      "Na prvoj slici je tekst zadatka otvorenoga tipa, a na posljednjoj priloženoj slici službeno rješenje iz ključa za ocjenjivanje (provjereno i točno). Objasni učeniku postupak rješavanja prema uputama, oslanjajući se na službeno rješenje.",
+    ].join("\n");
+  }
   return [
     `Predmet: ${subject}.`,
     `Zadatak broj: ${question}.`,
@@ -1578,12 +1622,17 @@ async function* streamOpenAiExplanation({
   subject,
   correctAnswer,
   question,
+  kind = "choice",
   image,
   contextImages = [],
+  solutionImage = null,
   signal,
 }) {
   const userContent = [
-    { type: "input_text", text: buildAiExplanationUserPrompt({ subject, correctAnswer, question }) },
+    {
+      type: "input_text",
+      text: buildAiExplanationUserPrompt({ subject, correctAnswer, question, kind }),
+    },
     { type: "input_image", image_url: image.dataUrl, detail: "high" },
   ];
   if (contextImages.length) {
@@ -1595,6 +1644,14 @@ async function* streamOpenAiExplanation({
       userContent.push({ type: "input_image", image_url: contextImage.dataUrl, detail: "high" });
     }
   }
+  // Kod otvorenih zadataka posljednja slika je službeno rješenje iz ključa.
+  if (kind === "open" && solutionImage) {
+    userContent.push({
+      type: "input_text",
+      text: "Sljedeća slika je službeno rješenje iz ključa za ocjenjivanje (provjereno i točno):",
+    });
+    userContent.push({ type: "input_image", image_url: solutionImage.dataUrl, detail: "high" });
+  }
 
   // gpt-5 i o-modeli su reasoning modeli: ne podržavaju temperature, a tokeni za
   // razmišljanje troše max_output_tokens, pa im dajemo nisko zalaganje i više tokena.
@@ -1602,12 +1659,19 @@ async function* streamOpenAiExplanation({
   const requestBody = {
     model: config.aiExplanationModel,
     stream: true,
-    max_output_tokens: isReasoningModel ? 2200 : 900,
+    // Postupna rješenja otvorenih zadataka (s LaTeX-om) dulja su od kratkoga
+    // ABCD obrazloženja, pa im dajemo više prostora za izlaz.
+    max_output_tokens: isReasoningModel
+      ? (kind === "open" ? 3000 : 2200)
+      : (kind === "open" ? 1500 : 900),
     input: [
       {
         role: "system",
         content: [
-          { type: "input_text", text: buildAiExplanationSystemPrompt(subject, correctAnswer) },
+          {
+            type: "input_text",
+            text: buildAiExplanationSystemPrompt(subject, correctAnswer, kind),
+          },
         ],
       },
       {
@@ -1780,7 +1844,7 @@ async function serveStaticFile(request, response, url) {
     return;
   }
 
-  const filePath = path.resolve(rootDir, `.${pathname}`);
+  let filePath = path.resolve(rootDir, `.${pathname}`);
   if (!filePath.startsWith(rootDir + path.sep)) {
     response.writeHead(403);
     response.end("Pristup nije dopušten.");
@@ -1802,12 +1866,34 @@ async function serveStaticFile(request, response, url) {
     return;
   }
 
+  // Transparently upgrade source-image PNGs to a pre-generated WebP sibling
+  // when the browser advertises support. HTML/data keep requesting `.png`;
+  // run `python3 scripts/optimize_images.py` to (re)generate the `.webp`
+  // files. Falls through to the PNG when no sibling exists.
+  let negotiated = false;
+  if (/\.png$/i.test(filePath) && /image\/webp/i.test(String(request.headers.accept || ""))) {
+    negotiated = true;
+    const webpPath = filePath.replace(/\.png$/i, ".webp");
+    try {
+      const webpStat = await fsp.stat(webpPath);
+      if (webpStat.isFile()) {
+        filePath = webpPath;
+        stat = webpStat;
+      }
+    } catch {
+      // No WebP sibling yet; serve the PNG unchanged.
+    }
+  }
+
   const headers = {
     "Cache-Control": cacheHeaderFor(filePath),
     "Content-Length": stat.size,
     "Content-Type": contentType(filePath),
     "X-Content-Type-Options": "nosniff",
   };
+  if (negotiated) {
+    headers.Vary = "Accept";
+  }
 
   response.writeHead(200, headers);
   if (request.method === "HEAD") {
@@ -4210,7 +4296,33 @@ function loadAiExplanationSubjectPrompts() {
   }
   for (const name of entries) {
     if (name === "ai-explanation-system.txt") continue;
+    // Open-promptovi (bazni i po predmetu) imaju vlastiti loader; preskoči ih ovdje.
+    if (name.startsWith("ai-explanation-open-")) continue;
     const match = /^ai-explanation-(.+)\.txt$/.exec(name);
+    if (!match) continue;
+    try {
+      const text = fs.readFileSync(path.join(rootDir, "prompts", name), "utf8").trim();
+      if (text) result[match[1]] = text;
+    } catch {
+      // Preskoči prompt koji se ne može pročitati.
+    }
+  }
+  return result;
+}
+
+// Učita per-predmet dodatke za otvorene zadatke: prompts/ai-explanation-open-<slug>.txt
+// (npr. -open-fizika.txt) u mapu slug -> tekst. Bazni open prompt se preskače.
+function loadAiExplanationOpenSubjectPrompts() {
+  const result = {};
+  let entries;
+  try {
+    entries = fs.readdirSync(path.join(rootDir, "prompts"));
+  } catch {
+    return result;
+  }
+  for (const name of entries) {
+    if (name === "ai-explanation-open-system.txt") continue;
+    const match = /^ai-explanation-open-(.+)\.txt$/.exec(name);
     if (!match) continue;
     try {
       const text = fs.readFileSync(path.join(rootDir, "prompts", name), "utf8").trim();

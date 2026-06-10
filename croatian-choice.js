@@ -44,6 +44,21 @@ const completionOptionLetters = ["A", "B", "C", "D"];
 const simulation = window.createExamSimulation({ onFinish: finishSimulation });
 const selfCheck = window.createTaskSelfCheck();
 
+// Na uskim ekranima overlay-praznine nad cijelom slikom teksta postanu nečitljive,
+// pa nadopunjavanje renderiramo kao kartice po praznini (fokusirani crop + ABCD lista).
+const mobileCompletionQuery =
+  typeof window.matchMedia === "function" ? window.matchMedia("(max-width: 760px)") : null;
+
+function isMobileCompletionLayout() {
+  return Boolean(mobileCompletionQuery?.matches);
+}
+
+mobileCompletionQuery?.addEventListener("change", () => {
+  if (activeTaskTypeId === "nadopunjavanje" && document.querySelector("#task-content-panel")) {
+    renderTaskTypeContent();
+  }
+});
+
 function isChecked(question) {
   return checked || selfCheck.has(question);
 }
@@ -518,13 +533,18 @@ function renderTaskTypeContent() {
 
   bindResponseListeners();
   bindCompletionHotspots();
+  bindCompletionCards();
   renderQuickSelect();
   bindQuickSelectTracking();
   bindTaskTypePager();
 }
 
 function renderTaskContext(task, hasInteractiveCompletion) {
-  if (hasInteractiveCompletion) return renderCompletionContext(task);
+  if (hasInteractiveCompletion) {
+    return isMobileCompletionLayout()
+      ? renderCompletionCards(task)
+      : renderCompletionContext(task);
+  }
   return renderContextImages(task.sourceImages, "Tekst s prazninama i ponuđeni odgovori");
 }
 
@@ -590,6 +610,197 @@ function renderCompletionContext(task) {
         .join("")}
     </section>
   `;
+}
+
+// Mobilni prikaz: prikazujemo cijeli službeni tekst, ali ga režemo isključivo na
+// granicama redaka. Nakon retka koji sadrži prazninu(e) umeću se kontrole odgovora;
+// ako su dvije praznine u istom retku, njihovi odgovori idu jedan ispod drugog.
+function renderCompletionCards(task) {
+  const images = completionSourceImages(task);
+  if (!images.length) return "";
+
+  const sections = images
+    .map((image, index) => renderCompletionImageRows(task, image, index))
+    .join("");
+
+  return `
+    <section class="croatian-completion-cards" aria-label="Tekst s prazninama za nadopunjavanje">
+      ${sections}
+    </section>
+  `;
+}
+
+function renderCompletionImageRows(task, source, imageIndex) {
+  const crop = source?.crop;
+  if (!crop) return "";
+
+  const blanks = (task.questions || [])
+    .filter((question) => question.blank?.sourceImageIndex === imageIndex)
+    .sort(
+      (a, b) => Number(a.blank.y) - Number(b.blank.y) || Number(a.blank.x) - Number(b.blank.x),
+    );
+
+  if (!blanks.length) {
+    return renderCompletionTextSegment(source, 0, Number(crop.height), []);
+  }
+
+  const rows = groupCompletionRows(blanks);
+  const pad = 8;
+  let html = "";
+  let segTop = 0;
+
+  rows.forEach((row) => {
+    const segBottom = Math.min(Number(crop.height), row.bottom + pad);
+    html += `
+      <article class="croatian-completion-card">
+        ${renderCompletionTextSegment(source, segTop, segBottom, row.blanks)}
+        ${row.blanks.map((question) => renderCompletionRowControl(question)).join("")}
+      </article>
+    `;
+    segTop = segBottom;
+  });
+
+  if (segTop < Number(crop.height) - 2) {
+    html += renderCompletionTextSegment(source, segTop, Number(crop.height), []);
+  }
+
+  return html;
+}
+
+// Grupira praznine u retke: praznine sa sličnim y pripadaju istom retku.
+function groupCompletionRows(blanks) {
+  const rows = [];
+  blanks.forEach((question) => {
+    const y = Number(question.blank.y);
+    const height = Number(question.blank.height);
+    const last = rows[rows.length - 1];
+    if (last && y < last.y + height * 0.7) {
+      last.blanks.push(question);
+      last.bottom = Math.max(last.bottom, y + height);
+    } else {
+      rows.push({ y, bottom: y + height, blanks: [question] });
+    }
+  });
+  rows.forEach((row) =>
+    row.blanks.sort((a, b) => Number(a.blank.x) - Number(b.blank.x)),
+  );
+  return rows;
+}
+
+function renderCompletionRowControl(question) {
+  const number = String(question.number);
+  const answer = responses[number] || "";
+  const resolved = isChecked(number);
+  let stateClass = answer ? " croatian-completion-row--answered" : "";
+  if (resolved && answer) {
+    stateClass += isCorrectAnswer(number, answer)
+      ? " croatian-completion-row--correct"
+      : " croatian-completion-row--wrong";
+  }
+
+  return `
+    <div class="croatian-completion-row${stateClass}" id="pitanje-${escapeHtml(number)}" data-question-number="${escapeHtml(number)}">
+      <div class="croatian-completion-row__head">
+        <span class="croatian-completion-card__number">Praznina ${escapeHtml(number)}</span>
+        ${renderCompletionCardStatus(number, answer, resolved)}
+      </div>
+      <div class="croatian-completion-card__options" role="radiogroup" aria-label="Ponuđeni odgovori za prazninu ${escapeHtml(number)}">
+        ${completionOptionsForQuestion(question)
+          .map(({ option, text }) => renderCompletionCardOption(number, option, text, answer, resolved))
+          .join("")}
+      </div>
+      ${correctAnswers(number).length
+        ? `<div class="solver-inline-actions">${selfCheck.renderButton(number, {
+            hidden: simulation.active || checked,
+          })}</div>`
+        : ""}
+      ${renderFeedback(number, answer)}
+    </div>
+  `;
+}
+
+function renderCompletionCardStatus(number, answer, resolved) {
+  if (resolved && answer) {
+    return isCorrectAnswer(number, answer)
+      ? `<span class="croatian-completion-card__status croatian-completion-card__status--correct">Točno</span>`
+      : `<span class="croatian-completion-card__status croatian-completion-card__status--wrong">Netočno</span>`;
+  }
+  return answer
+    ? `<span class="croatian-completion-card__status">Odgovoreno</span>`
+    : `<span class="croatian-completion-card__status croatian-completion-card__status--empty">Bez odgovora</span>`;
+}
+
+// Crop punih redaka (od segTop do segBottom, puna širina stupca) s markerima
+// praznina koje se u tom segmentu nalaze. Reže se isključivo po visini (na redovima).
+function renderCompletionTextSegment(source, segTop, segBottom, blanks) {
+  const crop = source?.crop;
+  const height = segBottom - segTop;
+  if (!crop || !(height > 0)) return "";
+
+  const segSource = {
+    url: source.url,
+    width: source.width,
+    height: source.height,
+    crop: { x: crop.x, y: Number(crop.y) + segTop, width: crop.width, height },
+  };
+
+  const markers = blanks
+    .map((question) => {
+      const blank = question.blank;
+      const style = [
+        `left: ${(Number(blank.x) / Number(crop.width)) * 100}%`,
+        `top: ${((Number(blank.y) - segTop) / height) * 100}%`,
+        `width: ${(Number(blank.width) / Number(crop.width)) * 100}%`,
+        `height: ${(Number(blank.height) / height) * 100}%`,
+      ].join("; ");
+      return `<span class="croatian-completion-band__marker" style="${style}" aria-hidden="true"></span>`;
+    })
+    .join("");
+
+  return `
+    <div class="croatian-completion-band">
+      ${renderCroppedImage(segSource, "Tekst s prazninama, službeni prikaz.", {
+        cropClass: "croatian-completion-band__crop",
+        overlayHtml: markers,
+      })}
+    </div>
+  `;
+}
+
+function renderCompletionCardOption(number, option, text, answer, resolved) {
+  const selected = option === answer;
+  const correct = isCorrectAnswer(number, option);
+  let resultClass = "";
+  if (resolved && correct) resultClass = " croatian-completion-card__option--correct";
+  if (resolved && selected && !correct) resultClass = " croatian-completion-card__option--wrong";
+  const selectedClass = selected ? " croatian-completion-card__option--selected" : "";
+
+  return `
+    <button
+      type="button"
+      class="croatian-completion-card__option${selectedClass}${resultClass}"
+      role="radio"
+      aria-checked="${selected}"
+      data-completion-card-question="${escapeHtml(number)}"
+      data-completion-card-option="${escapeHtml(option)}"
+      ${simulation.inputDisabledAttribute()}
+    >
+      <span class="croatian-completion-card__option-letter">${escapeHtml(option)}</span>
+      <span class="croatian-completion-card__option-text">${escapeHtml(text || `Odgovor ${option}`)}</span>
+    </button>
+  `;
+}
+
+function bindCompletionCards() {
+  document.querySelectorAll("[data-completion-card-option]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const number = button.dataset.completionCardQuestion;
+      const next = responses[number] === button.dataset.completionCardOption
+        ? ""
+        : button.dataset.completionCardOption;
+      updateResponse(number, next);
+    });
+  });
 }
 
 function renderCompletionHotspots(task, sourceImageIndex) {
@@ -1080,6 +1291,38 @@ function syncRenderedResponse(question) {
       "croatian-completion-blank--wrong",
     );
     button.setAttribute("aria-label", completionBlankAriaLabel(number, buttonAnswer));
+  });
+
+  syncCompletionCard(question);
+}
+
+// Ažurira mobilni redak praznine bez punog re-rendera (odabir/poništavanje odgovora).
+function syncCompletionCard(question) {
+  const number = String(question);
+  const row = document.querySelector(
+    `.croatian-completion-row[data-question-number="${CSS.escape(number)}"]`,
+  );
+  if (!row) return;
+
+  const answer = responses[number] || "";
+  row.classList.toggle("croatian-completion-row--answered", Boolean(answer));
+  row.classList.remove(
+    "croatian-completion-row--correct",
+    "croatian-completion-row--wrong",
+  );
+
+  const head = row.querySelector(".croatian-completion-row__head");
+  if (head) {
+    head.innerHTML = `
+      <span class="croatian-completion-card__number">Praznina ${escapeHtml(number)}</span>
+      ${renderCompletionCardStatus(number, answer, false)}
+    `;
+  }
+
+  row.querySelectorAll("[data-completion-card-option]").forEach((button) => {
+    const selected = button.dataset.completionCardOption === answer;
+    button.classList.toggle("croatian-completion-card__option--selected", selected);
+    button.setAttribute("aria-checked", String(selected));
   });
 }
 

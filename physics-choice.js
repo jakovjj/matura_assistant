@@ -953,15 +953,37 @@ function aiExplainButton(question) {
   return window.AsistentAI?.renderButton(question, { official: true }) || "";
 }
 
-// Kontekst koji asistent treba: slika zadatka (za OCR), broj zadatka i točan odgovor.
+// Kontekst koji asistent treba. Za višestruki izbor: slika zadatka (OCR) i točan
+// odgovor. Za otvorene zadatke: slika zadatka, dodatne stranice zadatka (ako ih
+// ima) i slika službenoga rješenja iz ključa koju model objašnjava korak po korak.
 function aiExplainContext(question) {
   const number = String(question);
   const questionData = questionByNumber.get(number);
+
+  if (questionData?.kind === taskTypes.open) {
+    const sources = questionData?.sourceImages || questionData?.sourceImage || null;
+    const sourceList = Array.isArray(sources) ? sources : sources ? [sources] : [];
+    const solution = questionData?.solutionImages || questionData?.solutionImage || null;
+    const solutionList = Array.isArray(solution) ? solution : solution ? [solution] : [];
+    return {
+      subject: "Fizika",
+      solver: "physics-choice",
+      examId: solverExam.id,
+      question: number,
+      kind: "open",
+      correctAnswer: [],
+      sourceImage: sourceList[0] || null,
+      solutionImage: solutionList[0] || null,
+      contextImages: sourceList.slice(1, 4),
+    };
+  }
+
   return {
     subject: "Fizika",
     solver: "physics-choice",
     examId: solverExam.id,
     question: number,
+    kind: "choice",
     correctAnswer: correctAnswers(number),
     sourceImage: questionData?.sourceImage || null,
     contextImages: [],
@@ -1022,6 +1044,7 @@ function renderOpenSolution(question) {
           Otvori rješenje
         </button>
         ${renderOpenScoreInput(question)}
+        ${simulation.active ? "" : aiExplainButton(question.number)}
       </div>
       <div class="physics-open-solution__body" id="${bodyId}" hidden>
         ${solutionImage}

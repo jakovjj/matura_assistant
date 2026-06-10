@@ -17,6 +17,16 @@ from crop_utils import (
 from pdf_utils import png_dimensions, render_pdf_page_to_png
 
 
+# NCVVO answer-key pages repeat the same page chrome: a logo and the table
+# header (`BROJ ZADATKA` / `TOČAN ODGOVOR`) at the top, and an address line plus
+# page number at the bottom. A crop that spans a page boundary must stop above
+# the footer and resume below the repeated header instead of swallowing them.
+_FOOTER_TEXT_PATTERN = re.compile(
+    r"ncvvo|nacionalni centar za vanjsko", re.IGNORECASE
+)
+_KEY_HEADER_PATTERN = re.compile(r"to[čc]an\s+odgovor|broj\s+zadatka", re.IGNORECASE)
+
+
 @dataclass(frozen=True)
 class SolutionMarker:
     number: str
@@ -262,19 +272,84 @@ def _solution_crops(
         number: (boundary_markers[number].page.number, boundary_markers[number].y_min)
         for number in boundary_markers
     }
-    crops: dict[str, list[SolutionCrop]] = {}
+    ordered_wanted = sorted(markers, key=question_sort_key)
 
-    for number in sorted(markers, key=question_sort_key):
-        marker = markers[number]
-        own_position = (marker.page.number, marker.y_min)
-
-        # The crop ends at the next boundary row, so a question never reaches
-        # into the following question's (or heading's) cell.
-        next_marker = None
+    def _next_boundary(own_position: tuple[int, float]) -> str | None:
         for candidate in ordered_boundary:
             if boundary_position[candidate] > own_position:
-                next_marker = boundary_markers[candidate]
-                break
+                return candidate
+        return None
+
+    def _previous_boundary(own_position: tuple[int, float]) -> SolutionMarker | None:
+        previous: SolutionMarker | None = None
+        previous_position: tuple[int, float] | None = None
+        for candidate in ordered_boundary:
+            position = boundary_position[candidate]
+            if position < own_position and (
+                previous_position is None or position > previous_position
+            ):
+                previous = boundary_markers[candidate]
+                previous_position = position
+        return previous
+
+    # Pass 1: locate each wanted question's model-answer text span. The NCVVO
+    # answer table centres the question number vertically inside a tall cell, so
+    # the label row sits in the MIDDLE of a long answer. `answer_start` is the
+    # true top of the cell (the answer's first line); image-only tasks leave it
+    # unresolved and fall back to the label row.
+    answer_text_by = {
+        number: str(open_answers.get(number, {}).get("modelAnswer") or "")
+        for number in ordered_wanted
+    }
+
+    # 1a: each answer's last line, bounded above by the next numbered row. This
+    # also serves as the lower bound for the NEXT answer's first-line search.
+    answer_ends: dict[str, tuple[Any, float] | None] = {}
+    for number in ordered_wanted:
+        marker = markers[number]
+        own_position = (marker.page.number, marker.y_min)
+        following = _next_boundary(own_position)
+        following_marker = boundary_markers[following] if following else None
+        answer_ends[number] = _find_answer_end(
+            ordered_lines, marker, answer_text_by[number], following=following_marker
+        )
+
+    # 1b: each answer's first line. The lower bound is the previous answer's
+    # located end (or, lacking one, the previous numbered row), so a boilerplate
+    # header shared by adjacent cells (e.g. `Model točnoga odgovora`) resolves to
+    # THIS cell rather than the previous answer's tail.
+    answer_starts: dict[str, tuple[Any, float] | None] = {}
+    for index, number in enumerate(ordered_wanted):
+        marker = markers[number]
+        own_position = (marker.page.number, marker.y_min)
+        following = _next_boundary(own_position)
+        upper_position = (
+            boundary_position[following] if following else None
+        )
+        previous_marker = _previous_boundary(own_position)
+        lower_position = (
+            _marker_position(previous_marker) if previous_marker else None
+        )
+        previous_number = ordered_wanted[index - 1] if index > 0 else None
+        previous_end = answer_ends.get(previous_number) if previous_number else None
+        if previous_end is not None:
+            previous_end_position = (previous_end[0].number, previous_end[1])
+            lower_position = (
+                previous_end_position
+                if lower_position is None
+                else max(lower_position, previous_end_position)
+            )
+        answer_starts[number] = _find_answer_start(
+            ordered_lines, answer_text_by[number], lower_position, upper_position
+        )
+
+    crops: dict[str, list[SolutionCrop]] = {}
+
+    for number in ordered_wanted:
+        marker = markers[number]
+        own_position = (marker.page.number, marker.y_min)
+        next_number = _next_boundary(own_position)
+        next_marker = boundary_markers[next_number] if next_number else None
 
         # The first subitem of a group absorbs its unscored parent heading
         # row, because the shared example/solution image sits in that cell
@@ -294,30 +369,68 @@ def _solution_crops(
         ):
             start_marker = all_markers[parent]
 
-        answer_end = None if next_marker else _find_answer_end(
-            ordered_lines,
-            marker,
-            str(open_answers.get(number, {}).get("modelAnswer") or ""),
-        )
-        end_page_number = (
-            next_marker.page.number
-            if next_marker
-            else answer_end[0].number
-            if answer_end
-            else pages[-1].number
-        )
+        # TOP: extend up to this question's answer start when it sits above the
+        # (centred) label, so the crop opens at the top of the cell.
+        answer_start = answer_starts[number]
+        start_page = start_marker.page
+        start_y = start_marker.y_min - 6
+        if answer_start is not None and (
+            answer_start[0].number,
+            answer_start[1],
+        ) < (start_marker.page.number, start_marker.y_min):
+            start_page = answer_start[0]
+            start_y = answer_start[1] - 6
+
+        # BOTTOM: stop at the rule between this cell and the next, i.e. the top
+        # of the next cell. Using the next question's located answer start (its
+        # cell top) instead of its centred label keeps the crop from spilling
+        # into the next answer, while still capturing image/continuation content
+        # that the model-answer text does not cover. The last question has no
+        # next cell, so it falls back to its own answer end, then page bottom.
+        bottom: tuple[int, float] | None = None
+        if next_marker is not None:
+            bottom = (next_marker.page.number, next_marker.y_min)
+            next_start = answer_starts.get(next_number) if next_number else None
+            if next_number in wanted and next_start is not None:
+                # The next cell opens at whichever is higher: its centred label
+                # (long answers) or its first text line (short, top-aligned
+                # answers whose first line sits below the label).
+                bottom = min(bottom, (next_start[0].number, next_start[1]))
+
+        answer_end = answer_ends[number]
+        if bottom is not None:
+            end_page_number = bottom[0]
+        elif answer_end is not None:
+            end_page_number = answer_end[0].number
+        else:
+            end_page_number = pages[-1].number
+        end_page_number = max(end_page_number, start_page.number)
         question_crops: list[SolutionCrop] = []
 
-        for page_number in range(start_marker.page.number, end_page_number + 1):
+        for page_number in range(start_page.number, end_page_number + 1):
             page = pages_by_number[page_number]
-            y_min = start_marker.y_min - 6 if page_number == start_marker.page.number else 36
-            y_max = (
-                next_marker.y_min - 6
-                if next_marker and page_number == next_marker.page.number
-                else answer_end[1] + 12
-                if answer_end and page_number == answer_end[0].number
-                else page.height - 36
-            )
+            if page_number == start_page.number:
+                y_min = start_y
+            else:
+                # A continuation page reopens with the logo and the repeated
+                # table header; start below it instead of at the page top.
+                header_bottom = _key_header_bottom(page)
+                y_min = header_bottom + 2 if header_bottom is not None else 36
+            if bottom is not None and page_number == bottom[0]:
+                y_max = bottom[1] - 6
+            elif (
+                bottom is None
+                and answer_end is not None
+                and page_number == answer_end[0].number
+            ):
+                y_max = answer_end[1] + 12
+            else:
+                y_max = page.height - 36
+            # Never reach into the footer band when the crop runs to the bottom
+            # of a page it continues past.
+            footer_top = _footer_top(page)
+            if footer_top is not None and y_max > footer_top - 6:
+                y_max = footer_top - 6
             if y_max <= y_min:
                 continue
             question_crops.append(
@@ -335,6 +448,54 @@ def _solution_crops(
     return crops
 
 
+def _footer_top(page: Any) -> float | None:
+    """Top y of the page footer band, or None.
+
+    Two footer shapes occur in NCVVO answer keys: an address line (often with
+    `www.ncvvo.hr` and a page number below it) or, on some exams, just a bare
+    page number. Both are matched only in the bottom margin so body text never
+    triggers them, and answer-table numbers (which carry a trailing period) are
+    not mistaken for a page number.
+    """
+    footer_y: list[float] = []
+    for line in page.lines:
+        text = _normalize_line(line.text)
+        if line.y_min >= page.height * 0.85 and _FOOTER_TEXT_PATTERN.search(text):
+            footer_y.append(line.y_min)
+        elif line.y_min >= page.height * 0.93 and re.fullmatch(r"\d{1,3}", text):
+            footer_y.append(line.y_min)
+    return min(footer_y) if footer_y else None
+
+
+def _key_header_bottom(page: Any) -> float | None:
+    """Bottom y of the repeated answer-key table header row, or None.
+
+    Restricted to the top of the page so it only matches the chrome header,
+    never a `TOČAN ODGOVOR` mention inside an answer body. The header label
+    `BROJ ZADATKA` is stacked across two left-column lines that don't match the
+    pattern on their own, so the matched row is expanded to cover every line it
+    vertically overlaps.
+    """
+    top_lines = [line for line in page.lines if line.y_min <= page.height * 0.25]
+    matched = [
+        line
+        for line in top_lines
+        if _KEY_HEADER_PATTERN.search(_normalize_line(line.text))
+    ]
+    if not matched:
+        return None
+    # Expand against the fixed matched-row band (not a growing one) so closely
+    # spaced answer-body lines below the header never chain the boundary down.
+    row_top = min(line.y_min for line in matched)
+    row_bottom = max(line.y_max for line in matched)
+    overlapping = [
+        line.y_max
+        for line in top_lines
+        if line.y_min <= row_bottom and line.y_max >= row_top
+    ]
+    return max([row_bottom, *overlapping])
+
+
 def _parent_number(number: str) -> str | None:
     text = str(number)
     if "." in text:
@@ -342,10 +503,57 @@ def _parent_number(number: str) -> str | None:
     return None
 
 
+def _find_answer_start(
+    ordered_lines: list[tuple[Any, Any]],
+    answer_text: str,
+    lower_position: tuple[int, float] | None,
+    upper_position: tuple[int, float] | None,
+) -> tuple[Any, float] | None:
+    """Locate the first model-answer line, i.e. the top of the task cell.
+
+    Bounded below by the previous answer's end (or the previous numbered row) and
+    above by the following numbered row, so a header line repeated across cells
+    (every answer opens with ``MODEL TOČNOGA ODGOVORA:``) resolves to this
+    question's own cell, never a neighbour's.
+    """
+    candidates: list[str] = []
+    for line in answer_text.splitlines():
+        normalized = _normalize_line(line)
+        if re.match(r"^(?:Izvor|Prilagođeno prema):", normalized, flags=re.IGNORECASE):
+            break
+        # A short scoring header such as `3 boda` legitimately opens a rubric
+        # cell; keep it as an anchor so the cell top is found above it rather
+        # than at the first prose line below.
+        if len(normalized) >= 8 or re.match(
+            r"^\d+\s*(?:bod|boda|bodova)\b", normalized, flags=re.IGNORECASE
+        ):
+            candidates.append(normalized)
+        if len(candidates) >= 6:
+            break
+    if not candidates:
+        return None
+
+    for page, line in ordered_lines:
+        position = (page.number, line.y_min)
+        if lower_position and position <= lower_position:
+            continue
+        if upper_position and position >= upper_position:
+            break
+        rendered = _normalize_line(line.text)
+        for candidate in candidates:
+            if rendered == candidate or (
+                min(len(rendered), len(candidate)) >= 18
+                and (rendered in candidate or candidate in rendered)
+            ):
+                return page, line.y_min
+    return None
+
+
 def _find_answer_end(
     ordered_lines: list[tuple[Any, Any]],
     marker: SolutionMarker,
     answer_text: str,
+    following: SolutionMarker | None = None,
 ) -> tuple[Any, float] | None:
     candidates = []
     for line in answer_text.splitlines():
@@ -355,9 +563,12 @@ def _find_answer_end(
         if len(normalized) >= 8:
             candidates.append(normalized)
     marker_position = _marker_position(marker)
+    following_position = _marker_position(following) if following else None
     for candidate in reversed(candidates):
         for page, line in reversed(ordered_lines):
             if (page.number, line.y_min) < marker_position:
+                continue
+            if following_position and (page.number, line.y_min) >= following_position:
                 continue
             rendered = _normalize_line(line.text)
             if rendered == candidate or (

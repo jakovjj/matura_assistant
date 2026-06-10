@@ -37,6 +37,19 @@ let checked = false;
 const simulation = window.createExamSimulation({ onFinish: finishSimulation });
 const selfCheck = window.createTaskSelfCheck();
 
+// Na uskim ekranima overlay-praznine nad cijelom slikom teksta postanu nečitljive,
+// pa nadopunjavanje renderiramo kao kartice po praznini (fokusirani crop + odgovor).
+const mobileCompletionQuery =
+  typeof window.matchMedia === "function" ? window.matchMedia("(max-width: 760px)") : null;
+
+function isMobileCompletionLayout() {
+  return Boolean(mobileCompletionQuery?.matches);
+}
+
+mobileCompletionQuery?.addEventListener("change", () => {
+  if (document.querySelector("#task-content-panel")) renderTaskTypeContent();
+});
+
 const taskTypeDefinitions = {
   choice: {
     id: "visestruki-izbor",
@@ -323,6 +336,17 @@ function renderTaskSourceImages(task) {
 
 function renderTaskSourceContent(task) {
   if (hasInlineGapBlanks(task)) {
+    if (isMobileCompletionLayout()) {
+      // Provjera je per-redak (Provjeri gumb u svakoj kartici). Grupni kontroler
+      // zadržavamo samo kao "Otvori ključ" fallback za zadatke bez auto-provjere.
+      const fallback = checkableTaskGroupQuestions(task).length
+        ? ""
+        : renderInlineGapCheckControls(task);
+      return `
+        ${renderInlineGapCards(task)}
+        ${fallback}
+      `;
+    }
     return `
       ${renderInlineGapSourceImages(task)}
       ${renderInlineGapCheckControls(task)}
@@ -417,6 +441,272 @@ function usesSharedInlineChoiceBank(task) {
   if (task?.kind !== "choice" || !task?.blanks || !Array.isArray(task.options)) return false;
   const hasUnusedOptionInstruction = /\byou do not need\b/i.test(task.text || "");
   return hasUnusedOptionInstruction || task.options.length > taskQuestions(task).length;
+}
+
+// ---- Mobilni prikaz nadopunjavanja (vidi isMobileCompletionLayout) ----
+// Prikazuje se cijeli službeni tekst, rezan isključivo na granicama redaka.
+// Nakon retka s prazninom(ama) idu kontrole; dvije praznine u istom retku → jedan ispod drugog.
+
+function renderInlineGapCards(task) {
+  const shared = usesSharedInlineChoiceBank(task);
+  const sections = inlineGapSourceImages(task)
+    .map(({ source, index }) => renderEnglishImageRows(task, source, index, shared))
+    .join("");
+
+  return `
+    <section class="english-completion-cards" aria-label="Tekst s prazninama za nadopunjavanje" data-card-task="${escapeHtml(task.number)}">
+      ${sections}
+    </section>
+  `;
+}
+
+function renderEnglishImageRows(task, source, imageIndex, shared) {
+  const crop = source?.crop;
+  if (!crop) return "";
+
+  const blanks = taskQuestions(task)
+    .map(String)
+    .filter((question) => task.blanks[question]?.sourceImageIndex === imageIndex)
+    .map((question) => ({ question, blank: task.blanks[question] }))
+    .sort(
+      (a, b) => Number(a.blank.y) - Number(b.blank.y) || Number(a.blank.x) - Number(b.blank.x),
+    );
+
+  if (!blanks.length) {
+    return renderEnglishTextSegment(source, 0, Number(crop.height), []);
+  }
+
+  const rows = englishGroupRows(blanks);
+  const pad = 8;
+  let html = "";
+  let segTop = 0;
+
+  rows.forEach((row) => {
+    const segBottom = Math.min(Number(crop.height), row.bottom + pad);
+    html += `
+      <article class="english-completion-card">
+        ${renderEnglishTextSegment(source, segTop, segBottom, row.blanks)}
+        ${row.blanks.map((item) => renderEnglishRowControl(task, item.question, shared)).join("")}
+      </article>
+    `;
+    segTop = segBottom;
+  });
+
+  if (segTop < Number(crop.height) - 2) {
+    html += renderEnglishTextSegment(source, segTop, Number(crop.height), []);
+  }
+
+  return html;
+}
+
+function englishGroupRows(blanks) {
+  const rows = [];
+  blanks.forEach((item) => {
+    const y = Number(item.blank.y);
+    const height = Number(item.blank.height);
+    const last = rows[rows.length - 1];
+    if (last && y < last.y + height * 0.7) {
+      last.blanks.push(item);
+      last.bottom = Math.max(last.bottom, y + height);
+    } else {
+      rows.push({ y, bottom: y + height, blanks: [item] });
+    }
+  });
+  rows.forEach((row) => row.blanks.sort((a, b) => Number(a.blank.x) - Number(b.blank.x)));
+  return rows;
+}
+
+function renderEnglishTextSegment(source, segTop, segBottom, blanks) {
+  const crop = source?.crop;
+  const height = segBottom - segTop;
+  if (!crop || !(height > 0)) return "";
+
+  const segSource = {
+    url: source.url,
+    width: source.width,
+    height: source.height,
+    crop: { x: crop.x, y: Number(crop.y) + segTop, width: crop.width, height },
+  };
+
+  const markers = blanks
+    .map(({ blank }) => {
+      const style = [
+        `left: ${(Number(blank.x) / Number(crop.width)) * 100}%`,
+        `top: ${((Number(blank.y) - segTop) / height) * 100}%`,
+        `width: ${(Number(blank.width) / Number(crop.width)) * 100}%`,
+        `height: ${(Number(blank.height) / height) * 100}%`,
+      ].join("; ");
+      return `<span class="english-completion-band__marker" style="${style}" aria-hidden="true"></span>`;
+    })
+    .join("");
+
+  return `
+    <div class="english-completion-band">
+      ${renderCroppedImage(segSource, "Tekst s prazninama, službeni prikaz.", {
+        cropClass: "english-completion-band__crop",
+        overlayHtml: markers,
+      })}
+    </div>
+  `;
+}
+
+function renderEnglishRowControl(task, question, shared) {
+  const answer = responses[question] || "";
+  const resolved = isChecked(question) && correctAnswers(question).length > 0;
+  let stateClass = answer ? " english-completion-row--answered" : "";
+  if (resolved && answer) {
+    stateClass += isCorrectAnswer(question, answer)
+      ? " english-completion-row--correct"
+      : " english-completion-row--wrong";
+  }
+
+  return `
+    <div class="english-completion-row${stateClass}" id="odgovor-${escapeHtml(question)}" data-question-number="${escapeHtml(question)}" data-card-task="${escapeHtml(task.number)}">
+      <div class="english-completion-row__head">
+        <span class="english-completion-card__number">Praznina ${escapeHtml(question)}</span>
+        ${renderEnglishCardStatus(question, answer, resolved)}
+      </div>
+      ${renderEnglishCardControl(task, question, answer, shared)}
+      ${correctAnswers(question).length
+        ? `<div class="solver-inline-actions">${selfCheck.renderButton(question, {
+            hidden: simulation.active || checked,
+          })}</div>`
+        : ""}
+      ${renderEnglishCardFeedback(question, answer, resolved)}
+    </div>
+  `;
+}
+
+function renderEnglishCardStatus(question, answer, resolved) {
+  if (resolved && answer) {
+    return isCorrectAnswer(question, answer)
+      ? `<span class="english-completion-card__status english-completion-card__status--correct">Točno</span>`
+      : `<span class="english-completion-card__status english-completion-card__status--wrong">Netočno</span>`;
+  }
+  return answer
+    ? `<span class="english-completion-card__status">Odgovoreno</span>`
+    : `<span class="english-completion-card__status english-completion-card__status--empty">Bez odgovora</span>`;
+}
+
+function renderEnglishCardControl(task, question, answer, shared) {
+  if (task.kind === "text") {
+    return `
+      <input
+        class="english-completion-card__input"
+        id="card-input-${escapeHtml(question)}"
+        data-question="${escapeHtml(question)}"
+        type="text"
+        value="${escapeHtml(answer)}"
+        autocomplete="off"
+        aria-label="Odgovor na prazninu ${escapeHtml(question)}"
+        ${simulation.inputDisabledAttribute()}
+      >
+    `;
+  }
+
+  const optionMap = inlineChoiceOptionTextMap(task, question);
+  const options = Array.isArray(task.options) && task.options.length
+    ? task.options
+    : ["A", "B", "C", "D"];
+  const usedOptions = shared ? inlineChoiceUsedOptions(task, question) : new Map();
+  const resolved = isChecked(question) && correctAnswers(question).length > 0;
+
+  return `
+    <div class="english-completion-card__options" role="${shared ? "group" : "radiogroup"}" aria-label="Ponuđeni odgovori za prazninu ${escapeHtml(question)}">
+      ${options
+        .map((option) =>
+          renderEnglishCardOption(question, option, optionMap[option], answer, resolved, usedOptions),
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderEnglishCardOption(question, option, text, answer, resolved, usedOptions) {
+  const selected = option === answer;
+  const correct = isCorrectAnswer(question, option);
+  let resultClass = "";
+  if (resolved && correct) resultClass = " english-completion-card__option--correct";
+  if (resolved && selected && !correct) resultClass = " english-completion-card__option--wrong";
+  const selectedClass = selected ? " english-completion-card__option--selected" : "";
+  const usedBy = usedOptions.get(option) || [];
+  const usedClass = usedBy.length && !selected ? " english-completion-card__option--used" : "";
+  const usedNote = usedBy.length
+    ? `<small class="english-completion-card__option-note">u ${escapeHtml(usedBy.join(", "))}</small>`
+    : "";
+
+  return `
+    <button
+      type="button"
+      class="english-completion-card__option${selectedClass}${resultClass}${usedClass}"
+      aria-pressed="${selected}"
+      data-english-card-question="${escapeHtml(question)}"
+      data-english-card-option="${escapeHtml(option)}"
+      ${simulation.inputDisabledAttribute()}
+    >
+      <span class="english-completion-card__option-letter">${escapeHtml(option)}</span>
+      <span class="english-completion-card__option-text">${escapeHtml(text || `Odgovor ${option}`)}</span>
+      ${usedNote}
+    </button>
+  `;
+}
+
+function renderEnglishCardFeedback(question, answer, resolved) {
+  if (!resolved) return "";
+  const answers = correctAnswers(question);
+  if (isCorrectAnswer(question, answer)) return `<small class="response-feedback">Točno.</small>`;
+  const label = answers.length > 1 ? "Točni odgovori" : "Točan odgovor";
+  return `<small class="response-feedback">${label}: ${escapeHtml(answers.join(" ili "))}.</small>`;
+}
+
+function bindEnglishCompletionCards() {
+  document.querySelectorAll("[data-english-card-option]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const question = button.dataset.englishCardQuestion;
+      const next = responses[question] === button.dataset.englishCardOption
+        ? ""
+        : button.dataset.englishCardOption;
+      updateResponse(question, next);
+    });
+  });
+}
+
+// Ažurira mobilne retke nakon promjene odgovora bez punog re-rendera.
+// Prolazi kroz sve retke jer "iskorišteno" u dijeljenom banku ovisi o svim odgovorima.
+function syncEnglishCompletionCards() {
+  const rows = document.querySelectorAll(".english-completion-row[data-card-task]");
+  if (!rows.length) return;
+
+  rows.forEach((row) => {
+    const question = row.dataset.questionNumber;
+    const taskNumber = Number(row.dataset.cardTask);
+    const task = solverExam.tasks.find((candidate) => candidate.number === taskNumber);
+    const answer = responses[question] || "";
+    const shared = task ? usesSharedInlineChoiceBank(task) : false;
+
+    row.classList.toggle("english-completion-row--answered", Boolean(answer));
+
+    const head = row.querySelector(".english-completion-row__head");
+    if (head) {
+      head.innerHTML = `
+        <span class="english-completion-card__number">Praznina ${escapeHtml(question)}</span>
+        ${renderEnglishCardStatus(question, answer, false)}
+      `;
+    }
+
+    const usedOptions = shared && task ? inlineChoiceUsedOptions(task, question) : new Map();
+    row.querySelectorAll("[data-english-card-option]").forEach((button) => {
+      const option = button.dataset.englishCardOption;
+      const selected = option === answer;
+      button.classList.toggle("english-completion-card__option--selected", selected);
+      button.setAttribute("aria-pressed", String(selected));
+      const usedBy = usedOptions.get(option) || [];
+      button.classList.toggle(
+        "english-completion-card__option--used",
+        Boolean(usedBy.length) && !selected,
+      );
+    });
+  });
 }
 
 function renderInlineGapControls(task, sourceImageIndex) {
@@ -1647,6 +1937,7 @@ function bindResponseListeners() {
       toggleInlineTextGapSelfCheck(Number(button.dataset.inlineGapGroupCheck));
     });
   });
+  bindEnglishCompletionCards();
 }
 
 function toggleSelfCheck(question) {
@@ -1830,6 +2121,7 @@ function syncRenderedInlineResponse(question) {
     if (String(button.dataset.selfCheck) === String(question)) button.disabled = !answer;
   });
   syncInlineGapGroupCheckButtons();
+  syncEnglishCompletionCards();
 }
 
 function syncInlineGapGroupCheckButtons() {

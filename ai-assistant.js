@@ -275,6 +275,21 @@
         break;
       }
 
+      // Ako se prije zatvarača pojavi novi isti otvarač (npr. \( ... \( ),
+      // ovaj je graničnik neuravnotežen — model je vjerojatno zaboravio
+      // zatvoriti. Prikaži otvarač kao tekst i nastavi skeniranje, da jedna
+      // pokvarena formula ne proguta i ispravne koje slijede u istom retku.
+      const open = match.delimiter.open;
+      const close = match.delimiter.close;
+      if (open !== close) {
+        const nextOpen = text.indexOf(open, contentStart);
+        if (nextOpen !== -1 && nextOpen < closeIndex) {
+          out += renderTextSegment(text.slice(match.start, contentStart));
+          index = contentStart;
+          continue;
+        }
+      }
+
       const tex = text.slice(contentStart, closeIndex);
       const rendered = renderMath(tex, match.delimiter.display);
       out +=
@@ -371,6 +386,18 @@
       if (controller.signal.aborted) return;
     }
 
+    // Otvoreni (produženi odgovor) zadatci nemaju ABCD odgovor, nego sliku
+    // službenoga rješenja koju model objašnjava korak po korak.
+    let solutionImage = null;
+    if (context.solutionImage) {
+      try {
+        solutionImage = { dataUrl: await cropToDataUrl(context.solutionImage) };
+      } catch {
+        solutionImage = null;
+      }
+      if (controller.signal.aborted) return;
+    }
+
     let response;
     try {
       response = await fetch(ENDPOINT, {
@@ -383,9 +410,11 @@
           solver: context.solver,
           examId: context.examId,
           question: context.question,
+          kind: context.kind === "open" ? "open" : "choice",
           correctAnswer: context.correctAnswer,
           image: imageDataUrl ? { dataUrl: imageDataUrl } : null,
           contextImages,
+          solutionImage,
         }),
       });
     } catch (error) {
@@ -425,12 +454,18 @@
 
     // Tri točkice (razmišljanje) drže se barem 1.5 s prije prikaza teksta, a
     // KaTeX mora biti učitan da se formule odmah prikažu ispravno renderirane.
+    // Točkice ostaju i nakon toga sve dok ne stigne prvi tekst — inače bi tijelo
+    // na par sekundi ostalo prazno dok model još razmišlja (npr. reasoning model).
+    const renderIfReady = () => {
+      if (errored || controller.signal.aborted) return;
+      if (!revealed || !text) return;
+      setBodyHtml(renderExplanationHtml(text));
+    };
+
     const ready = Promise.all([sleep(1500), ensureKatex()]);
     ready.then(() => {
-      if (!errored && !controller.signal.aborted) {
-        revealed = true;
-        setBodyHtml(renderExplanationHtml(text));
-      }
+      revealed = true;
+      renderIfReady();
     });
 
     const handleEvent = (event) => {
@@ -438,7 +473,7 @@
         showRemaining(event.remaining, event.unlimited);
       } else if (event.type === "delta") {
         text += event.text || "";
-        if (revealed) setBodyHtml(renderExplanationHtml(text));
+        renderIfReady();
       } else if (event.type === "done") {
         if (Object.prototype.hasOwnProperty.call(event, "remaining")) {
           showRemaining(event.remaining, event.unlimited);
@@ -474,7 +509,8 @@
 
     await ready;
     if (controller.signal.aborted || errored) return;
-    setBodyHtml(renderExplanationHtml(text));
+    if (text) setBodyHtml(renderExplanationHtml(text));
+    else setBodyMessage("Objašnjenje nije stiglo. Pokušaj ponovno.", "error");
   }
 
   async function reportCurrentExplanation() {
