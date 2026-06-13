@@ -255,6 +255,53 @@ function renderPreviewNotice(exam) {
   `;
 }
 
+function essayWordRange(exam = solverExam) {
+  const range = exam?.wordRange || {};
+  const min = Number(range.min);
+  const max = range.max == null ? null : Number(range.max);
+  return {
+    min: Number.isFinite(min) ? min : null,
+    max: Number.isFinite(max) ? max : null,
+  };
+}
+
+function countWords(text) {
+  const trimmed = String(text ?? "").trim();
+  return trimmed ? trimmed.split(/\s+/).length : 0;
+}
+
+function wordNoun(count) {
+  return count % 10 === 1 && count % 100 !== 11 ? "riječ" : "riječi";
+}
+
+function wordCountText(count, range) {
+  const base = `${count} ${wordNoun(count)}`;
+  if (range.min == null) return base;
+  const target = range.max != null ? `${range.min}–${range.max}` : `${range.min}+`;
+  return `${base} · cilj ${target}`;
+}
+
+function wordCountState(count, range) {
+  if (!count || range.min == null) return "";
+  const aboveMin = count >= range.min;
+  const belowMax = range.max == null || count <= range.max;
+  return aboveMin && belowMax ? "ok" : "warn";
+}
+
+function setupWordCounter() {
+  const textarea = document.querySelector("#essay-scratch");
+  const output = document.querySelector("#essay-word-count");
+  if (!textarea || !output) return;
+  const range = essayWordRange();
+  const update = () => {
+    const count = countWords(textarea.value);
+    output.textContent = wordCountText(count, range);
+    output.dataset.state = wordCountState(count, range);
+  };
+  textarea.addEventListener("input", update);
+  update();
+}
+
 function renderScratchPanel(exam) {
   return `
     <section class="essay-writing-panel essay-writing-panel--scratch" aria-labelledby="essay-scratch-title">
@@ -262,6 +309,7 @@ function renderScratchPanel(exam) {
         <div>
           <h3 id="essay-scratch-title">Tvoj ${escapeHtml(writingNameLower(exam))}</h3>
           <span class="essay-word-pill">Radni prostor bez spremanja</span>
+          <span class="essay-word-pill essay-word-count" id="essay-word-count" aria-live="polite"></span>
         </div>
       </div>
       <label class="essay-textarea-field">
@@ -318,6 +366,7 @@ function renderSolver(exam) {
     </div>
   `;
 
+  setupWordCounter();
   simulation.start(exam.durationMinutes);
 }
 

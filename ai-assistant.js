@@ -25,6 +25,7 @@
   let activeController = null;
   let currentContext = null;
   let reported = false;
+  let thinkingTimer = null;
 
   // KaTeX se vendora lokalno i učitava lijeno tek kad se prvi put otvori
   // asistent, da ne opterećuje učitavanje samoga rješavača. Ako učitavanje
@@ -167,6 +168,7 @@
     element.querySelector("[data-ai-subtitle]").textContent =
       `${context.subject} · zadatak ${context.question}`;
     element.querySelector("[data-ai-body]").innerHTML = thinkingHtml();
+    startThinkingTimer();
     element.querySelector("[data-ai-report-status]").textContent = "";
     const reportButton = element.querySelector("[data-ai-report]");
     reportButton.disabled = false;
@@ -177,6 +179,7 @@
   }
 
   function closeDrawer() {
+    stopThinkingTimer();
     if (activeController) {
       activeController.abort();
       activeController = null;
@@ -191,7 +194,29 @@
   }
 
   function thinkingHtml() {
-    return `<div class="ai-thinking" role="status" aria-label="Asistent razmišlja"><span></span><span></span><span></span></div>`;
+    return `<div class="ai-thinking-row"><div class="ai-thinking" role="status" aria-label="Asistent razmišlja"><span></span><span></span><span></span></div><span class="ai-thinking__timer" data-ai-timer>razmišlja 0s</span></div><p class="ai-thinking__hint">zna potrajati do 15-ak sekundi</p>`;
+  }
+
+  // Umjesto streamanja sažetka razmišljanja prikazujemo samo "razmišlja Ns"
+  // i brojač sekundi koji raste dok ne stigne prvi tekst odgovora.
+  function startThinkingTimer() {
+    stopThinkingTimer();
+    const start = Date.now();
+    const tick = () => {
+      const el = drawer?.querySelector("[data-ai-timer]");
+      if (!el) return;
+      const secs = Math.floor((Date.now() - start) / 1000);
+      el.textContent = `razmišlja ${secs}s`;
+    };
+    tick();
+    thinkingTimer = setInterval(tick, 1000);
+  }
+
+  function stopThinkingTimer() {
+    if (thinkingTimer) {
+      clearInterval(thinkingTimer);
+      thinkingTimer = null;
+    }
   }
 
   function setBodyHtml(html) {
@@ -200,9 +225,26 @@
   }
 
   function setBodyMessage(message, tone = "") {
+    stopThinkingTimer();
     const body = drawer?.querySelector("[data-ai-body]");
     if (!body) return;
     body.innerHTML = `<p class="ai-drawer__message${tone ? ` ai-drawer__message--${tone}` : ""}">${escapeHtml(message)}</p>`;
+  }
+
+  // Model počinje odgovor markerom kad bi objašnjenje ovisilo o sadržaju
+  // književnoga djela koje ne može pouzdano potvrditi — radije odustaje nego
+  // halucinira (vidi prompts/ai-explanation-hrvatski.txt). Dok marker još
+  // pristiže u dijelovima tijekom streaminga, tekst je njegov prefiks pa
+  // čekamo da stigne do kraja prije nego što odlučimo.
+  const ABSTAIN_MARKER = "[[NEDOVOLJNO]]";
+  const ABSTAIN_MESSAGE =
+    "Asistent za mature trenutno nije u mogućnosti odgovoriti na ovo pitanje jer traži poznavanje sadržaja konkretnoga književnog djela koje ne može pouzdano provjeriti.";
+
+  function abstentionState(text) {
+    const trimmed = text.trimStart();
+    if (trimmed.startsWith(ABSTAIN_MARKER)) return "abstain";
+    if (trimmed && ABSTAIN_MARKER.startsWith(trimmed)) return "pending";
+    return "none";
   }
 
   // Klasa boje za podebljanu oznaku na početku retka: točno -> zeleno, netočno
@@ -459,6 +501,13 @@
     const renderIfReady = () => {
       if (errored || controller.signal.aborted) return;
       if (!revealed || !text) return;
+      const state = abstentionState(text);
+      if (state === "pending") return; // marker još nije cijeli stigao
+      if (state === "abstain") {
+        setBodyMessage(ABSTAIN_MESSAGE, "notice");
+        return;
+      }
+      stopThinkingTimer();
       setBodyHtml(renderExplanationHtml(text));
     };
 
@@ -509,8 +558,13 @@
 
     await ready;
     if (controller.signal.aborted || errored) return;
-    if (text) setBodyHtml(renderExplanationHtml(text));
-    else setBodyMessage("Objašnjenje nije stiglo. Pokušaj ponovno.", "error");
+    if (text) {
+      if (abstentionState(text) === "abstain") setBodyMessage(ABSTAIN_MESSAGE, "notice");
+      else {
+        stopThinkingTimer();
+        setBodyHtml(renderExplanationHtml(text));
+      }
+    } else setBodyMessage("Objašnjenje nije stiglo. Pokušaj ponovno.", "error");
   }
 
   async function reportCurrentExplanation() {

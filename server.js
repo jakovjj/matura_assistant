@@ -1307,7 +1307,7 @@ async function handleAiExplanation(request, response) {
       }
       fullText = cached.explanation;
     } else {
-      for await (const delta of streamOpenAiExplanation({
+      for await (const part of streamOpenAiExplanation({
         subject,
         correctAnswer,
         question,
@@ -1318,8 +1318,13 @@ async function handleAiExplanation(request, response) {
         signal: clientSignal,
       })) {
         if (clientSignal.aborted) return;
-        fullText += delta;
-        writeNdjson(response, { type: "delta", text: delta });
+        if (part.kind === "reasoning") {
+          // Sažetak razmišljanja: prikazuje se uživo, ali se NE sprema u objašnjenje.
+          writeNdjson(response, { type: "reasoning", text: part.text });
+          continue;
+        }
+        fullText += part.text;
+        writeNdjson(response, { type: "delta", text: part.text });
       }
       if (!fullText.trim()) throw new Error("OpenAI nije vratio tekst objašnjenja.");
       writeAiExplanationCache(solver, examId, question, {
@@ -1661,8 +1666,11 @@ async function* streamOpenAiExplanation({
     stream: true,
     // Postupna rješenja otvorenih zadataka (s LaTeX-om) dulja su od kratkoga
     // ABCD obrazloženja, pa im dajemo više prostora za izlaz.
+    // Reasoning tokeni (osobito na "high" zalaganju) troše se iz max_output_tokens,
+    // pa budžet mora pokriti i razmišljanje i vidljivi tekst — inače model potroši
+    // sve na reasoning i vrati prazan odgovor (status incomplete).
     max_output_tokens: isReasoningModel
-      ? (kind === "open" ? 3000 : 2200)
+      ? (kind === "open" ? 8000 : 5000)
       : (kind === "open" ? 1500 : 900),
     input: [
       {
@@ -1681,8 +1689,10 @@ async function* streamOpenAiExplanation({
     ],
   };
   if (isReasoningModel) {
-    // "minimal" je najbrže zalaganje (manje čekanja prije nego krene tekst).
-    requestBody.reasoning = { effort: "minimal" };
+    // Srednje zalaganje: balans točnosti i latencije. "high" je znao razmišljati
+    // i do 35 s prije prvoga teksta, što je predugo za čekanje; "medium" zadržava
+    // većinu točnosti uz osjetno kraće razmišljanje.
+    requestBody.reasoning = { effort: "medium" };
   } else {
     requestBody.temperature = 0.2;
   }
@@ -1723,7 +1733,16 @@ async function* streamOpenAiExplanation({
       }
 
       if (event.type === "response.output_text.delta" && typeof event.delta === "string") {
-        yield event.delta;
+        yield { kind: "text", text: event.delta };
+      } else if (
+        event.type === "response.reasoning_summary_text.delta" &&
+        typeof event.delta === "string"
+      ) {
+        // Sažetak razmišljanja reasoning modela — prikazuje se dok tekst još ne stiže.
+        yield { kind: "reasoning", text: event.delta };
+      } else if (event.type === "response.reasoning_summary_part.added") {
+        // Razmak između odvojenih dijelova sažetka.
+        yield { kind: "reasoning", text: "\n\n" };
       } else if (
         event.type === "response.failed" ||
         event.type === "response.error" ||

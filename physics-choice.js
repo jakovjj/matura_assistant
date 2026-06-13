@@ -658,7 +658,7 @@ function renderSolverSummary() {
   const scoreSummary = document.querySelector("#score-summary");
   const footerScoreSummary = document.querySelector("#footer-score-summary");
   const resolvedMax = resolvedMaximum();
-  const score = resolvedMax ? `${resolvedScore()}/${resolvedMax} bodova` : "";
+  const score = resolvedMax ? `${resolvedScore()}/${resolvedMax} (${Math.round((resolvedScore() / resolvedMax) * 100)}%) bodova` : "";
   scoreSummary.textContent = score;
   footerScoreSummary.textContent = score;
 }

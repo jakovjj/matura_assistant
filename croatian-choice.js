@@ -226,6 +226,21 @@ function correctAnswers(question) {
   return Array.isArray(answer) ? answer : [answer].filter(Boolean);
 }
 
+// Poništena pitanja (npr. ukinuta 2020. zbog pandemije) označena su s
+// `excluded` u podatcima. Prikazujemo ih s napomenom i izuzimamo iz bodovanja.
+function isExcludedQuestion(question) {
+  const item = typeof question === "object" ? question : questionByNumber.get(String(question));
+  return window.isExcludedExamTask(item);
+}
+
+function scoredQuestions(exam = solverExam) {
+  return allQuestions(exam).filter((question) => !isExcludedQuestion(question));
+}
+
+function scoredTaskQuestions(task) {
+  return taskQuestions(task).filter((question) => !isExcludedQuestion(question));
+}
+
 function isCorrectAnswer(question, answer) {
   return correctAnswers(question).includes(answer);
 }
@@ -262,11 +277,11 @@ function saveResponses() {
 }
 
 function answeredCount(exam = solverExam, storedResponses = responses) {
-  return allQuestions(exam).filter((question) => storedResponses[question]?.trim()).length;
+  return scoredQuestions(exam).filter((question) => storedResponses[question]?.trim()).length;
 }
 
 function taskAnsweredCount(task) {
-  return taskQuestions(task).filter((question) => responses[question]?.trim()).length;
+  return scoredTaskQuestions(task).filter((question) => responses[question]?.trim()).length;
 }
 
 function renderMissingExam() {
@@ -398,7 +413,7 @@ function renderTaskTypeNavigation() {
           ${isActive ? 'aria-current="true"' : ""}
         >
           <strong>${escapeHtml(task.label)}</strong>
-          <small>${taskAnsweredCount(task)}/${taskQuestions(task).length}</small>
+          <small>${taskAnsweredCount(task)}/${scoredTaskQuestions(task).length}</small>
         </a>
       `;
     })
@@ -476,7 +491,7 @@ function selectTaskType(taskTypeId) {
 
 function renderSolverSummary() {
   const complete = answeredCount();
-  const total = allQuestions().length;
+  const total = scoredQuestions().length;
   document.querySelector("#answer-progress").textContent = `${complete}/${total} odgovora`;
   document.querySelector("#footer-answer-progress").textContent = `${complete}/${total} odgovora`;
   const checkButton = document.querySelector("#check-answers");
@@ -486,11 +501,11 @@ function renderSolverSummary() {
   checkButton.className = checkButtonClass();
   checkButton.innerHTML = renderCheckButtonContent();
 
-  const resolved = allQuestions().filter((question) => isChecked(question));
+  const resolved = scoredQuestions().filter((question) => isChecked(question));
   const resolvedCorrect = resolved.filter((question) =>
     isCorrectAnswer(question, responses[question]),
   ).length;
-  const score = resolved.length ? `${resolvedCorrect}/${resolved.length} bodova` : "";
+  const score = resolved.length ? `${resolvedCorrect}/${resolved.length} (${Math.round((resolvedCorrect / resolved.length) * 100)}%) bodova` : "";
   document.querySelector("#score-summary").textContent = score;
   document.querySelector("#footer-score-summary").textContent = score;
 }
@@ -1097,8 +1112,10 @@ function quickSelectItems() {
 }
 
 function quickSelectAnswerState(item) {
-  const answeredCountForItem = item.questions.filter((question) => responses[question]).length;
-  if (answeredCountForItem === item.questions.length) return "odgovoreno";
+  const scoredItemQuestions = item.questions.filter((question) => !isExcludedQuestion(question));
+  if (scoredItemQuestions.length === 0) return "izuzeto iz bodovanja";
+  const answeredCountForItem = scoredItemQuestions.filter((question) => responses[question]).length;
+  if (answeredCountForItem === scoredItemQuestions.length) return "odgovoreno";
   if (answeredCountForItem > 0) return "djelomično odgovoreno";
   return "nije odgovoreno";
 }
@@ -1117,13 +1134,20 @@ function renderQuickSelect() {
 
   quickSelect.innerHTML = items
     .map((item) => {
-      const isAnswered = item.questions.every((question) => responses[question]);
-      const stateClass = isAnswered ? " question-quickselect__link--answered" : "";
-      const resultClass = item.questions.every((question) => isChecked(question))
-        ? item.questions.every((question) => isCorrectAnswer(question, responses[question]))
-          ? " question-quickselect__link--correct"
-          : " question-quickselect__link--wrong"
-        : "";
+      const scoredItemQuestions = item.questions.filter((question) => !isExcludedQuestion(question));
+      const isExcluded = scoredItemQuestions.length === 0;
+      const isAnswered = !isExcluded && scoredItemQuestions.every((question) => responses[question]);
+      const stateClass = isExcluded
+        ? " question-quickselect__link--excluded"
+        : isAnswered
+          ? " question-quickselect__link--answered"
+          : "";
+      const resultClass =
+        !isExcluded && scoredItemQuestions.every((question) => isChecked(question))
+          ? scoredItemQuestions.every((question) => isCorrectAnswer(question, responses[question]))
+            ? " question-quickselect__link--correct"
+            : " question-quickselect__link--wrong"
+          : "";
       const activeClass =
         item.group === activeQuickSelectGroup() ? " question-quickselect__link--active" : "";
       const answerState = quickSelectAnswerState(item);
@@ -1197,6 +1221,14 @@ function updateQuickSelectActiveState() {
 }
 
 function renderQuestion(question) {
+  if (isExcludedQuestion(question)) {
+    return `
+      <fieldset class="physics-inline-response physics-inline-response--excluded">
+        <legend>Odgovor na ${escapeHtml(question)}. pitanje</legend>
+        ${window.renderExcludedExamTaskNotice()}
+      </fieldset>
+    `;
+  }
   const answer = responses[question] || "";
   const questionData = questionByNumber.get(String(question));
   const options = questionData?.choiceOptions || ["A", "B", "C", "D"];
@@ -1367,7 +1399,7 @@ function finishSimulation(reason) {
 function recordSubmittedSimulation() {
   if (!window.AsistentProfile) return;
 
-  const total = allQuestions().length;
+  const total = scoredQuestions().length;
   window.AsistentProfile.recordSimulationAttempt({
     solver: "croatian-choice",
     subject: "Hrvatski jezik",
@@ -1388,11 +1420,11 @@ function recordSubmittedSimulation() {
 }
 
 function totalScore() {
-  return allQuestions().filter((question) => isCorrectAnswer(question, responses[question])).length;
+  return scoredQuestions().filter((question) => isCorrectAnswer(question, responses[question])).length;
 }
 
 function scorePercentage() {
-  const maximum = allQuestions().length;
+  const maximum = scoredQuestions().length;
   return maximum ? Math.round((totalScore() / maximum) * 100) : 0;
 }
 
@@ -1401,7 +1433,7 @@ function openResultsDialog() {
   if (!dialog) return;
 
   document.querySelector("#exam-results-percentage").textContent = `${scorePercentage()}%`;
-  document.querySelector("#exam-results-score").textContent = `${totalScore()}/${allQuestions().length}`;
+  document.querySelector("#exam-results-score").textContent = `${totalScore()}/${scoredQuestions().length}`;
   dialog.hidden = false;
   document.body.classList.add("exam-results-dialog-open");
   document.querySelector("#close-exam-results").focus();

@@ -63,6 +63,14 @@ ANSWER_ENTRY_RE = re.compile(
 )
 POINT_VALUE_RE = re.compile(r"\(\s*\d+\s+bod(?:a|ova)?\s*\)", flags=re.IGNORECASE)
 
+# Ručne ispravke za pitanja gdje OCR sloj ključa krivo pročita slovo odgovora
+# (npr. "B"/"C" očitano kao ";"), pa ga blank-fallback pogrešno označi kao
+# poništeno pitanje s prihvaćenim svim odgovorima. Ključ je identifikator ispita
+# (vidi exam_id), vrijednost je {broj pitanja: [točan odgovor]}.
+ANSWER_OVERRIDES: dict[str, dict[str, list[str]]] = {
+    "hrvatski-2023-jesenski-rok": {"38": ["B"], "51": ["C"]},
+}
+
 
 @dataclass(frozen=True)
 class PdfWord:
@@ -1773,6 +1781,21 @@ def build_tasks(
     return tasks
 
 
+def mark_excluded_questions(
+    tasks: list[dict[str, Any]], answers: dict[str, list[str]]
+) -> None:
+    """Označi poništena pitanja (ključ prihvaća sve ponuđene odgovore) kao
+    izuzeta iz bodovanja. NCVVO je takva pitanja ukinuo (npr. zbog pogreške ili
+    pandemijskih okolnosti 2020.), pa ih solver prikazuje s napomenom umjesto da
+    nudi odabir odgovora."""
+    for task in tasks:
+        for question in task.get("questions", []):
+            answer = answers.get(question["number"], [])
+            options = question.get("choiceOptions", ["A", "B", "C", "D"])
+            if len(answer) > 1 and set(answer) == set(options):
+                question["excluded"] = True
+
+
 def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     archive_path = local_archive_path(exam["url"])
     identifier = exam_id(exam)
@@ -1792,6 +1815,10 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
         if not is_filled_answer_sheet_name(key_name):
             raise
         questions, answers = parse_filled_answer_sheet_answers(key_contents, exam)
+    for question, override in ANSWER_OVERRIDES.get(identifier, {}).items():
+        if question not in answers:
+            raise ValueError(f"Override for unknown question {question} in {identifier}")
+        answers[question] = override
     destination = PAPER_ROOT / identifier / "paper.pdf"
     paper_changed = not destination.is_file() or destination.read_bytes() != paper_contents
     write_if_changed(destination, paper_contents)
@@ -1805,6 +1832,7 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
         identifier,
         force_render=paper_changed,
     )
+    mark_excluded_questions(tasks, answers)
 
     return {
         "id": identifier,

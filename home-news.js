@@ -28,7 +28,7 @@
          </span>`
       : `<span class="home-news__image home-news__image--empty" aria-hidden="true"></span>`;
     return `<li class="home-news__item">
-        <a href="${url}" target="_blank" rel="noopener noreferrer">
+        <a href="${url}" target="_blank" rel="noopener">
           ${media}
           <span class="home-news__body">
             ${date ? `<time class="home-news__date">${date}</time>` : ""}

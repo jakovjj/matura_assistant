@@ -15,6 +15,8 @@
     "geografija.html": { examPart: "Ispit", subject: "Geografija" },
     "hrvatski-pisanje.html": { examPart: "Pisanje", subject: "Hrvatski jezik" },
     "hrvatski.html": { examPart: "Ispit", subject: "Hrvatski jezik" },
+    "informatika.html": { examPart: "Ispit", subject: "Informatika" },
+    "kemija.html": { examPart: "Ispit", subject: "Kemija" },
     "matematika.html": { examPart: "Ispit", subject: "Matematika" },
     "politika.html": { examPart: "Ispit", subject: "Politika i gospodarstvo" },
     "povijest.html": { examPart: "Ispit", subject: "Povijest" },
@@ -138,6 +140,14 @@
       : null;
     if (!control) return;
 
+    if (control.matches(".home-news__item a")) {
+      const titleEl = control.querySelector(".home-news__title");
+      track("news_open", {
+        news_title: titleEl ? titleEl.textContent.trim() : "",
+        link_url: control instanceof HTMLAnchorElement ? control.href : "",
+      });
+      return;
+    }
     if (control.matches(".subject-card[href]")) {
       track("subject_open", targetParameters(control));
       return;
