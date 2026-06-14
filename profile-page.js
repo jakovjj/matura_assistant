@@ -140,6 +140,8 @@
           </dl>
         </section>
 
+        ${renderSettings()}
+
         <section class="profile-panel" aria-labelledby="profile-simulations-title">
           <div class="profile-section-heading">
             <div>
@@ -148,8 +150,112 @@
           </div>
           ${simulations.length ? renderSimulationTable(simulations) : renderEmptyState()}
         </section>
+
+        ${renderMinorActions(Boolean(user))}
       </div>
     `;
+  }
+
+  function renderMinorActions(isSignedIn) {
+    return `
+      <div class="profile-minor" aria-label="Računi i podaci">
+        <button type="button" class="profile-minor__link" data-clear-progress>
+          Obriši spremljeni napredak
+        </button>
+        ${
+          isSignedIn
+            ? `<span class="profile-minor__sep" aria-hidden="true">·</span>
+               <button type="button" class="profile-minor__link profile-minor__link--danger" data-logout>
+                 Odjava
+               </button>`
+            : ""
+        }
+      </div>
+    `;
+  }
+
+  function currentTheme() {
+    if (window.AsistentTheme) return window.AsistentTheme.get();
+    return document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+  }
+
+  function renderSettings() {
+    const isDark = currentTheme() === "dark";
+    return `
+      <section class="profile-panel" aria-labelledby="profile-settings-title">
+        <div class="profile-section-heading">
+          <div>
+            <h2 id="profile-settings-title">Postavke</h2>
+          </div>
+        </div>
+        <div class="profile-settings__list">
+          <div class="profile-settings__row">
+            <div>
+              <p class="profile-settings__label">
+                ${window.renderLucideIcon ? window.renderLucideIcon("moon", "profile-settings__icon") : ""}
+                <span>Tamni način</span>
+              </p>
+              <p class="profile-settings__hint">Tamna pozadina za cijelu stranicu. Postavka se sprema u ovom pregledniku.</p>
+            </div>
+            <button
+              type="button"
+              class="theme-switch"
+              data-theme-toggle
+              role="switch"
+              aria-checked="${isDark ? "true" : "false"}"
+              aria-label="Tamni način"
+            >
+              <span class="theme-switch__knob" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
+      </section>
+    `;
+  }
+
+  function wireThemeToggle() {
+    const toggle = root.querySelector("[data-theme-toggle]");
+    if (!toggle || !window.AsistentTheme) return;
+
+    toggle.addEventListener("click", () => {
+      const next = window.AsistentTheme.get() === "dark" ? "light" : "dark";
+      window.AsistentTheme.set(next);
+      toggle.setAttribute("aria-checked", next === "dark" ? "true" : "false");
+    });
+  }
+
+  function wireMinorActions() {
+    const clearButton = root.querySelector("[data-clear-progress]");
+    if (clearButton) {
+      clearButton.addEventListener("click", () => {
+        const confirmed = window.confirm(
+          "Obrisati spremljene odgovore na svim vježbama? Ova se radnja ne može poništiti.",
+        );
+        if (!confirmed) return;
+
+        profileStore.clearPracticeProgress?.();
+        clearButton.disabled = true;
+        clearButton.textContent = "Napredak obrisan";
+      });
+    }
+
+    const logoutButton = root.querySelector("[data-logout]");
+    if (logoutButton) {
+      logoutButton.addEventListener("click", async () => {
+        logoutButton.disabled = true;
+        try {
+          await fetch("/api/auth/logout", {
+            body: "{}",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+          });
+        } catch {
+          // Bez obzira na ishod osvježi stranicu da odrazi odjavljeno stanje.
+        }
+        window.location.reload();
+      });
+    }
   }
 
   function renderEmptyState() {
@@ -226,6 +332,8 @@
       loadServerSimulations(),
     ]);
     renderProfile({ localProfile, serverSimulations, user });
+    wireThemeToggle();
+    wireMinorActions();
   }
 
   init();

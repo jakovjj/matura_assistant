@@ -1,3 +1,46 @@
+// Colour theme bootstrap.
+// analytics.js is the first parser-blocking <head> script on every page, so
+// applying the persisted theme here runs before first paint and avoids a flash
+// of light mode for users who chose dark. Default is light (no attribute set).
+// The toggle lives in profile settings and drives this via window.AsistentTheme.
+(() => {
+  const THEME_KEY = "asistent-za-mature:theme";
+
+  const readTheme = () => {
+    try {
+      return localStorage.getItem(THEME_KEY) === "dark" ? "dark" : "light";
+    } catch {
+      return "light";
+    }
+  };
+
+  const applyTheme = (theme) => {
+    const root = document.documentElement;
+    if (theme === "dark") root.setAttribute("data-theme", "dark");
+    else root.removeAttribute("data-theme");
+  };
+
+  const setTheme = (theme) => {
+    const next = theme === "dark" ? "dark" : "light";
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch {
+      // Theme preference simply won't persist if storage is unavailable.
+    }
+    applyTheme(next);
+    return next;
+  };
+
+  applyTheme(readTheme());
+
+  window.AsistentTheme = {
+    STORAGE_KEY: THEME_KEY,
+    get: readTheme,
+    set: setTheme,
+    apply: applyTheme,
+  };
+})();
+
 (() => {
   const measurementId = "G-3W2D6EJZ94";
   const clarityTagId = "x0a1kkmiqz";

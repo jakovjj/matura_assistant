@@ -5,6 +5,15 @@
 
   const noticeConfigPaths = ["./site-notice.txt", "./data/site-notice.txt"];
 
+  // Variants control the banner colour and default icon.
+  const ANNOUNCEMENT_VARIANTS = ["announcement", "info", "blue", "svijetloplava"];
+
+  const parseTimestamp = (value) => {
+    if (!value) return null;
+    const time = Date.parse(value);
+    return Number.isNaN(time) ? null : time;
+  };
+
   const parseNoticeConfig = (source) => {
     const config = {};
 
@@ -26,17 +35,21 @@
 
     return {
       enabled,
+      variant: String(config.variant || "").toLowerCase(),
+      icon: String(config.icon || "").toLowerCase(),
       message: config.message || "",
+      starts: parseTimestamp(config.starts),
+      until: parseTimestamp(config.until),
     };
   };
 
-  const createNoticeIcon = () => {
+  const createNoticeIcon = (iconName) => {
     const icon = document.createElement("span");
     icon.className = "site-notice__icon";
     icon.setAttribute("aria-hidden", "true");
 
     if (typeof window.renderLucideIcon === "function") {
-      icon.innerHTML = window.renderLucideIcon("wrench", "site-notice__icon-svg");
+      icon.innerHTML = window.renderLucideIcon(iconName || "wrench", "site-notice__icon-svg");
       return icon;
     }
 
@@ -85,6 +98,14 @@
 
       if (!notice.enabled || !notice.message) return;
 
+      // Optional scheduling window (timestamps include their own offset).
+      const now = Date.now();
+      if (notice.starts && now < notice.starts) return;
+      if (notice.until && now >= notice.until) return;
+
+      const isAnnouncement = ANNOUNCEMENT_VARIANTS.includes(notice.variant);
+      const iconName = notice.icon || (isAnnouncement ? "star" : "wrench");
+
       const inner = document.createElement("div");
       inner.className = "container site-notice__inner";
 
@@ -92,8 +113,9 @@
       message.className = "site-notice__message";
       message.textContent = notice.message;
 
-      inner.append(createNoticeIcon());
+      inner.append(createNoticeIcon(iconName));
       inner.append(message);
+      noticeRoot.classList.toggle("site-notice--announcement", isAnnouncement);
       noticeRoot.textContent = "";
       noticeRoot.appendChild(inner);
       noticeRoot.hidden = false;
@@ -127,6 +149,29 @@
             matura.com.hr
           </span>
           <div class="topbar__actions">
+            <button
+              type="button"
+              class="topbar__theme-toggle"
+              data-site-theme-toggle
+              aria-label="Uključi tamni prikaz"
+              aria-pressed="false"
+              title="Uključi tamni prikaz"
+            >
+              <svg class="topbar__theme-icon topbar__theme-icon--moon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+              </svg>
+              <svg class="topbar__theme-icon topbar__theme-icon--sun" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="4" />
+                <path d="M12 2v2" />
+                <path d="M12 20v2" />
+                <path d="m4.93 4.93 1.41 1.41" />
+                <path d="m17.66 17.66 1.41 1.41" />
+                <path d="M2 12h2" />
+                <path d="M20 12h2" />
+                <path d="m6.34 17.66-1.41 1.41" />
+                <path d="m19.07 4.93-1.41 1.41" />
+              </svg>
+            </button>
             <a href="https://www.ncvvo.hr/" target="_blank" rel="noreferrer">
               ncvvo.hr
               <svg aria-hidden="true" viewBox="0 0 16 16">
@@ -179,6 +224,42 @@
     </header>
   `;
 
+  const wireThemeToggle = () => {
+    const toggle = document.querySelector("[data-site-theme-toggle]");
+    if (!toggle) return;
+
+    const syncState = () => {
+      const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+      const label = isDark ? "Uključi svijetli prikaz" : "Uključi tamni prikaz";
+      toggle.setAttribute("aria-label", label);
+      toggle.setAttribute("title", label);
+      toggle.setAttribute("aria-pressed", isDark ? "true" : "false");
+    };
+
+    syncState();
+
+    toggle.addEventListener("click", () => {
+      const theme = window.AsistentTheme;
+      const current = theme
+        ? theme.get()
+        : document.documentElement.getAttribute("data-theme") === "dark"
+          ? "dark"
+          : "light";
+      const next = current === "dark" ? "light" : "dark";
+
+      if (theme) {
+        theme.set(next);
+      } else if (next === "dark") {
+        document.documentElement.setAttribute("data-theme", "dark");
+      } else {
+        document.documentElement.removeAttribute("data-theme");
+      }
+
+      syncState();
+    });
+  };
+
+  wireThemeToggle();
   renderNotice();
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", renderNotice, { once: true });

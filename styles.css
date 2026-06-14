@@ -10,6 +10,15 @@
   --soft: #f4f6f8;
   --pale-blue: #edf3fb;
   --white: #fff;
+  /* Role-based aliases. They resolve to the colour tokens above in light mode,
+     so light mode is unchanged; the dark theme (end of file) overrides them.
+     --heading: text that is navy in light mode (titles, strong copy)
+     --surface: panel/card/input backgrounds that are white in light mode
+     --link:    link / accent text that is blue in light mode */
+  --heading: var(--navy);
+  --surface: var(--white);
+  --link: var(--blue);
+  --link-dark: var(--blue-dark);
   --container: 1180px;
   --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -35,7 +44,7 @@ body {
   margin: 0;
   overflow-x: hidden;
   color: var(--ink);
-  background: var(--white);
+  background: var(--surface);
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.5;
@@ -53,12 +62,12 @@ main {
 }
 
 a {
-  color: var(--blue);
+  color: var(--link);
   text-decoration: none;
 }
 
 a:hover {
-  color: var(--blue-dark);
+  color: var(--link-dark);
   text-decoration: underline;
 }
 
@@ -125,8 +134,8 @@ button {
   left: 16px;
   z-index: 100;
   padding: 10px 14px;
-  color: var(--navy);
-  background: var(--white);
+  color: var(--heading);
+  background: var(--surface);
   border: 2px solid var(--navy);
   transition: top 160ms ease;
 }
@@ -202,6 +211,59 @@ button {
   stroke-width: 1.5;
 }
 
+.topbar__theme-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #d1dbee;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.topbar__theme-toggle:hover {
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.topbar__theme-toggle:focus-visible {
+  outline: 2px solid var(--white);
+  outline-offset: 2px;
+}
+
+.topbar__theme-toggle svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+/* Show the icon for the action the tap performs: moon while light (tap -> dark),
+   sun while dark (tap -> light). analytics.js sets data-theme before first paint,
+   so the correct icon shows without a flash. */
+.topbar__theme-toggle .topbar__theme-icon--sun {
+  display: none;
+}
+
+html[data-theme="dark"] .topbar__theme-toggle .topbar__theme-icon--moon {
+  display: none;
+}
+
+html[data-theme="dark"] .topbar__theme-toggle .topbar__theme-icon--sun {
+  display: block;
+}
+
 .site-notice[hidden] {
   display: none;
 }
@@ -210,6 +272,12 @@ button {
   color: #13213c;
   background: #f2c75c;
   border-bottom: 1px solid rgba(0, 0, 0, 0.14);
+}
+
+.site-notice--announcement {
+  color: #0b2c52;
+  background: #bfe0fb;
+  border-bottom-color: rgba(11, 44, 82, 0.16);
 }
 
 .site-notice__inner {
@@ -348,8 +416,8 @@ button {
   align-items: center;
   justify-content: center;
   padding: 7px 10px;
-  color: var(--navy);
-  background: var(--white);
+  color: var(--heading);
+  background: var(--surface);
   border: 1px solid var(--white);
   font-size: 12px;
   font-weight: 700;
@@ -357,11 +425,11 @@ button {
 }
 
 .topbar .auth-widget__button {
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .auth-widget__button:hover {
-  color: var(--navy);
+  color: var(--heading);
   background: #e8eef8;
   text-decoration: none;
 }
@@ -447,7 +515,7 @@ button {
 .auth-page-card {
   width: min(100%, 460px);
   padding: 30px;
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid #c9d8ee;
   border-top: 4px solid var(--navy);
 }
@@ -476,7 +544,7 @@ button {
   overflow: hidden;
   margin: 16px 0 0;
   padding: 11px 12px;
-  color: var(--navy);
+  color: var(--heading);
   background: #f1f6fd;
   border: 1px solid #cddcf1;
   font-size: 14px;
@@ -504,7 +572,7 @@ button {
   gap: 10px;
   padding: 11px 12px;
   color: #1f1f1f;
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid #747775;
   border-radius: 4px;
   font-family: Roboto, Arial, sans-serif;
@@ -524,7 +592,7 @@ button {
   flex: 0 0 auto;
   width: 20px;
   height: 20px;
-  background: var(--white);
+  background: var(--surface);
   object-fit: contain;
 }
 
@@ -539,7 +607,7 @@ button {
 
 .profile-panel {
   padding: 22px;
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   border-top: 4px solid var(--navy);
 }
@@ -554,7 +622,7 @@ button {
 .profile-summary h2,
 .profile-section-heading h2 {
   margin: 2px 0 0;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 26px;
   line-height: 1.1;
 }
@@ -631,7 +699,7 @@ button {
 }
 
 .profile-table th {
-  color: var(--navy);
+  color: var(--heading);
   background: var(--soft);
   font-size: 12px;
   letter-spacing: 0.04em;
@@ -691,7 +759,7 @@ button {
 
 .profile-empty h3 {
   margin: 0;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 18px;
 }
 
@@ -770,7 +838,7 @@ p {
 h1 {
   max-width: 720px;
   margin-bottom: 14px;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 52px;
   font-weight: 700;
   letter-spacing: 0;
@@ -779,7 +847,7 @@ h1 {
 
 h2 {
   margin-bottom: 0;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 27px;
   letter-spacing: 0;
   line-height: 1.18;
@@ -812,7 +880,7 @@ h2 {
 }
 
 .source-note strong {
-  color: var(--navy);
+  color: var(--heading);
   line-height: 1.15;
 }
 
@@ -836,13 +904,13 @@ h2 {
 }
 
 .source-note__contact span {
-  color: var(--navy);
+  color: var(--heading);
   font-weight: 700;
 }
 
 .source-note__contact-reveal {
   padding: 0;
-  color: var(--blue);
+  color: var(--link);
   background: transparent;
   border: 0;
   font: inherit;
@@ -850,7 +918,7 @@ h2 {
 }
 
 .source-note__contact-reveal:hover {
-  color: var(--blue-dark);
+  color: var(--link-dark);
   text-decoration: underline;
 }
 
@@ -879,9 +947,17 @@ h2 {
   padding: 32px 0 72px;
 }
 
+.home-suggestion {
+  padding: 22px 0;
+}
+
+.is-app-subpage .home-suggestion {
+  display: none;
+}
+
 .home-news {
   padding: 30px 0 14px;
-  background: var(--white);
+  background: var(--surface);
 }
 
 .is-app-subpage .home-news {
@@ -900,7 +976,7 @@ h2 {
   margin: 0;
   font-size: 24px;
   line-height: 1.15;
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .home-news__head p {
@@ -913,7 +989,7 @@ h2 {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--blue);
+  color: var(--link);
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
@@ -921,7 +997,7 @@ h2 {
 }
 
 .home-news__source:hover {
-  color: var(--blue-dark);
+  color: var(--link-dark);
 }
 
 .home-news__source svg {
@@ -966,7 +1042,7 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
-  background: var(--white);
+  background: var(--surface);
   text-decoration: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
@@ -1009,7 +1085,7 @@ h2 {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 15.5px;
   line-height: 1.35;
   font-weight: 600;
@@ -1029,8 +1105,8 @@ h2 {
   padding: 0;
   border: 1px solid var(--line-dark);
   border-radius: 999px;
-  background: var(--white);
-  color: var(--navy);
+  background: var(--surface);
+  color: var(--heading);
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0, 29, 77, 0.12);
   transition: background 0.15s ease, opacity 0.15s ease;
@@ -1118,7 +1194,7 @@ h2 {
 
 .home-information__topics h3 {
   margin: 0 0 5px;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 15px;
   line-height: 1.25;
 }
@@ -1139,22 +1215,21 @@ h2 {
 }
 
 .home-information__source strong {
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .home-feedback {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  text-align: center;
 }
 
 .home-feedback strong {
   display: block;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 15px;
   line-height: 1.25;
 }
@@ -1169,6 +1244,17 @@ h2 {
 
 .home-feedback .secondary-button {
   flex: 0 0 auto;
+  gap: 7px;
+}
+
+.home-feedback .secondary-button svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .feedback-dialog[hidden] {
@@ -1202,7 +1288,7 @@ h2 {
   overflow: auto;
   padding: 26px;
   color: var(--ink);
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   border-radius: 8px;
   box-shadow: 0 18px 54px rgba(0, 29, 77, 0.28);
@@ -1215,7 +1301,7 @@ h2 {
   width: 34px;
   height: 34px;
   padding: 0;
-  color: var(--navy);
+  color: var(--heading);
   background: var(--soft);
   border: 1px solid var(--line-dark);
   font-size: 14px;
@@ -1223,7 +1309,7 @@ h2 {
 }
 
 .feedback-dialog__close:hover {
-  color: var(--blue-dark);
+  color: var(--link-dark);
   border-color: var(--blue-dark);
 }
 
@@ -1234,7 +1320,7 @@ h2 {
 
 .feedback-dialog__form h2 {
   margin: 4px 38px 6px 0;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 24px;
   line-height: 1.2;
 }
@@ -1247,7 +1333,7 @@ h2 {
 }
 
 .feedback-dialog__form label {
-  color: var(--navy);
+  color: var(--heading);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -1258,7 +1344,7 @@ h2 {
 .feedback-dialog__form input {
   width: 100%;
   color: var(--ink);
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   border-radius: 0;
   font: inherit;
@@ -1349,7 +1435,7 @@ h2 {
 
 .subject-group__heading h3 {
   margin: 0;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 18px;
   line-height: 1.2;
 }
@@ -1379,7 +1465,7 @@ h2 {
   align-items: center;
   padding: 14px 14px 14px 16px;
   color: var(--ink);
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   border-left: 4px solid var(--subject-color, var(--navy));
   box-shadow: 0 1px 2px rgba(0, 29, 77, 0.06);
@@ -1409,7 +1495,7 @@ h2 {
 
 .subject-card:hover {
   color: var(--ink);
-  background: color-mix(in srgb, var(--subject-color, var(--navy)) 7%, var(--white));
+  background: color-mix(in srgb, var(--subject-color, var(--navy)) 7%, var(--surface));
   border-color: color-mix(in srgb, var(--subject-color, var(--navy)) 52%, var(--line-dark));
   box-shadow: 0 6px 14px rgba(0, 29, 77, 0.1);
   text-decoration: none;
@@ -1469,7 +1555,7 @@ h2 {
 }
 
 .subject-card__body strong {
-  color: var(--navy);
+  color: var(--heading);
   font-size: 16px;
   line-height: 1.18;
 }
@@ -1585,7 +1671,7 @@ h2 {
   align-items: center;
   gap: 6px;
   margin-bottom: 12px;
-  color: var(--blue);
+  color: var(--link);
   font-size: 13px;
   font-weight: 700;
 }
@@ -1703,7 +1789,7 @@ h2 {
 .exam-progress__percent {
   order: -1;
   flex: 0 0 38px;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 13px;
   line-height: 1;
   text-align: left;
@@ -1715,7 +1801,7 @@ h2 {
   height: 34px;
   place-items: center;
   padding: 0;
-  background: var(--white);
+  background: var(--surface);
   border: 2px solid currentColor;
   border-radius: 999px;
   box-shadow:
@@ -1767,8 +1853,8 @@ h2 {
   width: 34px;
   height: 34px;
   place-items: center;
-  color: var(--blue);
-  background: var(--white);
+  color: var(--link);
+  background: var(--surface);
   border: 1px solid var(--blue);
 }
 
@@ -1827,7 +1913,7 @@ h2 {
 
 .grade-thresholds {
   margin-top: 22px;
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   border-top: 4px solid var(--subject-color, var(--navy));
 }
@@ -1839,7 +1925,7 @@ h2 {
 
 .grade-thresholds__heading h3 {
   margin: 0;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 16px;
   line-height: 1.2;
 }
@@ -1872,7 +1958,7 @@ h2 {
 }
 
 .grade-thresholds__table td:last-child {
-  color: var(--navy);
+  color: var(--heading);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -1909,7 +1995,7 @@ h2 {
 .practice-interactive-card {
   margin-top: 22px;
   padding: 18px;
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   border-top: 4px solid var(--subject-color, var(--navy));
 }
@@ -1924,7 +2010,7 @@ h2 {
 
 .practice-interactive-card h3 {
   margin: 4px 0 0;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 22px;
   line-height: 1.2;
 }
@@ -1953,7 +2039,7 @@ h2 {
   align-items: center;
   min-height: 62px;
   padding: 12px 14px;
-  background: var(--white);
+  background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
 
@@ -1966,7 +2052,7 @@ h2 {
 }
 
 .practice-exam-row__name strong {
-  color: var(--navy);
+  color: var(--heading);
   line-height: 1.2;
 }
 
@@ -1982,7 +2068,7 @@ h2 {
 }
 
 .practice-exam-row__duration {
-  color: var(--navy);
+  color: var(--heading);
   font-size: 12px;
   font-weight: 700;
   text-align: right;
@@ -2009,7 +2095,7 @@ h2 {
 }
 
 .simulation-note strong {
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .archive-section {
@@ -2050,7 +2136,7 @@ h2 {
 }
 
 .filters h2 {
-  color: var(--navy);
+  color: var(--heading);
   font-size: 18px;
 }
 
@@ -2073,18 +2159,18 @@ h2 {
 }
 
 .year-jump-link:hover {
-  color: var(--blue-dark);
+  color: var(--link-dark);
   text-decoration: underline;
 }
 
 .year-jump-link--active {
-  color: var(--navy);
+  color: var(--heading);
   font-weight: 700;
 }
 
 .link-button {
   padding: 0;
-  color: var(--blue);
+  color: var(--link);
   background: transparent;
   border: 0;
   font-size: 13px;
@@ -2103,7 +2189,7 @@ h2 {
 .field > span:first-child {
   display: block;
   margin-bottom: 6px;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -2115,7 +2201,7 @@ select {
   width: 100%;
   height: 40px;
   color: var(--ink);
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   border-radius: 0;
   font-size: 14px;
@@ -2245,7 +2331,7 @@ a:focus-visible {
   display: inline-block;
   min-width: 25px;
   padding: 2px 5px;
-  color: var(--navy);
+  color: var(--heading);
   background: var(--pale-blue);
   border: 1px solid #cfdaea;
   font-size: 11px;
@@ -2299,13 +2385,13 @@ a:focus-visible {
 }
 
 .practice-link {
-  color: var(--blue);
+  color: var(--link);
   font-size: 12px;
   font-weight: 700;
 }
 
 .practice-link:hover {
-  color: var(--blue-dark);
+  color: var(--link-dark);
 }
 
 .empty-state {
@@ -2318,7 +2404,7 @@ a:focus-visible {
 
 .empty-state h3 {
   margin: 0 0 5px;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 18px;
 }
 
@@ -2458,11 +2544,11 @@ a:focus-visible {
 }
 
 .subpage-context a {
-  color: var(--blue);
+  color: var(--link);
 }
 
 .subpage-context span {
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .practice-section {
@@ -2584,24 +2670,24 @@ a:focus-visible {
 }
 
 .primary-button--muted {
-  color: var(--blue);
-  background: var(--white);
+  color: var(--link);
+  background: var(--surface);
   border-color: var(--line-dark);
 }
 
 .primary-button--muted:hover {
-  color: var(--blue-dark);
+  color: var(--link-dark);
   background: var(--soft);
   border-color: var(--blue-dark);
 }
 
 .secondary-button {
-  color: var(--blue);
-  background: var(--white);
+  color: var(--link);
+  background: var(--surface);
 }
 
 .secondary-button:hover {
-  color: var(--blue-dark);
+  color: var(--link-dark);
   border-color: var(--blue-dark);
 }
 
@@ -2629,7 +2715,7 @@ a:focus-visible {
 
 .solver-header {
   overflow: hidden;
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   border-top: 4px solid var(--subject-color, var(--navy));
 }
@@ -2708,7 +2794,7 @@ a:focus-visible {
   gap: 24px;
   padding: 15px 16px 10px;
   color: var(--ink);
-  background: var(--white);
+  background: var(--surface);
 }
 
 .solver-header__identity {
@@ -2731,7 +2817,7 @@ a:focus-visible {
 
 .solver-header__main h2 {
   margin: 0;
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .solver-header__main p {
@@ -2783,7 +2869,7 @@ a:focus-visible {
 
 .solver-summary {
   flex: 0 0 auto;
-  color: var(--navy);
+  color: var(--heading);
   text-align: right;
 }
 
@@ -2795,7 +2881,7 @@ a:focus-visible {
 
 .solver-summary span {
   min-height: 18px;
-  color: var(--blue);
+  color: var(--link);
 }
 
 .simulation-timer {
@@ -2812,7 +2898,7 @@ a:focus-visible {
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
-  color: var(--blue);
+  color: var(--link);
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -2836,12 +2922,12 @@ a:focus-visible {
 
 .simulation-timer strong {
   margin-top: 2px;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 15px;
 }
 
 .simulation-mode-notice strong {
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .simulation-start-dialog-open {
@@ -2867,14 +2953,14 @@ a:focus-visible {
   position: relative;
   width: min(100%, 470px);
   padding: 28px;
-  background: var(--white);
+  background: var(--surface);
   border-top: 4px solid var(--navy);
   box-shadow: 0 18px 60px rgba(0, 29, 77, 0.28);
 }
 
 .simulation-start-dialog__panel h2 {
   margin: 0;
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .simulation-start-dialog__panel > p:last-of-type {
@@ -2896,7 +2982,7 @@ a:focus-visible {
 }
 
 .simulation-start-dialog__details strong {
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .simulation-start-dialog__actions {
@@ -2922,7 +3008,7 @@ a:focus-visible {
 
 .essay-task-panel,
 .essay-writing-panel {
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
 }
 
@@ -2933,7 +3019,7 @@ a:focus-visible {
 .essay-task-panel h3,
 .essay-writing-panel h3 {
   margin: 0;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 20px;
 }
 
@@ -2985,13 +3071,13 @@ a:focus-visible {
   justify-content: space-between;
   gap: 12px;
   padding: 14px 0 0;
-  color: var(--navy);
+  color: var(--heading);
   cursor: pointer;
   font-weight: 800;
 }
 
 .essay-rubric > summary small {
-  color: var(--blue);
+  color: var(--link);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -3026,7 +3112,7 @@ a:focus-visible {
   justify-content: space-between;
   gap: 12px;
   margin: 0;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 14px;
 }
 
@@ -3061,7 +3147,7 @@ a:focus-visible {
 
 .essay-rubric__rules h4 {
   margin: 0;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 14px;
 }
 
@@ -3072,7 +3158,7 @@ a:focus-visible {
 }
 
 .essay-rubric__source a {
-  color: var(--blue);
+  color: var(--link);
 }
 
 .essay-writing-panel {
@@ -3202,7 +3288,7 @@ a:focus-visible {
 }
 
 .essay-photo-preview strong {
-  color: var(--navy);
+  color: var(--heading);
   word-break: break-word;
 }
 
@@ -3281,7 +3367,7 @@ body.solver-page {
   grid-template-columns: auto 1fr;
   align-items: center;
   gap: 7px;
-  color: var(--navy);
+  color: var(--heading);
   text-align: left;
 }
 
@@ -3306,7 +3392,7 @@ body.solver-page {
 }
 
 .solver-sticky-footer__status-copy span {
-  color: var(--blue);
+  color: var(--link);
   font-size: 12px;
 }
 
@@ -3368,7 +3454,7 @@ body.solver-page {
   position: relative;
   width: min(100%, 430px);
   padding: 28px;
-  background: var(--white);
+  background: var(--surface);
   border-top: 4px solid var(--navy);
   box-shadow: 0 18px 60px rgba(0, 29, 77, 0.28);
   text-align: center;
@@ -3382,7 +3468,7 @@ body.solver-page {
   width: 32px;
   height: 32px;
   place-items: center;
-  color: var(--navy);
+  color: var(--heading);
   background: var(--soft);
   border: 1px solid var(--line-dark);
   font-size: 24px;
@@ -3427,7 +3513,7 @@ body.solver-page {
 }
 
 .exam-results-dialog[data-state="grading"] .exam-results-dialog__panel .eyebrow {
-  color: var(--blue);
+  color: var(--link);
 }
 
 .exam-results-dialog__check circle {
@@ -3449,7 +3535,7 @@ body.solver-page {
 
 .exam-results-dialog__panel h2 {
   margin: 0;
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .exam-results-dialog__panel > p:last-child {
@@ -3478,7 +3564,7 @@ body.solver-page {
 }
 
 .exam-results-dialog__metrics strong {
-  color: var(--navy);
+  color: var(--heading);
   font-size: 26px;
 }
 
@@ -3498,7 +3584,7 @@ body.solver-page {
 
 .exam-results-dialog__criteria > strong {
   display: block;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 13px;
 }
 
@@ -3516,7 +3602,7 @@ body.solver-page {
   gap: 12px;
   align-items: center;
   padding: 8px 10px;
-  background: var(--white);
+  background: var(--surface);
 }
 
 .exam-results-dialog__criteria dt,
@@ -3530,7 +3616,7 @@ body.solver-page {
 }
 
 .exam-results-dialog__criteria dd {
-  color: var(--navy);
+  color: var(--heading);
   font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
@@ -3545,7 +3631,7 @@ body.solver-page {
 
 .exam-results-dialog__comment summary {
   padding: 10px 0;
-  color: var(--navy);
+  color: var(--heading);
   cursor: pointer;
   font-size: 14px;
   font-weight: 700;
@@ -3627,7 +3713,7 @@ body.solver-page {
   gap: 7px;
   justify-content: center;
   padding: 8px 10px;
-  color: var(--navy);
+  color: var(--heading);
   background: var(--soft);
   border: 1px solid var(--line-dark);
   text-align: center;
@@ -3636,7 +3722,7 @@ body.solver-page {
 
 .task-button:hover,
 .task-button--active {
-  color: var(--blue);
+  color: var(--link);
   background: var(--pale-blue);
   border-color: #afc5e6;
   text-decoration: none;
@@ -3653,7 +3739,7 @@ body.solver-page {
 }
 
 .task-button small {
-  color: var(--navy);
+  color: var(--heading);
   font-size: inherit;
   font-weight: 700;
 }
@@ -3678,7 +3764,7 @@ body.solver-page {
   gap: 10px;
   max-width: 48%;
   padding: 10px 14px;
-  color: var(--navy);
+  color: var(--heading);
   background: var(--soft);
   border: 1px solid var(--line-dark);
   cursor: pointer;
@@ -3690,7 +3776,7 @@ body.solver-page {
 }
 
 .task-type-pager__button:hover {
-  color: var(--blue);
+  color: var(--link);
   background: var(--pale-blue);
   border-color: #afc5e6;
 }
@@ -3748,14 +3834,14 @@ body.solver-page {
   display: block;
   width: 100%;
   height: 100%;
-  background: var(--white);
+  background: var(--surface);
   border: 0;
 }
 
 .task-content-panel,
 .answer-panel {
   min-width: 0;
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
 }
 
@@ -3771,7 +3857,7 @@ body.solver-page {
 
 .panel-heading h3 {
   margin: 0;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 18px;
 }
 
@@ -3823,7 +3909,7 @@ body.solver-page {
   max-width: 100%;
   min-width: 0;
   overflow: hidden;
-  background: var(--white);
+  background: var(--surface);
 }
 
 .pdf-source-crop img {
@@ -3845,7 +3931,7 @@ body.solver-page {
   justify-content: space-between;
   gap: 12px;
   padding: 12px 14px;
-  color: var(--navy);
+  color: var(--heading);
   border-bottom: 1px solid var(--line);
 }
 
@@ -3906,7 +3992,7 @@ body.solver-page {
   height: 34px;
   padding: 5px 8px;
   color: var(--ink);
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   font: inherit;
 }
@@ -4045,7 +4131,7 @@ body.solver-page {
   max-height: min(540px, calc(100vh - 24px));
   overflow: auto;
   color: var(--ink);
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   box-shadow: 0 14px 38px rgba(16, 35, 63, 0.22);
 }
@@ -4097,7 +4183,7 @@ body.solver-page {
   width: 100%;
   padding: 9px 10px;
   color: var(--ink);
-  background: var(--white);
+  background: var(--surface);
   border: 0;
   border-top: 1px solid var(--line);
   font: inherit;
@@ -4120,7 +4206,7 @@ body.solver-page {
   width: 28px;
   height: 28px;
   place-items: center;
-  color: var(--navy);
+  color: var(--heading);
   background: var(--soft);
   border: 1px solid var(--line-dark);
   font-size: 12px;
@@ -4191,7 +4277,7 @@ body.solver-page {
 
 .english-inline-group-result > strong {
   min-width: 32px;
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .english-inline-group-result .response-feedback {
@@ -4218,7 +4304,7 @@ body.solver-page {
 
 .english-inline-check-row > strong {
   min-width: 32px;
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .source-instructions {
@@ -4232,7 +4318,7 @@ body.solver-page {
 
 .source-title {
   margin-top: 22px;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 23px;
   letter-spacing: 0;
   line-height: 1.2;
@@ -4241,7 +4327,7 @@ body.solver-page {
 
 .source-subheading {
   margin-top: 18px;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 16px;
 }
 
@@ -4250,7 +4336,7 @@ body.solver-page {
   align-items: center;
   gap: 9px;
   margin-top: 20px;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 17px;
 }
 
@@ -4368,7 +4454,7 @@ body.solver-page {
   max-height: calc(100vh - 118px);
   padding: 11px;
   overflow: hidden;
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
 }
 
@@ -4391,7 +4477,7 @@ body.solver-page {
   justify-content: space-between;
   gap: 8px;
   padding-bottom: 9px;
-  color: var(--navy);
+  color: var(--heading);
   border-bottom: 1px solid var(--line);
 }
 
@@ -4419,8 +4505,8 @@ body.solver-page {
   width: 31px;
   min-height: 30px;
   place-items: center;
-  color: var(--navy);
-  background: var(--white);
+  color: var(--heading);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   font-size: 12px;
   font-weight: 700;
@@ -4428,7 +4514,7 @@ body.solver-page {
 
 .question-quickselect__link:hover,
 .physics-quickselect__link:hover {
-  color: var(--blue-dark);
+  color: var(--link-dark);
   background: var(--soft);
   border-color: var(--blue);
   text-decoration: none;
@@ -4436,7 +4522,7 @@ body.solver-page {
 
 .question-quickselect__link--answered,
 .physics-quickselect__link--answered {
-  color: var(--blue-dark);
+  color: var(--link-dark);
   background: var(--pale-blue);
   border-color: #afc5e6;
 }
@@ -4481,7 +4567,7 @@ body.solver-page {
   gap: 6px;
   margin-top: 10px;
   padding: 7px 9px;
-  color: var(--navy);
+  color: var(--heading);
   background: var(--soft);
   border: 1px solid var(--line-dark);
   font-size: 12px;
@@ -4530,7 +4616,7 @@ body.solver-page {
 }
 
 .task-audio__heading strong {
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .task-audio__heading small {
@@ -4718,7 +4804,7 @@ body.solver-page {
 
 .audio-track-button {
   padding: 6px 9px;
-  color: var(--navy);
+  color: var(--heading);
   background: var(--soft);
   border: 1px solid var(--line-dark);
   font-size: 12px;
@@ -4727,7 +4813,7 @@ body.solver-page {
 
 .audio-track-button:hover,
 .audio-track-button--active {
-  color: var(--blue);
+  color: var(--link);
   background: var(--pale-blue);
   border-color: #afc5e6;
 }
@@ -4748,7 +4834,7 @@ body.solver-page {
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  color: var(--navy);
+  color: var(--heading);
   background: #edf3f8;
   border-left: 4px solid var(--navy);
 }
@@ -4772,14 +4858,14 @@ body.solver-page {
   display: grid;
   gap: 10px;
   padding: 14px 0;
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line);
 }
 
 .croatian-source-context .eyebrow {
   margin: 0;
   padding-inline: 14px;
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .croatian-source-context .physics-source-crop {
@@ -4890,7 +4976,7 @@ body.solver-page {
 
 .history-open-question__heading h4 {
   margin: 0;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 15px;
 }
 
@@ -4929,7 +5015,7 @@ body.solver-page {
 }
 
 .history-open-feedback strong {
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .history-open-feedback p {
@@ -4941,7 +5027,7 @@ body.solver-page {
 }
 
 .history-open-feedback summary {
-  color: var(--navy);
+  color: var(--heading);
   cursor: pointer;
   font-weight: 700;
 }
@@ -4952,7 +5038,7 @@ body.solver-page {
   overflow: auto;
   padding: 12px 14px;
   color: #24354f;
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line);
   line-height: 1.55;
 }
@@ -5063,7 +5149,7 @@ body.solver-page {
   z-index: 60;
   width: min(360px, calc(100vw - 24px));
   color: var(--ink);
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   box-shadow: 0 14px 38px rgba(16, 35, 63, 0.22);
 }
@@ -5112,7 +5198,7 @@ body.solver-page {
   width: 100%;
   padding: 9px 10px;
   color: var(--ink);
-  background: var(--white);
+  background: var(--surface);
   border: 0;
   border-top: 1px solid var(--line);
   font: inherit;
@@ -5135,7 +5221,7 @@ body.solver-page {
   width: 28px;
   height: 28px;
   place-items: center;
-  color: var(--navy);
+  color: var(--heading);
   background: var(--soft);
   border: 1px solid var(--line-dark);
   font-size: 12px;
@@ -5173,7 +5259,7 @@ body.solver-page {
 
 .croatian-completion-card__number {
   font-weight: 700;
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .croatian-completion-card__status {
@@ -5198,7 +5284,7 @@ body.solver-page {
 /* Crop punog retka službenog teksta (puna širina, bez horizontalnog scrolla). */
 .croatian-completion-band {
   overflow: hidden;
-  background: var(--white);
+  background: var(--surface);
 }
 
 .croatian-completion-band__marker {
@@ -5250,7 +5336,7 @@ body.solver-page {
   width: 100%;
   padding: 6px 10px;
   color: var(--ink);
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   font: inherit;
   text-align: left;
@@ -5267,7 +5353,7 @@ body.solver-page {
   width: 24px;
   height: 24px;
   place-items: center;
-  color: var(--navy);
+  color: var(--heading);
   background: var(--soft);
   border: 1px solid var(--line-dark);
   font-size: 12px;
@@ -5329,7 +5415,7 @@ body.solver-page {
 
 .english-completion-card__number {
   font-weight: 700;
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .english-completion-card__status {
@@ -5353,7 +5439,7 @@ body.solver-page {
 
 .english-completion-band {
   overflow: hidden;
-  background: var(--white);
+  background: var(--surface);
 }
 
 .english-completion-band__marker {
@@ -5394,7 +5480,7 @@ body.solver-page {
   width: 100%;
   padding: 11px 12px;
   color: var(--ink);
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   font: inherit;
   font-size: 15px;
@@ -5419,7 +5505,7 @@ body.solver-page {
   width: 100%;
   padding: 11px 12px;
   color: var(--ink);
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   font: inherit;
   text-align: left;
@@ -5436,7 +5522,7 @@ body.solver-page {
   width: 28px;
   height: 28px;
   place-items: center;
-  color: var(--navy);
+  color: var(--heading);
   background: var(--soft);
   border: 1px solid var(--line-dark);
   font-size: 13px;
@@ -5532,7 +5618,7 @@ body.solver-page {
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 14px;
   font-weight: 700;
 }
@@ -5629,12 +5715,12 @@ body.solver-page {
   align-items: center;
   gap: 8px;
   padding: 6px 8px;
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line);
 }
 
 .art-matching-response__item {
-  color: var(--navy);
+  color: var(--heading);
   font-weight: 800;
 }
 
@@ -5643,8 +5729,8 @@ body.solver-page {
   min-width: 0;
   height: 32px;
   padding: 4px 6px;
-  color: var(--navy);
-  background: var(--white);
+  color: var(--heading);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   font: inherit;
   font-weight: 700;
@@ -5684,7 +5770,7 @@ body.solver-page {
   max-width: var(--crop-natural, 100%);
   min-width: 0;
   overflow: hidden;
-  background: var(--white);
+  background: var(--surface);
 }
 
 .physics-source-crop img {
@@ -5750,7 +5836,7 @@ body.solver-page {
   .physics-source-crop.source-crop-loaded,
   .pdf-source-crop.source-crop-loaded,
   .source-crop-segment.source-crop-loaded {
-    background-color: var(--white);
+    background-color: var(--surface);
   }
 }
 
@@ -5921,7 +6007,7 @@ body.solver-page {
 }
 
 .source-image-viewer__crop {
-  background: var(--white);
+  background: var(--surface);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.42);
   pointer-events: none;
 }
@@ -5983,7 +6069,7 @@ body.solver-page {
   min-height: 34px;
   align-items: center;
   gap: 6px;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 13px;
   font-weight: 700;
   vertical-align: top;
@@ -5994,8 +6080,8 @@ body.solver-page {
   width: 46px;
   height: 34px;
   padding: 5px 6px;
-  color: var(--navy);
-  background: var(--white);
+  color: var(--heading);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   font: inherit;
   text-align: right;
@@ -6038,8 +6124,8 @@ body.solver-page {
   min-height: 34px;
   margin-left: auto;
   padding: 6px 11px;
-  color: var(--navy);
-  background: var(--white);
+  color: var(--heading);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   font: inherit;
   font-size: 13px;
@@ -6058,7 +6144,7 @@ body.solver-page {
 }
 
 .inline-check-button--active {
-  color: var(--blue-dark);
+  color: var(--link-dark);
   border-color: var(--blue);
 }
 
@@ -6151,7 +6237,7 @@ body.solver-page {
 .response-question--text strong {
   float: left;
   width: 28px;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 13px;
 }
 
@@ -6180,8 +6266,8 @@ body.solver-page {
   width: 26px;
   height: 26px;
   place-items: center;
-  color: var(--navy);
-  background: var(--white);
+  color: var(--heading);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   font-size: 12px;
   font-weight: 700;
@@ -6286,12 +6372,11 @@ body.solver-page {
   }
 
   .home-feedback {
-    align-items: flex-start;
-    flex-direction: column;
+    align-items: center;
   }
 
   .home-feedback .secondary-button {
-    align-self: flex-start;
+    align-self: center;
   }
 
   .archive-layout {
@@ -6340,7 +6425,7 @@ body.solver-page {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     padding: 10px 12px;
-    background: var(--white);
+    background: var(--surface);
     border: 1px solid var(--line-dark);
     border-top: 4px solid var(--subject-color, var(--navy));
   }
@@ -7066,7 +7151,7 @@ body.solver-page {
   }
 
   .solver-header__task-navigation .task-button--active {
-    color: var(--navy);
+    color: var(--heading);
     background: var(--pale-blue);
     border-color: #94b4df;
     box-shadow: inset 3px 0 0 var(--blue);
@@ -7081,7 +7166,7 @@ body.solver-page {
   .solver-header__task-navigation .task-button small {
     justify-self: end;
     padding: 2px 6px;
-    background: var(--white);
+    background: var(--surface);
     border: 1px solid currentColor;
     font-size: 12px;
     line-height: 1;
@@ -7179,7 +7264,7 @@ body.solver-page {
   }
 
   .question-jump span {
-    color: var(--navy);
+    color: var(--heading);
     font-size: 13px;
     font-weight: 700;
   }
@@ -7189,8 +7274,8 @@ body.solver-page {
     min-width: 0;
     height: 34px;
     padding: 5px 28px 5px 8px;
-    color: var(--navy);
-    background: var(--white);
+    color: var(--heading);
+    background: var(--surface);
     border: 1px solid var(--line-dark);
     font: inherit;
     font-size: 13px;
@@ -7207,7 +7292,7 @@ body.solver-page {
     min-width: 0;
     min-height: 34px;
     padding: 6px 9px;
-    background: var(--white);
+    background: var(--surface);
     font-size: 12px;
   }
 
@@ -7244,7 +7329,7 @@ body.solver-page {
     width: 30px;
     min-height: 30px;
     flex-basis: 30px;
-    background: var(--white);
+    background: var(--surface);
     font-size: 12px;
   }
 
@@ -7252,7 +7337,7 @@ body.solver-page {
     min-width: 0;
     min-height: 30px;
     padding: 6px 8px;
-    background: var(--white);
+    background: var(--surface);
     font-size: 12px;
   }
 
@@ -7612,7 +7697,7 @@ body.solver-page {
   height: 34px;
   flex: 0 0 auto;
   padding: 0;
-  background: var(--white);
+  background: var(--surface);
   border: 1px solid var(--line-dark);
   border-radius: 0;
   cursor: pointer;
@@ -7655,7 +7740,7 @@ body.solver-page {
 .ai-login-modal__panel {
   position: relative;
   width: min(440px, 100%);
-  background: var(--white);
+  background: var(--surface);
   border-radius: 8px;
   padding: 28px 24px 24px;
   text-align: center;
@@ -7681,7 +7766,7 @@ body.solver-page {
 
 .ai-login-modal__panel h2 {
   margin: 0 0 8px;
-  color: var(--navy);
+  color: var(--heading);
   font-size: 20px;
 }
 
@@ -7717,7 +7802,7 @@ body.solver-page {
   max-height: 72vh;
   display: flex;
   flex-direction: column;
-  background: var(--white);
+  background: var(--surface);
   border-radius: 0;
   box-shadow: 0 -16px 50px rgba(0, 29, 77, 0.26);
   border-top: 3px solid var(--blue);
@@ -7768,7 +7853,7 @@ body.solver-page {
 }
 
 .ai-drawer__heading strong {
-  color: var(--navy);
+  color: var(--heading);
   font-size: 16px;
 }
 
@@ -7788,7 +7873,7 @@ body.solver-page {
 }
 
 .ai-drawer__close:hover {
-  color: var(--navy);
+  color: var(--heading);
 }
 
 .ai-drawer__body {
@@ -7929,7 +8014,7 @@ body.solver-page {
   align-items: center;
   gap: 7px;
   border: 1px solid var(--line-dark);
-  background: var(--white);
+  background: var(--surface);
   color: var(--muted);
   border-radius: 4px;
   padding: 7px 12px;
@@ -7976,4 +8061,435 @@ body.solver-page {
     flex-basis: 100%;
     text-align: left;
   }
+}
+
+/* ==========================================================================
+   Dark theme
+   Opt-in via the toggle in profile settings; persisted in localStorage and
+   applied early by analytics.js (window.AsistentTheme). Light mode is the
+   default and is untouched: every rule below is scoped to [data-theme="dark"].
+   The colour swaps lean on the role tokens (--surface/--heading/--link) so
+   most of the site themes automatically; explicit blocks below cover the
+   surfaces that use literal colours.
+   ========================================================================== */
+html[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* text */
+  --ink: #e6eaf2;
+  --muted: #9aa6bd;
+  --heading: #c9d6ef;
+  --white: #eef2f8;        /* text that sits on accents (header, buttons…) */
+
+  /* surfaces */
+  --surface: #161c26;      /* panels, cards, inputs (was white) */
+  --soft: #1e2532;         /* table headers, insets, disabled, empty states */
+  --pale-blue: #1a2433;
+
+  /* lines */
+  --line: #2b3340;
+  --line-dark: #3a4453;
+
+  /* accents */
+  --navy: #2c4a86;         /* navy accent: chips + 4px accent strips */
+  --blue: #3a67bd;         /* button backgrounds (white text stays AA-readable) */
+  --blue-dark: #305aa8;    /* button hover background */
+  --link: #7aa2e6;         /* links / accent text */
+  --link-dark: #9cbcf2;    /* link hover */
+
+  /* dark-only semantic state tints */
+  --d-inset: #1b2330;
+  --d-hover: #232d3d;
+  --d-ok-bg: #163021;
+  --d-ok-text: #82d9a2;
+  --d-no-bg: #371c1c;
+  --d-no-text: #f0a6a6;
+  --d-warn-bg: #34300f;
+  --d-warn-text: #e3c071;
+}
+
+html[data-theme="dark"] body {
+  background: #0f141c;     /* page is a touch darker than panels, for depth */
+}
+
+/* Header & footer keep a deep navy (the --navy accent value is too light for
+   full-bleed bars), with light text. */
+html[data-theme="dark"] .site-header,
+html[data-theme="dark"] .site-footer {
+  background: #0c1626;
+}
+
+/* Neutral inset surfaces that used literal light blues/greys. */
+html[data-theme="dark"] :is(
+  .croatian-pdf-frame,
+  .pdf-source-figure,
+  .physics-open-solution__body,
+  .physics-quickselect,
+  .physics-source-option,
+  .source-options__item,
+  .solver-header__task-navigation .task-button,
+  .croatian-completion-card__option--selected,
+  .croatian-completion-popover__option--selected,
+  .english-choice-popover__option--selected,
+  .english-completion-card__option--selected,
+  .english-choice-popover__option--used,
+  .english-choice-popover__option--used strong,
+  .math-open-question-group__heading,
+  .history-open-feedback,
+  .history-open-question__prompt,
+  .history-open-question__heading span,
+  .physics-source-question__meta span,
+  .progress-meter,
+  .question-quickselect__link--excluded,
+  .excluded-task-notice,
+  .subject-best-score--empty,
+  .auth-page-card__user
+) {
+  background-color: var(--d-inset);
+}
+
+/* Hover/active inset states. */
+html[data-theme="dark"] :is(
+  .croatian-completion-blank:hover,
+  .english-choice-blank:hover,
+  .inline-check-button:hover,
+  .auth-widget__button:hover,
+  .subject-card--unavailable:hover .subject-card__action
+) {
+  background-color: var(--d-hover);
+}
+
+/* Re-light text that was a dark literal on those now-dark insets. */
+html[data-theme="dark"] :is(
+  .history-open-feedback,
+  .history-open-question__prompt,
+  .history-open-question__heading span,
+  .physics-source-question__meta span
+) {
+  color: var(--ink);
+}
+html[data-theme="dark"] :is(
+  .excluded-task-notice,
+  .subject-best-score--empty,
+  .subject-card--unavailable,
+  .subject-card--unavailable:hover,
+  .subject-card--unavailable:hover .subject-card__action
+) {
+  color: var(--muted);
+}
+
+/* Unavailable subject cards. */
+html[data-theme="dark"] :is(
+  .subject-card--unavailable,
+  .subject-card--unavailable:hover
+) {
+  background-color: var(--d-inset);
+}
+
+/* Correct / green state tints. */
+html[data-theme="dark"] :is(
+  .answer-choice--correct input:checked + span,
+  .croatian-completion-blank--correct,
+  .croatian-completion-card__option--correct,
+  .croatian-completion-row--correct,
+  .english-choice-blank--correct,
+  .english-completion-card__option--correct,
+  .english-completion-row--correct,
+  .english-inline-group-result--correct,
+  .english-text-blank--correct,
+  .physics-quickselect__link--correct,
+  .art-matching-response__row--correct,
+  .source-example,
+  .status-badge--available
+) {
+  background-color: var(--d-ok-bg);
+}
+html[data-theme="dark"] :is(
+  .answer-choice--correct input:checked + span,
+  .croatian-completion-blank--correct,
+  .english-choice-blank--correct,
+  .english-text-blank--correct,
+  .physics-quickselect__link--correct,
+  .source-example,
+  .status-badge--available
+) {
+  color: var(--d-ok-text);
+}
+
+/* Wrong / red state tints. */
+html[data-theme="dark"] :is(
+  .answer-choice--wrong input:checked + span,
+  .croatian-completion-blank--wrong,
+  .croatian-completion-card__option--wrong,
+  .croatian-completion-row--wrong,
+  .english-choice-blank--wrong,
+  .english-completion-card__option--wrong,
+  .english-completion-row--wrong,
+  .english-inline-group-result--wrong,
+  .english-text-blank--wrong,
+  .physics-quickselect__link--wrong,
+  .art-matching-response__row--wrong,
+  .auth-page-card__message[data-tone="error"],
+  .practice-notice--error
+) {
+  background-color: var(--d-no-bg);
+}
+html[data-theme="dark"] :is(
+  .answer-choice--wrong input:checked + span,
+  .croatian-completion-blank--wrong,
+  .english-choice-blank--wrong,
+  .english-text-blank--wrong,
+  .physics-quickselect__link--wrong,
+  .auth-page-card__message[data-tone="error"],
+  .practice-notice--error
+) {
+  color: var(--d-no-text);
+}
+
+/* Amber / informational tints. */
+html[data-theme="dark"] :is(
+  .art-matching-response__row--unused,
+  .source-gap
+) {
+  background-color: var(--d-warn-bg);
+}
+html[data-theme="dark"] .source-gap {
+  color: var(--d-warn-text);
+}
+
+/* Subject best-score badges: keep tint and text contrasting. */
+html[data-theme="dark"] .subject-best-score--excellent {
+  background-color: var(--d-ok-bg);
+}
+html[data-theme="dark"] .subject-best-score--good {
+  background-color: #21300f;
+}
+html[data-theme="dark"] .subject-best-score--medium {
+  background-color: var(--d-warn-bg);
+}
+html[data-theme="dark"] .subject-best-score--low {
+  background-color: #35260f;
+}
+html[data-theme="dark"] .subject-best-score--poor {
+  background-color: var(--d-no-bg);
+}
+
+/* Score / percentage tone text, brightened for dark backgrounds. */
+html[data-theme="dark"] :is(.profile-percentage--excellent, .subject-best-score--excellent) {
+  color: #4ade80;
+}
+html[data-theme="dark"] :is(.profile-percentage--good, .subject-best-score--good) {
+  color: #9bd35a;
+}
+html[data-theme="dark"] :is(.profile-percentage--medium, .subject-best-score--medium) {
+  color: #e0bf4a;
+}
+html[data-theme="dark"] :is(.profile-percentage--low, .subject-best-score--low) {
+  color: #ef9f5a;
+}
+html[data-theme="dark"] :is(.profile-percentage--poor, .subject-best-score--poor) {
+  color: #ef8a8a;
+}
+
+/* Level badge. */
+html[data-theme="dark"] .level-badge--a {
+  background-color: #21344f;
+  color: var(--white);
+}
+
+/* Essay textarea (literal #fff). */
+html[data-theme="dark"] .essay-textarea-field textarea {
+  background: #12161f;
+}
+
+/* Skeleton / source-crop shimmer. */
+html[data-theme="dark"] :is(.skeleton-block, .source-crop-segment) {
+  background-color: #1d2632;
+  background-image: linear-gradient(100deg, #1d2632 25%, #28323f 50%, #1d2632 75%);
+}
+
+/* Auth page background. */
+html[data-theme="dark"] .auth-page {
+  background: #0f141c;
+}
+
+/* Google sign-in button stays a light branded button (per Google guidance). */
+html[data-theme="dark"] .auth-google-button {
+  background: #fff;
+  color: #202124;
+  border-color: #dadce0;
+}
+html[data-theme="dark"] .auth-google-button:hover {
+  background: #f1f3f4;
+  color: #202124;
+}
+html[data-theme="dark"] .auth-google-button__mark {
+  background: #fff;
+}
+
+/* ---- Theme toggle control (profile settings) -------------------------- */
+.profile-settings__list {
+  display: grid;
+  gap: 4px;
+}
+.profile-settings__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.profile-settings__row:first-child {
+  padding-top: 0;
+}
+.profile-settings__row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+.profile-settings__label {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.profile-settings__icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  color: var(--muted);
+}
+.profile-settings__hint {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.theme-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 26px;
+  padding: 0;
+  background: var(--soft);
+  border: 1px solid var(--line-dark);
+  border-radius: 999px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.theme-switch__knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: var(--muted);
+  border-radius: 50%;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.theme-switch[aria-checked="true"] {
+  background: var(--blue);
+  border-color: var(--blue);
+}
+.theme-switch[aria-checked="true"] .theme-switch__knob {
+  background: #fff;
+  transform: translateX(22px);
+}
+.theme-switch:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* Diskretne sporedne akcije na dnu profila (brisanje napretka, odjava). */
+.profile-minor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 2px;
+  padding: 2px 0 6px;
+}
+.profile-minor__link {
+  padding: 2px 0;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.profile-minor__link:hover {
+  color: var(--ink);
+}
+.profile-minor__link--danger {
+  color: #8f1d1d;
+}
+.profile-minor__link--danger:hover {
+  color: #6f1414;
+}
+.profile-minor__link:disabled {
+  color: var(--muted);
+  text-decoration: none;
+  cursor: default;
+  opacity: 0.7;
+}
+.profile-minor__link:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.profile-minor__sep {
+  color: var(--line-dark);
+  font-size: 13px;
+}
+html[data-theme="dark"] .profile-minor__link--danger {
+  color: #ef8a8a;
+}
+html[data-theme="dark"] .profile-minor__link--danger:hover {
+  color: #f4a6a6;
+}
+
+/* --- Dark-mode solver polish ------------------------------------------- */
+
+/* Sticky footer used a hardcoded near-white background (literal rgba, so the
+   --white re-tokenisation didn't reach it). Give it the same deep chrome as
+   the header/footer, lifted off the page with an upward shadow. */
+html[data-theme="dark"] .solver-sticky-footer {
+  background: #0c1626;
+  box-shadow: 0 -6px 22px rgba(0, 0, 0, 0.5);
+}
+
+/* Active / hovered task tab: replace the hardcoded light-blue border. */
+html[data-theme="dark"] :is(
+  .task-button:hover,
+  .task-button--active,
+  .task-type-pager__button:hover
+) {
+  border-color: var(--blue);
+}
+
+/* Official exam crops stay faithful white "paper" (never inverted — it would
+   ruin diagrams, scores and colour). Present them as sheets on the dark
+   workspace: rounded corners + soft shadow, and a touch less glare. The
+   shadow/radius go on the crop container; individual segments of a segmented
+   crop must stay seamless, so they aren't framed on their own. */
+html[data-theme="dark"] :is(.pdf-source-crop, .physics-source-crop) {
+  border-radius: 5px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 28px rgba(0, 0, 0, 0.4);
+}
+html[data-theme="dark"] :is(
+  .pdf-source-crop,
+  .physics-source-crop,
+  .source-crop-segment
+) img {
+  filter: brightness(0.9);
 }

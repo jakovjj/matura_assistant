@@ -1,6 +1,20 @@
 # Uključi ili isključi banner u headeru.
 # Dozvoljene vrijednosti: true ili false
-enabled=false
+enabled=true
+
+# Vrsta banera određuje boju i zadanu ikonu:
+#   maintenance  = žuta (zadano), za radove i kvarove
+#   announcement = svijetloplava, za najave i čestitke
+variant=announcement
+
+# Ikona (lucide naziv, npr. star, wrench, lightbulb, circle-check).
+# Ostavi prazno za zadanu ikonu odabrane vrste.
+icon=star
 
 # Tekst koji se prikazuje u banneru.
-message=Obavijest: Sve stavke bi sada trebale biti dostupne. Ako nešto i dalje ne radi, slobodno pošaljite poruku. Hvala!
+message=Sretno svima na hrvatskom sutra! 
+
+# Opcionalni vremenski okvir (ISO 8601 s vremenskom zonom).
+# Baner se ne prikazuje prije "starts" niti nakon "until".
+# Ovdje: vidljiv do 6 ujutro po CEST.
+until=2026-06-15T06:00:00+02:00

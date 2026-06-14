@@ -560,6 +560,41 @@
     return item;
   }
 
+  // Obriši sve spremljene odgovore na vježbama iz ovog preglednika. removeItem je
+  // presretnut (installPracticeStorageCapture), pa za prijavljene korisnike ovo
+  // ujedno prazni napredak na računu (šalje praznu vrijednost po ključu).
+  function clearPracticeProgress() {
+    if (!canUseLocalStorage()) return 0;
+
+    const keys = [];
+    try {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (isPracticeStorageKey(key)) keys.push(key);
+      }
+    } catch {
+      return 0;
+    }
+
+    let removed = 0;
+    for (const key of keys) {
+      try {
+        localStorage.removeItem(key);
+        removed += 1;
+      } catch {
+        // Best-effort: nastavi s ostalim ključevima.
+      }
+    }
+
+    try {
+      localStorage.removeItem(practiceMetaStorageKey);
+    } catch {
+      // Uklanjanje metapodataka je best-effort.
+    }
+
+    return removed;
+  }
+
   installPracticeStorageCapture();
   const legacyMigrationStarted = startLegacyPracticeMigration();
   const migratedPracticeItems = legacyMigrationStarted ? [] : consumePracticeMigration();
@@ -568,6 +603,7 @@
     : syncPracticeProgress();
 
   window.AsistentProfile = {
+    clearPracticeProgress,
     getProfile,
     legacyMigrationStarted,
     migratedPracticeItems,

@@ -949,6 +949,9 @@ function bindResponseListeners() {
 }
 
 function aiExplainButton(question) {
+  // Asistent objašnjava samo zadatke višestrukoga izbora, ne i čitanje s polaznim
+  // tekstom, povezivanje ili nadopunjavanje.
+  if (activeTaskTypeId !== "visestruki-izbor") return "";
   return window.AsistentAI?.renderButton(question, { official: true }) || "";
 }
 

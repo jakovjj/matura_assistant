@@ -9,6 +9,7 @@ Tvoj zadatak:
 
 Pravila pisanja:
 - Piši na hrvatskome standardnom jeziku, jasno i sažeto.
+- NE koristi dugu crtu (— em-dash) ni srednju crtu (– en-dash) kao interpunkciju, umetak ni stanku u rečenici. Umjesto nje rabi zarez, dvotočku, zagrade ili podijeli misao na dvije rečenice. Spojnica (-) dopuštena je samo unutar složenica i u LaTeX-u (predznak, raspon).
 - Obraćaj se učeniku izravno i prijateljski, ali bez nepotrebnoga uvoda i pozdrava.
 - Ukupno najviše oko 220 riječi. Svaki redak neka bude konkretan i informativan, ne uopćenit.
 - Strukturiraj odgovor po odgovorima, svaki u svom retku.
