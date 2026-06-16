@@ -2,6 +2,10 @@ Ovo je zadatak iz fizike, pa objašnjenje mora biti fizikalno precizno, a ne sam
 
 - Imenuj fizikalni pojam, zakon ili definiciju koju zadatak ispituje (npr. Newtonovi zakoni, očuvanje energije i količine gibanja, Ohmov zakon, kinematika, valovi, termodinamika) i navedi relevantnu formulu sa standardnim simbolima.
 - Za točan odgovor ukratko pokaži ključni odnos ili korak koji do njega vodi: koja veličina kako ovisi o drugoj (proporcionalnost), ili vrlo kratak izračun s uvrštenim vrijednostima i mjernim jedinicama.
-- Za svaki netočan odgovor navedi konkretnu fizikalnu pogrešku koja do njega vodi, a ne samo da je netočan. Tipične zamke: kriva ili pobrkana formula/zakon, zamijenjene veličine, kriva vrsta ovisnosti (npr. linearno umjesto kvadratno ili obrnuto proporcionalno), pogrešne mjerne jedinice ili red veličine, krivi predznak ili smjer vektora, te česte konceptualne zablude (npr. brkanje mase i težine, brzine i akceleracije, napona i struje).
 - Sve formule i izračune piši u LaTeX-u (\( ... \) unutar rečenice, \[ ... \] za izdvojenu jednadžbu), npr. \( v = v_0 + a t \), \( R_\text{eq} = \tfrac{R}{2} + \tfrac{R}{2} = R \), \[ s = \int v \, dt \]. Mjerne jedinice piši unutar \text{...} (npr. \text{m/s}, \text{m/s}^2, N, J, W, V, A, \Omega, Pa, Hz). Ako treba račun, prikaži ga vrlo kratko, bez dugih izvoda.
-- Cilj je da učenik shvati i fizikalnu ideju iza točnog odgovora i gdje je zamka u svakom netočnom.
+- Cilj je da učenik shvati fizikalnu ideju iza točnoga odgovora.
+
+NE objašnjavaj netočne odgovore (ovo pravilo ima prednost pred svim gornjim uputama, pravilima oblika iz osnovnih uputa i pravilima kontrole kvalitete koja traže redak za svaki netočan odgovor):
+- Iz fizike se put do netočnoga odgovora u pravilu ne može pouzdano rekonstruirati, pa bi obrazloženje „kako je netko došao do krivoga rezultata" bilo nagađanje i izmišljanje. Zato netočne odgovore uopće ne obrazlažeš.
+- NE piši zasebne retke s oznakama slova ("**A:**", "**B:**", "**C:**", "**D:**"). Nijedan takav redak ne smije postojati u odgovoru.
+- Objašnjenje se sastoji ISKLJUČIVO od jednoga retka koji počinje s "**Točno ({{correctAnswer}}):**" i u kojem pokažeš pojam i postupak do točnoga rješenja. To je prvi i jedini redak odgovora.

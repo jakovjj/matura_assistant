@@ -19,9 +19,25 @@ const config = {
     /^https:\/\//i.test(process.env.PUBLIC_BASE_URL || ""),
   essayModel: process.env.OPENAI_ESSAY_MODEL || "gpt-4.1-mini",
   aiExplanationModel: process.env.OPENAI_AI_EXPLANATION_MODEL || "gpt-4.1",
+  // Druga prolaza (verifikacija): nakon nacrta model još jednom provjeri i ispravi
+  // objašnjenje prije slanja. Plaća se samo pri prvom (necacheiranom) generiranju.
+  // Isključi s AI_EXPLANATION_VERIFY=0. Model verifikatora po želji posebno (inače isti).
+  aiExplanationVerify: process.env.AI_EXPLANATION_VERIFY !== "0",
+  aiExplanationVerifyModel:
+    process.env.OPENAI_AI_VERIFY_MODEL || process.env.OPENAI_AI_EXPLANATION_MODEL || "gpt-4.1",
+  // Zalaganje (reasoning) verifikatora: "low" je brz fokusiran pregled gotova nacrta.
+  aiExplanationVerifyEffort: process.env.OPENAI_AI_VERIFY_EFFORT || "low",
   aiFreeExplanations: readPositiveNumber(process.env.AI_FREE_EXPLANATIONS, 3),
   aiUnlimitedEmails: new Set(
     String(process.env.AI_UNLIMITED_EMAILS || "jakov@jandric.com")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  ),
+  // Administratorski računi (mogu regenerirati AI objašnjenja). Mailovi iz
+  // ADMIN_EMAILS, odvojeni zarezom.
+  adminEmails: new Set(
+    String(process.env.ADMIN_EMAILS || "")
       .split(",")
       .map((email) => email.trim().toLowerCase())
       .filter(Boolean),
@@ -82,6 +98,8 @@ const aiExplanationSystemPrompt = loadPromptFile("ai-explanation-system.txt");
 // Zaseban bazni prompt za otvorene zadatke (produženi odgovor): tu nema ABCD
 // točnoga odgovora, nego službeno rješenje iz ključa koje model objašnjava.
 const aiExplanationOpenSystemPrompt = loadPromptFile("ai-explanation-open-system.txt");
+// Bazni prompt za drugu prolazu (verifikacija/ispravak nacrta objašnjenja).
+const aiExplanationVerifySystemPrompt = loadPromptFile("ai-explanation-verify-system.txt");
 // Opcionalni dodaci po predmetu: prompts/ai-explanation-<slug>.txt (npr. -fizika.txt).
 const aiExplanationSubjectPrompts = loadAiExplanationSubjectPrompts();
 // Opcionalni dodaci po predmetu za otvorene zadatke: ai-explanation-open-<slug>.txt.
@@ -1252,8 +1270,12 @@ async function handleAiExplanation(request, response) {
     return;
   }
 
+  // Regeneriranje (zaobilazi spremište i generira nanovo) smiju samo administratori.
+  const admin = userIsAdmin(user);
+  const regenerate = body?.regenerate === true && admin;
+
   const key = `${solver}|${examId}|${question}`;
-  const unlimited = userAiUnlimited(user);
+  const unlimited = userAiUnlimited(user) || admin;
   if (!user.aiUnlocked || typeof user.aiUnlocked !== "object" || Array.isArray(user.aiUnlocked)) {
     user.aiUnlocked = {};
   }
@@ -1268,7 +1290,7 @@ async function handleAiExplanation(request, response) {
     return;
   }
 
-  const cached = readAiExplanationCache(solver, examId, question);
+  const cached = regenerate ? null : readAiExplanationCache(solver, examId, question);
   if (!cached && !image) {
     sendJson(response, 400, { error: "Nedostaje slika zadatka za objašnjenje." });
     return;
@@ -1306,6 +1328,60 @@ async function handleAiExplanation(request, response) {
         await sleep(14);
       }
       fullText = cached.explanation;
+    } else if (config.aiExplanationVerify && kind === "choice") {
+      // Nacrt teče uživo (brz prvi prikaz, kao i bez verifikacije). U pozadini ga
+      // druga prolaza provjeri i, ako nešto ispravi, pošaljemo "replace" da klijent
+      // zamijeni prikazani tekst. U spremište ide provjerena verzija.
+      let draftText = "";
+      for await (const part of streamOpenAiExplanation({
+        subject,
+        correctAnswer,
+        question,
+        kind,
+        image,
+        contextImages,
+        solutionImage,
+        signal: clientSignal,
+      })) {
+        if (clientSignal.aborted) return;
+        if (part.kind === "reasoning") {
+          writeNdjson(response, { type: "reasoning", text: part.text });
+          continue;
+        }
+        draftText += part.text;
+        writeNdjson(response, { type: "delta", text: part.text });
+      }
+      draftText = draftText.trim();
+      if (!draftText) throw new Error("OpenAI nije vratio tekst objašnjenja.");
+
+      // Marker odustajanja ([[NEDOVOLJNO]]) se ne provjerava ni ne mijenja.
+      let finalText = draftText;
+      if (!draftText.trimStart().startsWith("[[NEDOVOLJNO]]")) {
+        finalText =
+          (
+            await verifyAiExplanation({
+              subject,
+              correctAnswer,
+              question,
+              image,
+              contextImages,
+              draft: draftText,
+              signal: clientSignal,
+            })
+          ).trim() || draftText;
+      }
+      if (clientSignal.aborted) return;
+      if (finalText !== draftText) {
+        writeNdjson(response, { type: "replace", text: finalText });
+      }
+      fullText = finalText;
+      writeAiExplanationCache(solver, examId, question, {
+        subject,
+        correctAnswer,
+        kind,
+        explanation: fullText.trim(),
+        model: config.aiExplanationModel,
+      });
     } else {
       for await (const part of streamOpenAiExplanation({
         subject,
@@ -1511,6 +1587,12 @@ function userAiUnlimited(user) {
   return config.aiUnlimitedEmails.has(String(user?.email || "").trim().toLowerCase());
 }
 
+// Administrator (mail iz ADMIN_EMAILS): smije regenerirati objašnjenja i ima
+// neograničen broj generiranja.
+function userIsAdmin(user) {
+  return config.adminEmails.has(String(user?.email || "").trim().toLowerCase());
+}
+
 function aiExplanationCacheFile(solver, examId, question) {
   const safe = (value) =>
     String(value)
@@ -1599,11 +1681,26 @@ function buildAiExplanationSystemPrompt(subject, correctAnswer, kind = "choice")
   return `${base}\n\nPosebne upute za predmet ${subject}:\n${fill(extra).trim()}`;
 }
 
+// Sustavni prompt za verifikaciju: bazni prompt verifikatora + ista pravila predmeta
+// koja je nacrt trebao poštovati (da verifikator provjerava prema istim mjerilima).
+function buildAiExplanationVerifySystemPrompt(subject, correctAnswer) {
+  const fill = (text) =>
+    text.replaceAll("{{subject}}", subject).replaceAll("{{correctAnswer}}", correctAnswer);
+  const base = fill(aiExplanationVerifySystemPrompt).trim();
+  const slug = aiSubjectSlug(subject);
+  const extra = slug ? aiExplanationSubjectPrompts[slug] : "";
+  if (!extra) return base;
+  return `${base}\n\nPravila predmeta ${subject} koja objašnjenje mora poštovati:\n${fill(extra).trim()}`;
+}
+
 function aiSubjectSlug(subject) {
   return (
-    { fizika: "fizika", "hrvatski jezik": "hrvatski", matematika: "matematika" }[
-      String(subject || "").trim().toLowerCase()
-    ] || ""
+    {
+      fizika: "fizika",
+      "hrvatski jezik": "hrvatski",
+      matematika: "matematika",
+      "politika i gospodarstvo": "politika",
+    }[String(subject || "").trim().toLowerCase()] || ""
   );
 }
 
@@ -1756,6 +1853,88 @@ async function* streamOpenAiExplanation({
   }
 }
 
+// Druga prolaza: model dobije sliku zadatka, točan odgovor i gotov nacrt te vrati
+// ispravljeno (ili nepromijenjeno) objašnjenje. Nije streaming. Na bilo kakvu
+// pogrešku vraća nacrt nepromijenjen, da provjera nikad ne pokvari odgovor.
+async function verifyAiExplanation({
+  subject,
+  correctAnswer,
+  question,
+  image,
+  contextImages = [],
+  draft,
+  signal,
+}) {
+  try {
+    const userContent = [
+      {
+        type: "input_text",
+        text: [
+          `Predmet: ${subject}.`,
+          `Zadatak broj: ${question}.`,
+          `Pouzdano točan odgovor: ${correctAnswer}.`,
+          "Na priloženoj slici je tekst zadatka i ponuđeni odgovori. Provjeri nacrt objašnjenja u nastavku prema uputama i vrati konačno objašnjenje.",
+          "",
+          "NACRT OBJAŠNJENJA:",
+          draft,
+        ].join("\n"),
+      },
+      { type: "input_image", image_url: image.dataUrl, detail: "high" },
+    ];
+    for (const contextImage of contextImages) {
+      userContent.push({ type: "input_image", image_url: contextImage.dataUrl, detail: "high" });
+    }
+
+    const model = config.aiExplanationVerifyModel;
+    const isReasoningModel = /^(gpt-5|o\d)/i.test(model);
+    const requestBody = {
+      model,
+      stream: false,
+      max_output_tokens: isReasoningModel ? 5000 : 900,
+      input: [
+        {
+          role: "system",
+          content: [
+            {
+              type: "input_text",
+              text: buildAiExplanationVerifySystemPrompt(subject, correctAnswer),
+            },
+          ],
+        },
+        { role: "user", content: userContent },
+      ],
+    };
+    if (isReasoningModel) {
+      // Provjera je usmjeren pregled gotova nacrta, pa nisko zalaganje drži tail
+      // kratkim. Knob: OPENAI_AI_VERIFY_EFFORT (low/medium/high).
+      requestBody.reasoning = { effort: config.aiExplanationVerifyEffort };
+    } else {
+      requestBody.temperature = 0;
+    }
+
+    const openAiResponse = await fetch("https://api.openai.com/v1/responses", {
+      body: JSON.stringify(requestBody),
+      headers: {
+        Authorization: `Bearer ${config.openAiApiKey}`,
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+      signal: abortSignalWithTimeout(signal, 90_000),
+    });
+    if (!openAiResponse.ok) {
+      const payload = await openAiResponse.json().catch(() => ({}));
+      throw new Error(payload?.error?.message || `HTTP ${openAiResponse.status}`);
+    }
+    const payload = await openAiResponse.json();
+    const verified = extractOpenAiOutputText(payload).trim();
+    return verified || draft;
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    console.error("Verifikacija AI objašnjenja nije uspjela, koristim nacrt:", error.message);
+    return draft;
+  }
+}
+
 function upsertGoogleUser(profile) {
   const now = new Date().toISOString();
   let user =
@@ -1805,6 +1984,7 @@ function createSession(user, request) {
 
 function publicUser(user) {
   return {
+    admin: userIsAdmin(user),
     createdAt: user.createdAt,
     displayName: user.displayName,
     email: user.email,
@@ -4315,6 +4495,8 @@ function loadAiExplanationSubjectPrompts() {
   }
   for (const name of entries) {
     if (name === "ai-explanation-system.txt") continue;
+    // Prompt verifikatora ima vlastitu varijablu; nije dodatak po predmetu.
+    if (name === "ai-explanation-verify-system.txt") continue;
     // Open-promptovi (bazni i po predmetu) imaju vlastiti loader; preskoči ih ovdje.
     if (name.startsWith("ai-explanation-open-")) continue;
     const match = /^ai-explanation-(.+)\.txt$/.exec(name);

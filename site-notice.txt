@@ -9,12 +9,12 @@ variant=announcement
 
 # Ikona (lucide naziv, npr. star, wrench, lightbulb, circle-check).
 # Ostavi prazno za zadanu ikonu odabrane vrste.
-icon=star
+icon=moon
 
 # Tekst koji se prikazuje u banneru.
-message=Sretno svima na hrvatskom sutra! 
+message=Ne zaboravite spavati prije mature :). Sretno svima još jednom! - Jakov (isto sutra pišem)
 
 # Opcionalni vremenski okvir (ISO 8601 s vremenskom zonom).
 # Baner se ne prikazuje prije "starts" niti nakon "until".
 # Ovdje: vidljiv do 6 ujutro po CEST.
-until=2026-06-15T06:00:00+02:00
+until=2026-06-15T04:00:00+02:00

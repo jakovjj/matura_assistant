@@ -21,6 +21,7 @@ from crop_utils import (
     grayscale_image_from_png,
     source_image_metadata,
     trim_crop_bottom_whitespace,
+    trim_writing_lines,
 )
 from open_answer_validation import (
     OpenAnswerValidationError,
@@ -735,6 +736,7 @@ def render_source_pages(
     paper_path: Path,
     identifier: str,
     crops: dict[str, QuestionCrop],
+    open_numbers: set[str],
 ) -> tuple[dict[str, dict[str, Any]], set[str]]:
     destination = PAPER_ROOT / identifier
     crops_by_page: dict[int, list[tuple[str, QuestionCrop]]] = {}
@@ -776,6 +778,16 @@ def render_source_pages(
                 y_min = max(0, math.floor(crop.y_min * scale_y))
                 x_max = min(image_width, math.ceil(crop.x_max * scale_x))
                 y_max = min(image_height, math.ceil(crop.y_max * scale_y))
+                if key in open_numbers:
+                    # Open-response crops include the blank writing lines, which
+                    # cannot be used on a screenshot; drop them before tidying.
+                    x_min, y_min, x_max, y_max = trim_writing_lines(
+                        page_image,
+                        x_min,
+                        y_min,
+                        x_max,
+                        y_max,
+                    )
                 x_min, y_min, x_max, y_max = trim_crop_bottom_whitespace(
                     page_image,
                     x_min,
@@ -819,10 +831,18 @@ def build_source_images(
     if not question_numbers:
         return {}
 
+    open_numbers = {
+        str(question["number"])
+        for task in tasks
+        for question in task.get("questions", [])
+        if question.get("type") == "open"
+    }
     pages = pdf_bbox_pages(paper_contents)
     markers = find_question_markers(pages, set(question_numbers))
     crops = find_question_crops(markers)
-    source_images, expected_assets = render_source_pages(paper_path, identifier, crops)
+    source_images, expected_assets = render_source_pages(
+        paper_path, identifier, crops, open_numbers
+    )
     remove_unexpected_assets(identifier, expected_assets)
     return source_images
 

@@ -463,6 +463,92 @@ def trim_crop_bottom_whitespace(
     return x_min, y_min, x_max, candidate_y_max
 
 
+def trim_writing_lines(
+    image: Image.Image,
+    x_min: int,
+    y_min: int,
+    x_max: int,
+    y_max: int,
+    *,
+    rule_threshold: int = 150,
+    rule_min_ratio: float = 0.55,
+    content_threshold: int = 150,
+    content_min_dark: int = 8,
+    side_margin: int = 10,
+    points_box_ratio: float = 0.62,
+    min_gap: int = 20,
+    rule_fringe: int = 3,
+    min_height: int = 48,
+) -> tuple[int, int, int, int]:
+    """Drop the blank answer-writing lines from the bottom of an open-response crop.
+
+    The writing area is the run of full-width horizontal rules that always sits
+    BELOW every part of the question. We find the lowest content row (text,
+    graphics, or chart labels in the left+centre band, ignoring a right-aligned
+    points box such as ``(1 bod)`` and the anti-aliased fringe of the rules) and
+    cut at the first full-width rule below it. Charts, tables, and diagrams are
+    preserved because their internal rules always have content (labels, source
+    notes) below them, so no rule qualifies. Inline fill-in blanks are preserved
+    because they are not full-width rules. Returns the box unchanged when no
+    writing-line area is detected."""
+    width = x_max - x_min
+    height = y_max - y_min
+    if width < 200 or height < 60:
+        return x_min, y_min, x_max, y_max
+
+    region = image.crop((x_min, y_min, x_max, y_max)).convert("L")
+    data = region.tobytes()
+    scan_x_min = side_margin
+    scan_x_max = width - side_margin
+    scan_width = scan_x_max - scan_x_min
+    if scan_width <= 0:
+        return x_min, y_min, x_max, y_max
+
+    rule_minimum = int(scan_width * rule_min_ratio)
+    left_x_max = scan_x_min + int(scan_width * points_box_ratio)
+
+    is_rule = [False] * height
+    dark_left = [0] * height
+    for row_index in range(height):
+        base = row_index * width
+        row = data[base + scan_x_min : base + scan_x_max]
+        if has_long_horizontal_rule(
+            row, threshold=rule_threshold, minimum_width=rule_minimum
+        ):
+            is_rule[row_index] = True
+        dark_left[row_index] = sum(
+            value < content_threshold
+            for value in data[base + scan_x_min : base + left_x_max]
+        )
+
+    rule_rows = [row_index for row_index in range(height) if is_rule[row_index]]
+    if not rule_rows:
+        return x_min, y_min, x_max, y_max
+
+    # Rows within rule_fringe pixels of a rule are part of the rule (ignore the
+    # anti-aliased fringe so it is not mistaken for question content).
+    in_rule_zone = [False] * height
+    for row_index in rule_rows:
+        for fringe in range(
+            max(0, row_index - rule_fringe), min(height, row_index + rule_fringe + 1)
+        ):
+            in_rule_zone[fringe] = True
+
+    last_content = -1
+    for row_index in range(height):
+        if dark_left[row_index] > content_min_dark and not in_rule_zone[row_index]:
+            last_content = row_index
+
+    rules_below = [row_index for row_index in rule_rows if row_index > last_content]
+    if not rules_below:
+        return x_min, y_min, x_max, y_max
+    first_rule = min(rules_below)
+    if first_rule - last_content < min_gap or first_rule < min_height:
+        return x_min, y_min, x_max, y_max
+
+    return x_min, y_min, x_max, y_min + first_rule
+
+
 def trim_crop_horizontal_whitespace(
     image: Image.Image,
     x_min: int,

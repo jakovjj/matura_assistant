@@ -136,6 +136,13 @@
       id: "profile",
       href: "./profil.html",
       label: "profil",
+      // Shown only when the link collapses on mobile (see styles.css main-nav__icon).
+      icon: `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="8" r="3.25" />
+          <path d="M5.5 19.5a6.5 6.5 0 0 1 13 0" />
+        </svg>
+      `,
     },
   ];
   const hasActiveNavItem = navItems.some((item) => item.id === activePage);
@@ -207,13 +214,23 @@
             ${navItems
               .map((item) => {
                 const isActive = item.id === activePage;
+                const linkClass = [
+                  "main-nav__link",
+                  item.icon ? "main-nav__link--icon" : "",
+                  isActive ? "main-nav__link--active" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ");
+                const iconMarkup = item.icon
+                  ? `<span class="main-nav__icon" aria-hidden="true">${item.icon}</span>`
+                  : "";
                 return `
                   <a
-                    class="main-nav__link${isActive ? " main-nav__link--active" : ""}"
+                    class="${linkClass}"
                     href="${item.href}"
                     ${isActive ? 'aria-current="page"' : ""}
                   >
-                    ${item.label}
+                    ${iconMarkup}<span class="main-nav__label">${item.label}</span>
                   </a>
                 `;
               })

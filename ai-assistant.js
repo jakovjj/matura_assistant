@@ -26,6 +26,8 @@
   let currentContext = null;
   let reported = false;
   let thinkingTimer = null;
+  // Administrator (vidi server: ADMIN_EMAILS) dobiva gumb za regeneriranje.
+  let isAdminUser = false;
 
   // KaTeX se vendora lokalno i učitava lijeno tek kad se prvi put otvori
   // asistent, da ne opterećuje učitavanje samoga rješavača. Ako učitavanje
@@ -140,6 +142,10 @@
             ${window.renderLucideIcon ? window.renderLucideIcon("triangle-alert", "ai-drawer__report-icon") : ""}
             <span>Prijavi loše objašnjenje</span>
           </button>
+          <button class="ai-drawer__regenerate" type="button" data-ai-regenerate hidden>
+            ${window.renderLucideIcon ? window.renderLucideIcon("rotate-ccw", "ai-drawer__regenerate-icon") : ""}
+            <span>Regeneriraj</span>
+          </button>
           <span class="ai-drawer__report-status" data-ai-report-status></span>
           <p class="ai-drawer__disclaimer">
             Objašnjenje je generirano koristeći umjetnu inteligenciju te može sadržavati greške.
@@ -150,6 +156,7 @@
 
     element.querySelector("[data-ai-close]").addEventListener("click", closeDrawer);
     element.querySelector("[data-ai-report]").addEventListener("click", reportCurrentExplanation);
+    element.querySelector("[data-ai-regenerate]").addEventListener("click", regenerateCurrentExplanation);
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !element.hidden) closeDrawer();
     });
@@ -172,6 +179,9 @@
     element.querySelector("[data-ai-report-status]").textContent = "";
     const reportButton = element.querySelector("[data-ai-report]");
     reportButton.disabled = false;
+    const regenerateButton = element.querySelector("[data-ai-regenerate]");
+    regenerateButton.hidden = !isAdminUser;
+    regenerateButton.disabled = false;
 
     element.hidden = false;
     document.body.classList.add("ai-drawer-open");
@@ -401,7 +411,8 @@
     });
   }
 
-  async function explain(context) {
+  async function explain(context, options) {
+    const regenerate = Boolean(options && options.regenerate);
     openDrawer(context);
 
     if (activeController) activeController.abort();
@@ -457,6 +468,7 @@
           image: imageDataUrl ? { dataUrl: imageDataUrl } : null,
           contextImages,
           solutionImage,
+          regenerate,
         }),
       });
     } catch (error) {
@@ -522,6 +534,10 @@
         showRemaining(event.remaining, event.unlimited);
       } else if (event.type === "delta") {
         text += event.text || "";
+        renderIfReady();
+      } else if (event.type === "replace") {
+        // Druga prolaza (verifikacija) ispravila je nacrt: zamijeni prikazani tekst.
+        text = event.text || text;
         renderIfReady();
       } else if (event.type === "done") {
         if (Object.prototype.hasOwnProperty.call(event, "remaining")) {
@@ -601,12 +617,20 @@
     }
   }
 
+  // Regeneriranje je dostupno samo administratorima: zaobilazi spremljeno
+  // objašnjenje i traži od servera da generira nanovo (i prepiše spremište).
+  function regenerateCurrentExplanation() {
+    if (!currentContext || !isAdminUser) return;
+    explain(currentContext, { regenerate: true });
+  }
+
   async function handleButtonClick(context) {
     const user = await fetchAuth();
     if (!user) {
       showLoginModal();
       return;
     }
+    isAdminUser = Boolean(user.admin);
     explain(context);
   }
 

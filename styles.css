@@ -401,6 +401,25 @@ html[data-theme="dark"] .topbar__theme-toggle .topbar__theme-icon--sun {
   border-bottom-color: var(--white);
 }
 
+/* The icon only surfaces when a link collapses on mobile; otherwise label only. */
+.main-nav__icon {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.main-nav__icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
 .auth-widget {
   display: flex;
   align-items: center;
@@ -6911,8 +6930,26 @@ body.solver-page {
     align-self: auto;
   }
 
-  .main-nav:not(.main-nav--no-active) .main-nav__link:not(.main-nav__link--active) {
+  /* The active tab keeps its text; a plain non-active link is hidden to save
+     space, but an icon link (profil) survives collapsed down to just its glyph. */
+  .main-nav:not(.main-nav--no-active)
+    .main-nav__link:not(.main-nav__link--active):not(.main-nav__link--icon) {
     display: none;
+  }
+
+  .main-nav:not(.main-nav--no-active)
+    .main-nav__link--icon:not(.main-nav__link--active) .main-nav__label {
+    display: none;
+  }
+
+  .main-nav:not(.main-nav--no-active)
+    .main-nav__link--icon:not(.main-nav__link--active) .main-nav__icon {
+    display: inline-flex;
+  }
+
+  .main-nav:not(.main-nav--no-active)
+    .main-nav__link--icon:not(.main-nav__link--active) {
+    padding: 0 10px;
   }
 
   .page-heading {
@@ -8048,6 +8085,46 @@ body.solver-page {
 .ai-drawer__report-status {
   color: var(--muted);
   font-size: 13px;
+}
+
+.ai-drawer__regenerate {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line-dark);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 4px;
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ai-drawer__regenerate[hidden] {
+  display: none;
+}
+
+.ai-drawer__regenerate-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ai-drawer__regenerate:hover:not(:disabled) {
+  border-color: var(--link);
+  color: var(--link);
+}
+
+.ai-drawer__regenerate:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 @media (max-width: 600px) {

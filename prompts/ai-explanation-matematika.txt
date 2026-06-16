@@ -2,6 +2,10 @@ Ovo je zadatak iz matematike, pa objašnjenje mora biti matematički precizno i 
 
 - Imenuj matematički pojam ili pravilo koje zadatak ispituje (npr. linearna/kvadratna jednadžba, funkcije i graf, derivacija, integral, nizovi, vjerojatnost, trigonometrija, geometrija, postoci) i navedi relevantnu formulu sa standardnim oznakama.
 - Za točan odgovor pokaži ključne korake postupka koji do njega vode: kratak, ali potpun izračun s uvrštenim vrijednostima, tako da učenik može ponoviti rješavanje. Ne preskači korak u kojem nastaje rezultat.
-- Za svaki netočan odgovor navedi konkretnu matematičku pogrešku koja do njega vodi, a ne samo da je netočan. Tipične zamke: kriva formula, pogreška u predznaku, zamijenjeni brojnik i nazivnik, krivo skraćivanje, pogrešan redoslijed računskih operacija, zaokruživanje u krivom trenutku, brkanje sličnih pojmova (npr. opseg i površina, derivacija i integral, presjek i unija).
 - Sve izraze, jednadžbe i izračune piši u LaTeX-u (\( ... \) unutar rečenice, \[ ... \] za izdvojenu jednadžbu), npr. \( x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a} \), \[ \int_0^1 x^2 \, dx = \tfrac{1}{3} \]. Koristi \frac, \sqrt, \cdot, indekse s _ i potencije s ^, te grčka slova gdje treba. Mjerne jedinice, ako se pojave, piši uspravno unutar \text{...}.
-- Cilj je da učenik shvati i postupak koji vodi do točnog odgovora i gdje točno nastaje pogreška u svakom netočnom.
+- Cilj je da učenik shvati postupak koji vodi do točnog odgovora.
+
+NE objašnjavaj netočne odgovore (ovo pravilo ima prednost pred svim gornjim uputama, pravilima oblika iz osnovnih uputa i pravilima kontrole kvalitete koja traže redak za svaki netočan odgovor):
+- Iz matematike se put do netočnoga odgovora u pravilu ne može pouzdano rekonstruirati, pa bi obrazloženje „kako je netko došao do krivoga rezultata" bilo nagađanje i izmišljanje. Zato netočne odgovore uopće ne obrazlažeš.
+- NE piši zasebne retke s oznakama slova ("**A:**", "**B:**", "**C:**", "**D:**"). Nijedan takav redak ne smije postojati u odgovoru.
+- Objašnjenje se sastoji ISKLJUČIVO od jednoga retka koji počinje s "**Točno ({{correctAnswer}}):**" i u kojem pokažeš pojam i postupak do točnoga rješenja. To je prvi i jedini redak odgovora.

@@ -5,7 +5,9 @@ Na prvoj slici je OCR sken samoga zadatka zajedno s ponuđenim odgovorima (A, B,
 Tvoj zadatak:
 1. Najprije za sebe prepoznaj koji se pojam, pravilo, odnos ili kategorija u ovom zadatku ispituje (npr. vrsta sintagme, jezična razina, povijesno razdoblje, vrsta stilske figure, geografski pojam). To je okvir kojim sve obrazlažeš.
 2. Objasni zašto je točan odgovor točan tako da ga izričito svrstaš u traženu kategoriju / pravilo i povežeš s tekstom zadatka.
-3. Za svaki netočan odgovor NEMOJ samo reći da je netočan. Reci što on zapravo jest unutar istog okvira — kojoj kategoriji pripada ili koje pravilo zadovoljava — i zato zašto ne odgovara traženomu. (Npr. ako se traži određena vrsta sintagme, za svaki krivi odgovor navedi koja je to vrsta sintagme.)
+3. Za netočne odgovore NAJPRIJE za sebe procijeni ima li svaki od njih smislenoga objašnjenja. NE pretpostavljaj ni ne izmišljaj pogreške i zablude kojih nema samo da bi popunio redak.
+   - Ako iza netočnoga odgovora stoji prepoznatljiv pojam, kategorija, pravilo ili česta, vjerojatna učenička zabluda, reci što taj odgovor zapravo jest unutar istoga okvira (kojoj kategoriji pripada ili koje pravilo zadovoljava) i zašto ne odgovara traženomu. (Npr. ako se traži određena vrsta sintagme, za svaki krivi odgovor navedi koja je to vrsta sintagme.)
+   - Ako pak iza netočnoga odgovora ne stoji nikakva smislena zabluda, nego je to samo proizvoljna netočna vrijednost (npr. puki krivi broj koji ne nastaje nikakvim prirodnim načinom brojenja), NEMOJ izmišljati nategnut put kojim bi se do njega došlo. Tada kratko i izravno reci samo zašto nije točan, oslonjen na ono što u zadatku stvarno postoji.
 
 Pravila pisanja:
 - Piši na hrvatskome standardnom jeziku, jasno i sažeto.
