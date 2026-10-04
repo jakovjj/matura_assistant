@@ -1,0 +1,43 @@
+65. LC krug se u radioprijemniku koristi za slušanje radiopostaje koja emi-
+tira program na 100 MHz. Izračunajte induktivnost zavojnice LC kruga
+ako kapacitet kondenzatora iznosi 2,5 pF?
+
+A. 0,1 nH
+B. 10nH
+C. 1 μH
+
+D. 16 pH
+E. 1,6 mH
+
+66. Idealna trafostanica u stambenom naselju trebala bi imati efikasnost
+100 %. Što možemo zaključiti o takvom idealnom transformatoru?
+
+A. snaga se smanjuje, jakost struje se smanjuje
+B. snaga se ne mijenja, jakost struje se smanjuje
+C. snaga se povećava, jakost struje se smanjuje
+D. snaga se ne mijenja, jakost struje se povećava
+E. snaga se smanjuje, jakost struje se povećava
+
+67. Žica razapeta na gitari duga je 80 cm. Kad titra frekvencijom od 400 Hz,
+nastane stojni val s tri trbuha. Izračunajte brzinu širenja vala kroz žicu
+gitare!
+
+A. 21 km/s
+B. 213 m/s
+C. 106 m/s
+D. 1200 m/s
+E. 320 m/s
+
+68. Harmonijski valovi jednakih valnih duljina interferiraju konstruktivno
+
+kad im je:
+
+A. razlika hoda jednaka π
+
+B. pomak u fazi jednak π/2
+
+C. razlika hoda jednaka valnoj duljini
+
+D. pomak u fazi jednak π
+
+E. pomak u fazi jednak polovici valne duljine

@@ -37,7 +37,7 @@
   function validSegments(source) {
     const crop = source?.crop;
     const segments = Array.isArray(source?.segments) ? source.segments : [];
-    if (segments.length < 2 || !validSourceCrop(source, crop)) return [];
+    if (!segments.length || !validSourceCrop(source, crop)) return [];
 
     const cropXMax = Number(crop.x) + Number(crop.width);
     const cropYMax = Number(crop.y) + Number(crop.height);
@@ -56,7 +56,19 @@
         width === Number(crop.width)
       );
     });
-    return valid ? segments : [];
+    if (!valid) return [];
+
+    // Older generated indexes can contain a page number/document code as a
+    // tiny final segment after a very large blank band. Do not visually glue
+    // that running footer to the task while those indexes await regeneration.
+    const last = segments.at(-1);
+    const previous = segments.at(-2);
+    const trailingGap = Number(last.y) - (Number(previous.y) + Number(previous.height));
+    const likelyPageFooter =
+      Number(last.y) >= Number(source.height) * 0.9 &&
+      Number(last.height) <= 90 &&
+      trailingGap >= Math.max(120, Number(crop.width) * 0.18);
+    return likelyPageFooter ? segments.slice(0, -1) : segments;
   }
 
   function sourceCropImage(source, crop, alt, loading, index = 0) {
@@ -120,7 +132,7 @@
         : sourceCropImage(source, crop, alt, loading);
 
       return `
-        <figure class="${figureClass}">
+        <figure class="${figureClass}"${source.adminCropId ? ` data-crop-source="${escapeHtml(JSON.stringify(source))}"` : ""}>
           <div
             class="${cropBaseClass}${cropClass}${segmentedClass}"
             style="${naturalWidthStyle}${displayWidth}${compactStyle}aspect-ratio: ${crop.width} / ${displayedHeight}"
@@ -137,6 +149,15 @@
         : "";
     }
   };
+
+  function loadCropEditor() {
+    if (!document.body.classList.contains("solver-page")) return;
+    const script = document.createElement("script");
+    script.src = "/crop-editor.js";
+    document.head.append(script);
+  }
+  document.addEventListener("DOMContentLoaded", loadCropEditor);
+  if (document.readyState !== "loading") loadCropEditor();
 
   let dialog;
   let viewport;
@@ -157,8 +178,8 @@
   }
 
   function icon(name) {
-    if (typeof window.renderLucideIcon === "function") {
-      return window.renderLucideIcon(name, "source-image-viewer__icon");
+    if (typeof window.renderPhosphorIcon === "function") {
+      return window.renderPhosphorIcon(name, "source-image-viewer__icon");
     }
     return "";
   }

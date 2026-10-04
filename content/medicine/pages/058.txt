@@ -1,0 +1,35 @@
+72. Tijelo A giba se po kružnici radijusa r_A kutnom brzinom ω_A. Kolika je kutna
+brzina tijela B u odnosu na kutnu brzinu tijela A ako se ono giba po kruž-
+nici radijusa r_B = r_A/2, a vrijedi da je obodna brzina tijela B jednaka 4v_A?
+A. ω_B = ω_A
+
+B. ω_B = 2ω_A
+C. ω_B = 8ω_A
+D. ω_B = (1/2)ω_A
+E. ω_B = (1/8)ω_A
+
+73. Koliko električne energije u jednom satu koristi žarulja od 100 W?
+A. 27kJ
+B. 0,36 MJ
+C. 0,1 J
+D. 27mJ
+E. 1,7 J
+
+74. Dva titrajna kruga su u rezonanciji ______.
+A. kad se nalaze u istom sredstvu
+B. kad je maksimalni prijenos energije s jednog na drugi krug
+C. kad imaju jednake vlastite amplitude
+D. ako su počeli titrati istovremeno
+E. ako u nekom trenutku imaju jednaku elongaciju
+
+75. Tijelo A mase m_A = 0,5 kg giba se brzinom v_A = 2 m/s, a tijelo B mase m_B =
+0,3 kg brzinom v_B = −2 m/s, kao što prikazuje slika. Izračunajte brzinu
+koju imaju tijela A i B ako se nakon sudara nastave gibati zajedno.
+
+[figure:physics-75]
+
+A. 0,5 m/s
+B. -2m/s
+C. 0 m/s
+D. —0,5 m/s
+E. 3,2 m/s

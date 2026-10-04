@@ -1,0 +1,30 @@
+8. Koja od navedenih tvrdnji NIJE točna za spoj prikazan na slici?
+[figure:chemistry-8]
+A. Na slici je prikazan natrijev palmitat.
+B. Struktura prikazanog spoja sastoji se od hidrofobnog i hidrofilnog dijela.
+C. Prikazani spoj moguće je dobiti baznom hidrolizom triacilglicerola.
+D. Spoj prikazan na slici ima amfoterna svojstva.
+E. Na slici je prikazan sapun.
+
+9. Koliku je masu Glauberove soli (natrijev sulfat dekahidrat) potrebno
+otopiti u 2000 g vode da bi se priredila otopina natrijeva sulfata molali-
+teta 0,60 mol/kg?
+
+A. 386,7 g
+B. 96,7g
+C. 193,3 g
+D. 170,4g
+E. 42,6 g
+10. Najvišu temperaturu vrenja imat će:
+[figure:chemistry-10]
+A. Prikaz A
+B. Prikaz B
+C. Prikaz C
+D. Prikaz D
+E. Prikaz E
+11. Jedinica za brzinu kemijske reakcije glasi:
+A. s⁻¹
+B. dm³ mol⁻¹ s⁻¹
+C. s
+D. mol dm⁻³ s⁻¹
+E. dm³ mol⁻¹ s

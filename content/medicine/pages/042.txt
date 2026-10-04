@@ -1,0 +1,34 @@
+23. Tijelo mase m klizi po podlozi bez trenja brzinom v te se zabije i zalijepi
+za slobodni kraj opruge konstante elastičnosti k. Opruga je drugim kra-
+jem vezana uza zid te se pri sudaru stlači za pomak d, nakon čega sustav
+počne slobodno titrati. Vrijeme između dvije maksimalne elongacije su-
+stava ovisi samo o:
+
+A. brzini i masi tijela
+
+B. konstanti elastičnosti opruge i pomaku
+
+C. brzini i masi tijela, ali i o konstanti elastičnosti opruge
+D. masi tijela i konstanti elastičnosti opruge
+
+E. brzini i pomaku tijela
+
+24. Stari bakin sat ima njihalo kojem vrijeme između dvije maksimalne elon-
+
+gacije traje x sekundi. Kolika je duljina tog njihala?
+A. g(x/(2π))²
+B. (g/π)(x/2)²
+C. (gx/π)²
+D. g(x/π)²
+E. (g/π)x²
+
+25. Intenzitet laserskog snopa na nekoj površini je I₀. Ako na put snopa sta-
+vimo divergentnu leću, polumjer snopa poveća se za 300 %. Izračunajte
+novi intenzitet snopa!
+
+A. I₀
+
+B. I₀/3
+C. I₀/4
+D. I₀/9
+E. I₀/16

@@ -1,0 +1,20 @@
+110. Aktivna komponenta lijeka Aspirina, acetilsalicilna kiselina ester je:
+[figure:exam-110]
+A. benzen-1,2-dikarboksilne kiseline
+B. feniloctene kiseline
+C. cikloheksan-1,2-dikarboksilne kiseline
+D. octene kiseline
+E. 2-hidroksibenzojeve kiseline
+111. U ljudskom se organizmu masne kiseline skladište u obliku ______.
+A. kolesterola
+B. triacilglicerola
+C. slobodnih masnih kiselina
+D. proteina
+E. voskova
+112. Koja od navedenih tvrdnji NIJE točna za prikazane spojeve?
+[figure:exam-112]
+A. Spoj A strukturna je komponenta saharoze.
+B. Redukcijom spoja A nastaje isključivo jedan produkt.
+C. Spoj B strukturna je komponenta saharoze.
+D. Spoj A i spoj B strukturni su izomeri.
+E. Redukcijom spoja B nastaje isključivo jedan produkt.

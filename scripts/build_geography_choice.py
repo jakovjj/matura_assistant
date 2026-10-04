@@ -36,6 +36,7 @@ from open_answer_validation import (
     repair_open_answer_boundaries,
     rubric_heading_points,
 )
+from generated_data_revision import update_data_revision
 from manual_solution_images import (
     attach_manual_solution_images,
     build_manual_solution_images,
@@ -1617,6 +1618,7 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
         question_sort_key=question_sort_key,
         render_dpi=SOURCE_RENDER_DPI,
         required_message="pdftocairo is required to build Geography solution images",
+        group_aware=True,
     )
     attach_manual_solution_images(tasks, solution_images)
 
@@ -1677,6 +1679,7 @@ def main() -> None:
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     OUTPUT.write_text(f"{OUTPUT_PREFIX}{serialized};\n", encoding="utf-8")
+    update_data_revision(ROOT, OUTPUT, serialized)
 
     print(f"Wrote {len(exams)} Geography practice exams to {OUTPUT.relative_to(ROOT)}")
     if skipped:

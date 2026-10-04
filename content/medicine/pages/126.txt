@@ -1,0 +1,35 @@
+76. Graf prikazuje ovisnost kinetičke energije izbijenih elektrona s površi-
+ne metalne pločice o frekvenciji svjetlosti kojom je obasjana. Odredite
+maksimalnu valnu duljinu svjetlosti koja kod ovog metala uzrokuje fo-
+toelektrični učinak.
+
+[figure:exam-76]
+
+A. 667 nm
+B. 500 nm
+C. 240 nm
+D. 3,78 pm
+E. 150 nm
+
+77. U Bohrovom modelu atoma, energija elektrona na prvoj stazi u vodikovu
+atomu je E₁ = −13,6 eV. Energije elektrona na višim stazama dane su is-
+pod. Odredite minimalnu energiju fotona dovoljnu za prijelaz vodikova
+atoma iz osnovnog u neko više energijsko stanje.
+
+[table:exam-77]
+A. 0,01 eV
+
+B. 0,03 eV
+
+C. 1,89 eV
+
+D. 0,6 eV
+
+E. 10,2 eV
+
+78. Nakon gama-raspada nekog izotopa ______.
+A. ne mijenja se ni maseni niti redni broj atoma
+B. mijenja se samo redni broj
+C. mijenja se samo maseni broj atoma
+D. mijenja se i redni i maseni broj atoma
+E. nastaje novi kemijski element

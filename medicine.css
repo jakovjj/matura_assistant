@@ -1,0 +1,43 @@
+.med-note { color: var(--muted, #536174); font-size: .9rem; line-height: 1.5; margin: 12px 0; }
+.med-unofficial { color: var(--muted, #536174); font-size: .78rem; font-weight: 700; margin: 12px 0; }
+.med-storage-error { color: #a33131; }
+.medicine-solver .solver-question-layout { margin-top: 20px; }
+.medicine-solver .physics-source-list { display: grid; gap: 16px; }
+.med-task { scroll-margin-top: 24px; background: var(--surface, #fff); border: 1px solid var(--line, #dbe1e9); border-radius: 6px; padding: clamp(16px, 3vw, 28px); }
+.med-task h4 { font-size: 1rem; color: var(--muted, #516176); margin: 0 0 16px; }
+.med-rich { line-height: 1.7; overflow-wrap: anywhere; }
+.med-rich p { margin: 0 0 12px; }
+.med-rich sub { font-size: .75em; }
+.med-figure { max-width: 100%; background: white; }
+.med-task .pdf-source-figure { margin: 14px 0; }
+.med-table-wrap { max-width: 100%; overflow: auto; margin: 14px 0; }
+.med-table-wrap table { border-collapse: collapse; font-size: .95rem; }
+.med-table-wrap caption { text-align: left; padding-bottom: 6px; }
+.med-table-wrap th, .med-table-wrap td { text-align: left; padding: 7px 13px; border: 1px solid var(--line, #d9e0e8); }
+.med-options { border: 0; margin: 20px 0 14px; padding: 0; min-width: 0; }
+.med-options legend { font-size: .85rem; color: var(--muted, #536174); margin-bottom: 8px; }
+.med-option { display: flex; align-items: flex-start; gap: 12px; border: 1px solid var(--line, #d5dde7); border-radius: 5px; padding: 12px; margin: 7px 0; cursor: pointer; }
+.med-option input { flex-shrink: 0; margin: 7px 0 0; width: 17px; height: 17px; accent-color: #15335b; }
+.med-option .med-rich { flex: 1; min-width: 0; }
+.med-option .med-rich p:last-child { margin-bottom: 0; }
+.med-option:has(input:checked) { border-color: #315f69; background: #f0f5fc; }
+.med-option.is-correct { border-color: #328253; background: #eaf8ef; }
+.med-option.is-wrong { border-color: #bb4141; background: #fff0f0; }
+.med-feedback { font-weight: 600; color: #215f3b; }
+.med-feedback.is-wrong { color: #a33131; }
+.med-task-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.med-task button:disabled { opacity: .5; cursor: default; }
+.med-issue { border-left: 3px solid #b08237; padding-left: 12px; font-size: .85rem; color: #654b28; }
+.med-reset { margin: 24px 0; }
+.med-result-table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+.med-result-table td, .med-result-table th { text-align: left; padding: 7px; border-bottom: 1px solid var(--line, #dde3eb); }
+@media (max-width: 600px) {
+  .med-task { padding: 14px; }
+  .med-option { padding: 10px; gap: 8px; }
+}
+html[data-theme="dark"] .med-option:has(input:checked) { background: #183654; }
+html[data-theme="dark"] .med-option.is-correct { background: #143e2e; }
+html[data-theme="dark"] .med-option.is-wrong { background: #4c2029; }
+html[data-theme="dark"] .med-feedback { color: #8bdab0; }
+html[data-theme="dark"] .med-feedback.is-wrong { color: #ffb5b5; }
+html[data-theme="dark"] .med-issue { color: #edd199; }

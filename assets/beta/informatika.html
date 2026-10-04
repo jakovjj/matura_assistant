@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="hr">
+  <head>
+    <base href="/" />
+    <script src="/assets/beta/navigation.js?v=20261004-1100"></script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Interaktivno rješavanje zadataka iz Informatike na državnoj maturi."
+    />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Maturomat - Informatika</title>
+    <link rel="icon" type="image/webp" href="./assets/asistent_za_maturu.webp" />
+    <link rel="stylesheet" href="/assets/beta/styles.css?v=20261004-1100" />
+    <script>
+      if (!new URLSearchParams(window.location.search).has("exam")) {
+        window.location.replace("./?predmet=Informatika");
+      }
+    </script>
+    <script src="./analytics.js?v=20261004-1100"></script>
+      <link rel="stylesheet" href="/assets/beta/beta.css?v=20261004-1100" />
+  </head>
+  <body>
+    <div class="beta-banner"><div class="container"><strong>Beta · Neslužbeni projekt</strong><span>Probni prikaz ispita</span><a href="/" data-beta-exit>Glavna stranica ↗</a></div></div>
+    <script src="./assets/phosphor-icons.js?v=20261004-1100"></script>
+    <a class="skip-link" href="#main">Preskoči na sadržaj</a>
+
+    <div data-site-header></div>
+    <script src="./site-header.js?v=20261004-1100"></script>
+
+    <main id="main">
+      <section class="practice-section">
+        <div class="container practice-container" id="informatics-app"></div>
+      </section>
+    </main>
+
+    <div data-site-footer></div>
+    <script src="./site-footer.js?v=20261004-1100"></script>
+
+    <script src="./data/informatics-choice.js?v=20261004-1100"></script>
+    <script src="./profile-store.js?v=20261004-1100"></script>
+    <script src="./exam-simulation.js?v=20261004-1100"></script>
+    <script src="./solver-self-check.js?v=20261004-1100"></script>
+    <script src="./solver-header.js?v=20261004-1100"></script>
+    <script src="./source-image-viewer.js?v=20261004-1100"></script>
+    <script src="./informatics-choice.js?v=20261004-1100"></script>
+    <script src="./auth-client.js?v=20261004-1100"></script>
+  </body>
+</html>

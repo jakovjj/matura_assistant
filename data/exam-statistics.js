@@ -1,0 +1,157 @@
+(() => {
+  const sources = {
+    2016: {
+      schoolYear: "2015./2016.",
+      url: "https://www.ncvvo.hr/wp-content/uploads/2017/12/Izvjestaj-o-provedbi-i-rezultatima-DM-2016.pdf",
+    },
+    2017: {
+      schoolYear: "2016./2017.",
+      url: "https://www.ncvvo.hr/wp-content/uploads/2017/12/Izvjestaj-o-provedbi-i-rezultatima-DM-2017.pdf",
+    },
+    2018: {
+      schoolYear: "2017./2018.",
+      url: "https://www.ncvvo.hr/wp-content/uploads/2019/06/Statisti%C4%8Dka-i-psihometrijska-analiza-ispita-DM-2017_2018-finale-web.pdf",
+    },
+    2019: {
+      schoolYear: "2018./2019.",
+      url: "https://www.ncvvo.hr/wp-content/uploads/2020/06/Statisticki-i-psihometrijski-izvjestaj-DM-018_2019-za-web-NOVO.pdf",
+    },
+    2020: {
+      schoolYear: "2019./2020.",
+      url: "https://www.ncvvo.hr/wp-content/uploads/2021/03/Statisticka-i-psihometrijska-analiza-ispita-drzavne-mature-19-20.pdf",
+    },
+    2021: {
+      schoolYear: "2020./2021.",
+      url: "https://www.ncvvo.hr/wp-content/uploads/2022/03/NCVVO-Psihometrijska-analiza-2021_12_2021.pdf",
+    },
+    2022: {
+      schoolYear: "2021./2022.",
+      url: "https://www.ncvvo.hr/wp-content/uploads/2023/07/Statisticka-i-psihometrijska-analiza-DM-21_22.pdf",
+    },
+    2025: {
+      schoolYear: "2024./2025.",
+      url: "https://www.ncvvo.hr/wp-content/uploads/2025/11/Rezultati-ispita-DM-2024_2025_zupanije_VF.pdf",
+    },
+    2026: {
+      schoolYear: "2025./2026.",
+      url: "https://www.ncvvo.hr/wp-content/uploads/2026/07/Konacni-rezultati-_DM-2026_1_rok_15_srpnja_2026.pdf",
+    },
+  };
+
+  function statistic(
+    year,
+    subject,
+    level,
+    candidates,
+    items,
+    mean,
+    median = null,
+    gradeDistribution = null,
+  ) {
+    return {
+      year,
+      term: "ljetni rok",
+      subject,
+      level,
+      candidates,
+      items,
+      mean,
+      median,
+      gradeDistribution,
+      source: sources[year],
+    };
+  }
+
+  window.ASISTENT_ZA_MATURE_EXAM_STATISTICS = [
+    statistic(2016, "Hrvatski jezik", "A", 23890, 92, 63.57, 60.63),
+    statistic(2016, "Hrvatski jezik", "B", 9192, 92, 50.95, 53.12),
+    statistic(2016, "Engleski jezik", "A", 19285, 69, 72.14, 73.16),
+    statistic(2016, "Engleski jezik", "B", 12060, 51, 61.76, 65.33),
+    statistic(2016, "Matematika", "A", 11886, 46, 55.95, 56.7),
+    statistic(2016, "Matematika", "B", 21782, 36, 54.48, 55),
+    statistic(2016, "Biologija", null, 7159, 100, 52.09),
+    statistic(2016, "Fizika", null, 9096, 35, 47.21, 45),
+
+    statistic(2017, "Hrvatski jezik", "A", 22264, 92, 62.38),
+    statistic(2017, "Hrvatski jezik", "B", 9188, 92, 51.95, 53.13),
+    statistic(2017, "Engleski jezik", "A", 19138, 69, 74.11, 75.33),
+    statistic(2017, "Engleski jezik", "B", 10959, 51, 64.58, 68),
+    statistic(2017, "Matematika", "A", 11645, 46, 44.77, 43.33),
+    statistic(2017, "Matematika", "B", 20211, 36, 45.05, 42.5),
+    statistic(2017, "Biologija", null, 6192, 100, 49.63, 49),
+    statistic(2017, "Fizika", null, 8533, 37, 43.51, 40),
+
+    statistic(2018, "Hrvatski jezik", "A", 21009, 92, 59.4, 60),
+    statistic(2018, "Hrvatski jezik", "B", 8884, 92, 46.5, 48.8),
+    statistic(2018, "Engleski jezik", "A", 17944, 69, 73.4, 75.3),
+    statistic(2018, "Engleski jezik", "B", 10623, 51, 56.1, 58.7),
+    statistic(2018, "Matematika", "A", 10627, 49, 48.2, 45),
+    statistic(2018, "Matematika", "B", 19705, 33, 47.2, 45),
+    statistic(2018, "Biologija", null, 5572, 100, 51.9, 52),
+    statistic(2018, "Fizika", null, 7764, 37, 48.9, 48.3),
+
+    statistic(2019, "Hrvatski jezik", "A", 20260, 92, 58.67, 58.33),
+    statistic(2019, "Hrvatski jezik", "B", 8351, 92, 50.87, 50.83),
+    statistic(2019, "Engleski jezik", "A", 17287, 69, 77.45, 79.5),
+    statistic(2019, "Engleski jezik", "B", 10089, 51, 61.93, 64.5),
+    statistic(2019, "Matematika", "A", 10162, 49, 42.08, 40),
+    statistic(2019, "Matematika", "B", 18662, 40, 39.9, 37.5),
+    statistic(2019, "Biologija", null, 5154, 80, 44.1, 43.8),
+    statistic(2019, "Fizika", null, 7386, 37, 44.3, 40),
+
+    statistic(2020, "Hrvatski jezik", "A", 19298, 84, 62.09, 62.59),
+    statistic(2020, "Hrvatski jezik", "B", 9611, 84, 53.43, 54.35),
+    statistic(2020, "Engleski jezik", "A", 16969, 69, 78.26, 80.67),
+    statistic(2020, "Engleski jezik", "B", 10398, 51, 63.44, 67.17),
+    statistic(2020, "Matematika", "A", 9567, 45, 47.71, 46.3),
+    statistic(2020, "Matematika", "B", 19644, 40, 44.5, 45),
+    statistic(2020, "Biologija", null, 4653, 80, 46.07, 45),
+    statistic(2020, "Fizika", null, 6846, 37, 36.04, 31.67),
+
+    statistic(2021, "Hrvatski jezik", "A", 18512, 92, 58.31, 57.5),
+    statistic(2021, "Hrvatski jezik", "B", 9061, 92, 47.71, 48.33),
+    statistic(2021, "Engleski jezik", "A", 17188, 69, 75.5, 77.67),
+    statistic(2021, "Engleski jezik", "B", 9507, 51, 62.77, 67.17),
+    statistic(2021, "Matematika", "A", 9622, 49, 51.54, 51.67),
+    statistic(2021, "Matematika", "B", 18209, 40, 50.23, 50),
+    statistic(2021, "Biologija", null, 4858, 80, 42.48, 40),
+    statistic(2021, "Fizika", null, 6793, 37, 42.99, 38.33),
+
+    statistic(2022, "Hrvatski jezik", "A", 18236, 92, 61.61, 62.5),
+    statistic(2022, "Hrvatski jezik", "B", 8515, 92, 50.5, 50.83),
+    statistic(2022, "Engleski jezik", "A", 17271, 69, 80.57, 83.16),
+    statistic(2022, "Engleski jezik", "B", 8757, 51, 69.19, 75),
+    statistic(2022, "Matematika", "A", 10703, 51, 56.31, 55),
+    statistic(2022, "Matematika", "B", 16143, 40, 38.46, 35),
+    statistic(2022, "Biologija", null, 4484, 80, 53.66, 53.75),
+    statistic(2022, "Fizika", null, 6909, 37, 46.15, 41.67),
+
+    statistic(2025, "Hrvatski jezik", null, 25095, null, 53.6),
+    statistic(2025, "Engleski jezik", "A", 15174, null, 71.5),
+    statistic(2025, "Engleski jezik", "B", 9305, null, 66.4),
+    statistic(2025, "Matematika", "A", 9633, null, 46.1),
+    statistic(2025, "Matematika", "B", 15306, null, 43.4),
+    statistic(2025, "Biologija", null, 4182, null, 46.7),
+    statistic(2025, "Fizika", null, 6299, null, 43.4),
+    statistic(2025, "Kemija", null, 3010, null, 50),
+    statistic(2025, "Politika i gospodarstvo", null, 3745, null, 56.9),
+
+    statistic(2026, "Hrvatski jezik", null, 27612, null, 54, null, [13.5, 25.6, 42.3, 16.1, 2.5]),
+    statistic(2026, "Engleski jezik", "A", 15847, null, 69.9, null, [0.9, 6.4, 37.8, 44.1, 10.8]),
+    statistic(2026, "Engleski jezik", "B", 10980, null, 62, null, [10.6, 17, 29.4, 28.7, 14.3]),
+    statistic(2026, "Matematika", "A", 10392, null, 43.5, null, [20.5, 43.9, 20.8, 9, 5.8]),
+    statistic(2026, "Matematika", "B", 17366, null, 41.1, null, [17.8, 50.7, 23.1, 6.9, 1.5]),
+    statistic(2026, "Njemački jezik", "A", 191, null, 69.1, null, [11.5, 8.9, 24.1, 19.9, 35.6]),
+    statistic(2026, "Njemački jezik", "B", 596, null, 60.6, null, [9.6, 21.1, 31, 27.2, 11.1]),
+    statistic(2026, "Biologija", null, 5229, null, 48.5, null, [12.4, 40.9, 29.6, 14.2, 2.8]),
+    statistic(2026, "Fizika", null, 7221, null, 42, null, [29.6, 34, 20.1, 11, 5.3]),
+    statistic(2026, "Geografija", null, 272, null, 59.3, null, [1.8, 19.9, 50, 26.1, 2.2]),
+    statistic(2026, "Informatika", null, 2214, null, 38.9, null, [36.1, 30.7, 20, 10.3, 2.9]),
+    statistic(2026, "Kemija", null, 3670, null, 48, null, [22.6, 29.6, 25.4, 16.5, 5.9]),
+    statistic(2026, "Likovna umjetnost", null, 1210, null, 64.6, null, [1.2, 17.5, 40.7, 32.2, 8.4]),
+    statistic(2026, "Politika i gospodarstvo", null, 4022, null, 44.9, null, [15.7, 50.7, 26.4, 6.3, 0.9]),
+    statistic(2026, "Povijest", null, 522, null, 54.4, null, [5.7, 34.5, 39.7, 16.9, 3.1]),
+    statistic(2026, "Psihologija", null, 2578, null, 54, null, [20.4, 28.4, 20, 16.6, 14.6]),
+    statistic(2026, "Sociologija", null, 731, null, 55, null, [5.2, 33.8, 37.4, 17.8, 5.8]),
+  ];
+})();

@@ -32,8 +32,8 @@ API_URL = (
     "?categories=58&per_page=100&_fields=link,title"
 )
 ARCHIVE_URL = "https://www.ncvvo.hr/kategorija/drzavna-matura/provedeni-ispiti/"
-MIN_YEAR = 2013
-MAX_YEAR = 2025
+MIN_YEAR = 2015
+MAX_YEAR = 2026
 DOWNLOAD_WORKERS = 4
 USER_AGENT = "asistent-za-mature-archive-builder/1.0"
 
@@ -51,14 +51,13 @@ SUBJECTS = (
     "Psihologija",
     "Sociologija",
     "Filozofija",
-    "Logika",
     "Likovna umjetnost",
     "Njemački jezik",
-    "Talijanski jezik",
 )
 
 EXCLUDED_SUBJECTS = {
     "Glazbena umjetnost",
+    "Talijanski jezik",
     "Talijanski jezik i književnost",
     "Vjeronauk",
 }
@@ -155,10 +154,6 @@ def parse_subject(label: str) -> str | None:
         if lower_label.startswith(subject.casefold()):
             return subject
 
-    # Older posts use "materinski" wording for minority-language exams.
-    if lower_label.startswith("talijanski materinski"):
-        return "Talijanski jezik"
-
     return None
 
 
@@ -177,7 +172,9 @@ def parse_level(label: str, filename: str, subject: str) -> str | None:
         "Engleski jezik": "ENG",
         "Matematika": "MAT",
     }[subject]
-    match = re.search(rf"{code}[_-]?([AB])", filename, re.I)
+    # Require the level letter to stand alone so subject-name files such as
+    # "Hrvatski_1_rok_2025_2026.zip" do not match HRV + "a" from "Hrvatski".
+    match = re.search(rf"{code}[_-]?([AB])(?![A-Za-z])", filename, re.I)
     return match.group(1).upper() if match else None
 
 

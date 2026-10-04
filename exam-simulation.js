@@ -10,11 +10,11 @@
   }
 
   function icon(iconName, className) {
-    if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
+    if (window.renderPhosphorIcon) return window.renderPhosphorIcon(iconName, className);
 
     return `
       <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-        <use href="./assets/lucide-icons.svg#${iconName}"></use>
+        <use href="./assets/phosphor-icons.svg#${iconName}"></use>
       </svg>
     `;
   }

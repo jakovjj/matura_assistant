@@ -71,7 +71,7 @@
 
       if (state.user) {
         widget.innerHTML = `
-          <a class="auth-widget__user" href="./profil.html" title="${escapeHtml(state.user.email)}">
+          <a class="auth-widget__user" href="/profil" title="${escapeHtml(state.user.email)}">
             ${escapeHtml(state.user.email)}
           </a>
           <button class="auth-widget__logout" type="button" data-auth-logout>
@@ -109,7 +109,7 @@
           </p>
           <div class="auth-page-card__actions">
             <a class="primary-button" href="./">Nastavi na vježbe</a>
-            <a class="secondary-button" href="./profil.html">Otvori profil</a>
+            <a class="secondary-button" href="/profil">Otvori profil</a>
             <button class="secondary-button" type="button" data-auth-logout>Odjava</button>
           </div>
         `,
@@ -138,15 +138,12 @@
             <span>Nastavi s Googleom</span>
           </a>
         </div>
-        <p class="auth-page-card__note">
-          Neslužbeni projekt.
-        </p>
       `,
       title: "Prijava",
     });
   }
 
-  function authCard({ body, eyebrow = "Asistent za maturu", intro, title }) {
+  function authCard({ body, eyebrow = "Maturomat", intro, title }) {
     return `
       <article class="auth-page-card">
         <div class="auth-page-card__brand">

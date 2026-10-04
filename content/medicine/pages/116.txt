@@ -1,0 +1,24 @@
+49. Na jednom kraju poluge udaljenom 1 m od oslonca nalazi se uteg mase
+m1, a na drugom kraju uteg dvostruko manje mase. Izračunajte na kojoj
+se udaljenosti od oslonca treba nalaziti drugi uteg da bi poluga bila u
+ravnoteži. Zanemarite masu poluge.
+A. 1 m
+B. 2m
+C. 3 m
+D. 50cm
+E. 25 cm
+50. Izračunajte gravitacijsku silu između kugli masa 1 t i 3 t koje su prika-
+zane na slici! (G = 6,67·10⁻¹¹ Nm²/kg²) Uputa: Na slici duljina oznake
+(stranice kvadratića) iznosi 1 m.
+[figure:exam-50]
+A. 16,3 μN
+B. 4,2 μN
+C. 16,3 pN
+D. 57,1 pN
+E. 1,3 μN
+51. Hidraulički tlak posljedica je ______.
+A. termičkoga gibanja molekula
+B. djelovanja vanjske sile na tekućinu
+C. stlačivosti tekućine
+D. dinamičkog tlaka fluida
+E. laminarnog strujanja fluida

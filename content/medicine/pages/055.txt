@@ -1,0 +1,31 @@
+63. Brzina svjetlosti u sredstvu indeksa loma 2,5 je u odnosu na brzinu svje-
+tlosti u vakuumu:
+A. veća za 25 %
+
+B. jednaka jer se radi o iznimno velikoj brzini
+C. manja za 25 %
+
+D. manja za 60 %
+
+E. veća za 40 %
+
+64. Ispred divergentne leće smještene u ishodište koordinatnog sustava
+nalazi se predmet označen strelicom. Crna točka je žarište leće. Kakva
+slika nastaje ovom lećom i na kojem se položaju nalazi? (Razmak između
+podjela na optičkoj osi iznosi 5 cm.)
+
+[figure:physics-64]
+A. virtualna slika na otprilike 20 cm
+B. virtualna slika na otprilike -20 cm
+C. virtualna slika na otprilike 80 cm
+D. realna slika na otprilike 80 cm
+E. virtualna slika na otprilike -55 cm
+
+65. Koja jednadžba opisuje harmonijsko titranje amplitude 15 cm, a početne
+faze 120° i ako oscilator u jednoj minuti napravi 240 titraja!
+A. y = 15 cm sin (240π s⁻¹ t + 2/3)
+
+B. y = 15 cm sin (480π s⁻¹ t + 2π/3)
+C. y = 15 cm sin (60π s⁻¹ t + 2π/3)
+D. y = 15 cm sin (240π s⁻¹ t + 2π/3)
+E. y = 15 cm sin (8π s⁻¹ t + 2π/3)

@@ -1,0 +1,31 @@
+50. Pločasti kondenzator spojen je na izvor istosmjernog napona od 9 V.
+Udaljenost između ploča je D = 4 m. Naboj od 0,3 C nalazi se na udaljeno-
+sti D/3 od negativne ploče. Na kojem je električnom potencijalu naboj?
+A. 9V
+B. 12J/C
+C. 6 J/C
+D. 3V
+E. 15V
+
+51. Ulje mase 1 kg specifičnog toplinskog kapaciteta 1800 J /(kgK) zagrija-
+vamo na kuhalu. Kuhalo je priključeno na izvor napona od 120 Vi njime
+teče struja jakosti 0,5 A. Za koliko se promijenila temperatura ulja na-
+kon 10 minuta zagrijavanja?
+
+A. 5°C
+
+B. 10°C
+C. 20°C
+D. 30°C
+E. 40°C
+
+52. Čestica se giba u homogenom magnetnom polju B brzinom v, pri čemu
+na nju djeluje sila F smjera, kako je prikazano na slici. Što možete za-
+ključiti? Čestica:
+
+[figure:physics-52]
+A. ima pozitivan naboj
+B. nema naboj
+C. se giba jednoliko pravocrtno
+D. ima negativan naboj
+E. se giba jednoliko ubrzano po pravcu

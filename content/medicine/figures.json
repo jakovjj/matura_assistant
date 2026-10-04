@@ -1,0 +1,902 @@
+{
+  "biology-43": {
+    "page": 20,
+    "box": [
+      125,
+      735,
+      620,
+      935
+    ],
+    "alt": "Stanica u anafazi mejotičke diobe"
+  },
+  "physics-3": {
+    "page": 36,
+    "box": [
+      140,
+      765,
+      410,
+      985
+    ],
+    "alt": "Graf sile F u kN o putu s u m"
+  },
+  "physics-11": {
+    "page": 39,
+    "box": [
+      110,
+      180,
+      365,
+      430
+    ],
+    "alt": "Promjene stanja plina u dijagramu p prema 1/V"
+  },
+  "physics-20": {
+    "page": 41,
+    "box": [
+      100,
+      520,
+      550,
+      610
+    ],
+    "alt": "Dva vodiča i točka T"
+  },
+  "physics-27": {
+    "page": 43,
+    "box": [
+      110,
+      505,
+      590,
+      845
+    ],
+    "alt": "Električno polje prema vremenu u pikosekundama"
+  },
+  "physics-29": {
+    "page": 44,
+    "box": [
+      120,
+      250,
+      540,
+      445
+    ],
+    "alt": "Snop u prozirnom štapu"
+  },
+  "physics-30": {
+    "page": 44,
+    "box": [
+      125,
+      770,
+      610,
+      1040
+    ],
+    "alt": "Put svjetlosti kroz tri sredstva"
+  },
+  "physics-37": {
+    "page": 46,
+    "box": [
+      145,
+      740,
+      950,
+      930
+    ],
+    "alt": "Pet grafova ovisnosti sile o masi"
+  },
+  "physics-41": {
+    "page": 47,
+    "box": [
+      120,
+      860,
+      845,
+      1220
+    ],
+    "alt": "Šest slučajeva djelovanja sile na štap"
+  },
+  "physics-44": {
+    "page": 49,
+    "box": [
+      100,
+      240,
+      545,
+      680
+    ],
+    "alt": "Cijev dovodi vodu na kat visine 4 m"
+  },
+  "physics-49": {
+    "page": 50,
+    "box": [
+      140,
+      1110,
+      585,
+      1210
+    ],
+    "alt": "Raspored triju naboja s udaljenostima x i y"
+  },
+  "physics-52": {
+    "page": 51,
+    "box": [
+      112,
+      898,
+      520,
+      1100
+    ],
+    "alt": "Smjerovi brzine, sile i magnetnog polja"
+  },
+  "physics-55": {
+    "page": 52,
+    "box": [
+      125,
+      860,
+      765,
+      1220
+    ],
+    "alt": "Pet grafova jakosti struje prema vremenu"
+  },
+  "physics-62": {
+    "page": 54,
+    "box": [
+      125,
+      805,
+      355,
+      1110
+    ],
+    "alt": "Dva zrcala razmaknuta 1 m i upadna zraka pod 20°"
+  },
+  "physics-64": {
+    "page": 55,
+    "box": [
+      110,
+      535,
+      890,
+      860
+    ],
+    "alt": "Predmet, žarište i divergentna leća na optičkoj osi"
+  },
+  "physics-68": {
+    "page": 56,
+    "box": [
+      110,
+      750,
+      630,
+      1180
+    ],
+    "alt": "Srednja energija vezanja po nukleonu prema masenom broju"
+  },
+  "physics-69": {
+    "page": 57,
+    "box": [
+      105,
+      205,
+      420,
+      490
+    ],
+    "alt": "Dvije sile pod kutom prema osi x"
+  },
+  "physics-75": {
+    "page": 58,
+    "box": [
+      145,
+      1010,
+      550,
+      1208
+    ],
+    "alt": "Dva tijela prije i nakon sudara"
+  },
+  "physics-76": {
+    "page": 59,
+    "box": [
+      125,
+      210,
+      785,
+      400
+    ],
+    "alt": "Pet grafova brzine prema vremenu"
+  },
+  "physics-78": {
+    "page": 59,
+    "box": [
+      120,
+      1000,
+      540,
+      1215
+    ],
+    "alt": "Presjeci vodoravne cijevi i smjer toka"
+  },
+  "physics-80": {
+    "page": 60,
+    "box": [
+      130,
+      400,
+      540,
+      570
+    ],
+    "alt": "Tri prikaza silnica električnog polja"
+  },
+  "physics-81": {
+    "page": 60,
+    "box": [
+      135,
+      870,
+      505,
+      1220
+    ],
+    "alt": "Naboji na kvadratnoj mreži i pet smjerova sile"
+  },
+  "physics-82": {
+    "page": 61,
+    "box": [
+      110,
+      245,
+      295,
+      510
+    ],
+    "alt": "Grijač u strujnom krugu i točke A i B"
+  },
+  "physics-83": {
+    "page": 61,
+    "box": [
+      110,
+      835,
+      380,
+      1090
+    ],
+    "alt": "Strujni krug s tri žaruljice"
+  },
+  "physics-85": {
+    "page": 62,
+    "box": [
+      130,
+      540,
+      690,
+      680
+    ],
+    "alt": "Dva magnetna polja, vodič i ponuđeni smjerovi"
+  },
+  "physics-87": {
+    "page": 63,
+    "box": [
+      110,
+      165,
+      900,
+      395
+    ],
+    "alt": "Pet grafova napona samoindukcije"
+  },
+  "physics-89": {
+    "page": 63,
+    "box": [
+      110,
+      1020,
+      845,
+      1205
+    ],
+    "alt": "Pet grafova elastične sile prema vremenu"
+  },
+  "physics-95": {
+    "page": 65,
+    "box": [
+      110,
+      545,
+      600,
+      848
+    ],
+    "alt": "Objekt, leća i slika na zastoru"
+  },
+  "chemistry-7": {
+    "page": 73,
+    "box": [
+      105,
+      880,
+      840,
+      1185
+    ],
+    "alt": "Pet prikaza slojeva otapala označenih A do E"
+  },
+  "chemistry-8": {
+    "page": 74,
+    "box": [
+      145,
+      145,
+      585,
+      213
+    ],
+    "alt": "Strukturna formula spoja"
+  },
+  "chemistry-10": {
+    "page": 74,
+    "box": [
+      145,
+      804,
+      490,
+      1185
+    ],
+    "alt": "Strukturne formule pet ponuđenih spojeva A do E"
+  },
+  "chemistry-23": {
+    "page": 77,
+    "box": [
+      112,
+      700,
+      570,
+      955
+    ],
+    "alt": "Strukturna formula tetraciklina"
+  },
+  "chemistry-25-a": {
+    "page": 78,
+    "box": [
+      155,
+      140,
+      665,
+      325
+    ],
+    "alt": "Ponuđena struktura A"
+  },
+  "chemistry-25-b": {
+    "page": 78,
+    "box": [
+      155,
+      335,
+      665,
+      520
+    ],
+    "alt": "Ponuđena struktura B"
+  },
+  "chemistry-25-c": {
+    "page": 78,
+    "box": [
+      155,
+      535,
+      665,
+      720
+    ],
+    "alt": "Ponuđena struktura C"
+  },
+  "chemistry-25-d": {
+    "page": 78,
+    "box": [
+      155,
+      738,
+      550,
+      1085
+    ],
+    "alt": "Ponuđena struktura D"
+  },
+  "chemistry-25-e": {
+    "page": 78,
+    "box": [
+      155,
+      1100,
+      440,
+      1405
+    ],
+    "alt": "Ponuđena struktura E"
+  },
+  "chemistry-29": {
+    "page": 79,
+    "box": [
+      105,
+      970,
+      790,
+      1300
+    ],
+    "alt": "Strukturne formule pet baza"
+  },
+  "chemistry-33": {
+    "page": 80,
+    "box": [
+      120,
+      985,
+      680,
+      1170
+    ],
+    "alt": "Strukturna formula peptida"
+  },
+  "chemistry-43": {
+    "page": 83,
+    "box": [
+      110,
+      220,
+      560,
+      540
+    ],
+    "alt": "Fazni dijagram s označenom točkom T"
+  },
+  "chemistry-45": {
+    "page": 84,
+    "box": [
+      140,
+      115,
+      855,
+      275
+    ],
+    "alt": "Reakcija kiseline s amonijakom"
+  },
+  "chemistry-54": {
+    "page": 86,
+    "box": [
+      115,
+      710,
+      850,
+      950
+    ],
+    "alt": "Pet molekula označenih A do E"
+  },
+  "chemistry-59": {
+    "page": 87,
+    "box": [
+      110,
+      915,
+      810,
+      1290
+    ],
+    "alt": "Pet ponuđenih strukturnih formula"
+  },
+  "chemistry-60": {
+    "page": 88,
+    "box": [
+      120,
+      135,
+      590,
+      260
+    ],
+    "alt": "Reakcija oksidacije aromatskog spoja"
+  },
+  "chemistry-61": {
+    "page": 88,
+    "box": [
+      120,
+      495,
+      925,
+      680
+    ],
+    "alt": "Strukturna formula triglicerida"
+  },
+  "chemistry-62": {
+    "page": 88,
+    "box": [
+      125,
+      950,
+      245,
+      1130
+    ],
+    "alt": "Lančasta struktura šećera"
+  },
+  "chemistry-62-c": {
+    "page": 88,
+    "box": [
+      350,
+      1215,
+      535,
+      1320
+    ],
+    "alt": "Ciklička struktura u odgovoru C"
+  },
+  "chemistry-64": {
+    "page": 89,
+    "box": [
+      110,
+      405,
+      910,
+      515
+    ],
+    "alt": "Reakcija ketona i anilina"
+  },
+  "chemistry-65": {
+    "page": 89,
+    "box": [
+      115,
+      800,
+      600,
+      1000
+    ],
+    "alt": "Strukturna formula disulfida"
+  },
+  "chemistry-72": {
+    "page": 91,
+    "box": [
+      110,
+      875,
+      300,
+      1105
+    ],
+    "alt": "Dvije strukturne formule"
+  },
+  "chemistry-94": {
+    "page": 97,
+    "box": [
+      110,
+      185,
+      240,
+      305
+    ],
+    "alt": "Opća struktura R–CO–Y"
+  },
+  "chemistry-100": {
+    "page": 98,
+    "box": [
+      115,
+      755,
+      790,
+      1020
+    ],
+    "alt": "Strukturna formula spoja"
+  },
+  "chemistry-101": {
+    "page": 99,
+    "box": [
+      110,
+      155,
+      280,
+      360
+    ],
+    "alt": "Struktura vanilina"
+  },
+  "chemistry-102": {
+    "page": 99,
+    "box": [
+      115,
+      640,
+      250,
+      860
+    ],
+    "alt": "Fischerova projekcija molekule"
+  },
+  "chemistry-102-c": {
+    "page": 99,
+    "box": [
+      310,
+      970,
+      440,
+      1190
+    ],
+    "alt": "Fischerova projekcija ponuđenog enantiomera"
+  },
+  "chemistry-103": {
+    "page": 100,
+    "box": [
+      105,
+      190,
+      900,
+      330
+    ],
+    "alt": "Pet struktura označenih rimskim brojevima"
+  },
+  "chemistry-105-d": {
+    "page": 100,
+    "box": [
+      745,
+      945,
+      885,
+      1030
+    ],
+    "alt": "Aminokiselina D"
+  },
+  "chemistry-105-g": {
+    "page": 100,
+    "box": [
+      750,
+      1092,
+      885,
+      1210
+    ],
+    "alt": "Aminokiselina G"
+  },
+  "chemistry-106": {
+    "page": 101,
+    "box": [
+      115,
+      165,
+      720,
+      425
+    ],
+    "alt": "Strukture triju aminokiselina"
+  },
+  "chemistry-107": {
+    "page": 101,
+    "box": [
+      110,
+      760,
+      875,
+      920
+    ],
+    "alt": "Strukturna formula miriocina"
+  },
+  "exam-43": {
+    "page": 113,
+    "box": [
+      105,
+      733,
+      407,
+      1022
+    ],
+    "alt": "Graf v(t)"
+  },
+  "exam-44": {
+    "page": 114,
+    "box": [
+      119,
+      195,
+      815,
+      368
+    ],
+    "alt": "Pet ponuđenih grafova"
+  },
+  "exam-45": {
+    "page": 114,
+    "box": [
+      119,
+      714,
+      305,
+      898
+    ],
+    "alt": "Položaji točaka A, B i C na disku"
+  },
+  "exam-46": {
+    "page": 115,
+    "box": [
+      110,
+      219,
+      540,
+      394
+    ],
+    "alt": "Tijelo na vodoravnoj dasci"
+  },
+  "exam-50": {
+    "page": 116,
+    "box": [
+      111,
+      576,
+      370,
+      791
+    ],
+    "alt": "Dvije kugle na mreži s označenim mjerilom"
+  },
+  "exam-52": {
+    "page": 117,
+    "box": [
+      113,
+      192,
+      534,
+      386
+    ],
+    "alt": "Sustav cijevi s različitim polumjerima"
+  },
+  "exam-56": {
+    "page": 118,
+    "box": [
+      118,
+      601,
+      679,
+      1065
+    ],
+    "alt": "Pet termodinamičkih grafova"
+  },
+  "exam-62": {
+    "page": 120,
+    "box": [
+      110,
+      593,
+      361,
+      871
+    ],
+    "alt": "Smjer struje i Lorentzove sile na elektron"
+  },
+  "exam-63": {
+    "page": 121,
+    "box": [
+      108,
+      211,
+      720,
+      375
+    ],
+    "alt": "Dva vodiča, točka T i strane svijeta"
+  },
+  "exam-64": {
+    "page": 121,
+    "box": [
+      105,
+      766,
+      407,
+      999
+    ],
+    "alt": "Prsten s označenim dimenzijama"
+  },
+  "exam-69": {
+    "page": 123,
+    "box": [
+      108,
+      184,
+      489,
+      482
+    ],
+    "alt": "Elongacija tijela u ovisnosti o vremenu"
+  },
+  "exam-71": {
+    "page": 124,
+    "box": [
+      103,
+      251,
+      642,
+      588
+    ],
+    "alt": "Polarizatori i točka T"
+  },
+  "exam-73": {
+    "page": 125,
+    "box": [
+      105,
+      205,
+      712,
+      301
+    ],
+    "alt": "Valovi iz izvora A i B te točka C"
+  },
+  "exam-75": {
+    "page": 125,
+    "box": [
+      108,
+      970,
+      680,
+      1209
+    ],
+    "alt": "Predmet i njegova slika uz leću"
+  },
+  "exam-76": {
+    "page": 126,
+    "box": [
+      108,
+      253,
+      432,
+      426
+    ],
+    "alt": "Graf kinetičke energije elektrona prema frekvenciji"
+  },
+  "exam-79": {
+    "page": 127,
+    "box": [
+      117,
+      185,
+      629,
+      594
+    ],
+    "alt": "Energija vezanja po nukleonu prema masenom broju"
+  },
+  "exam-83": {
+    "page": 128,
+    "box": [
+      107,
+      763,
+      915,
+      936
+    ],
+    "alt": "Pet ponuđenih Lewisovih struktura"
+  },
+  "exam-101": {
+    "page": 133,
+    "box": [
+      105,
+      221,
+      578,
+      525
+    ],
+    "alt": "Shema galvanskog članka"
+  },
+  "exam-103-b": {
+    "page": 134,
+    "box": [
+      127,
+      179,
+      297,
+      327
+    ],
+    "alt": "Strukturna formula B"
+  },
+  "exam-103-d": {
+    "page": 134,
+    "box": [
+      128,
+      381,
+      280,
+      506
+    ],
+    "alt": "Strukturna formula D"
+  },
+  "exam-103-e": {
+    "page": 134,
+    "box": [
+      124,
+      509,
+      282,
+      580
+    ],
+    "alt": "Strukturna formula E"
+  },
+  "exam-107": {
+    "page": 135,
+    "box": [
+      110,
+      173,
+      889,
+      446
+    ],
+    "alt": "Pet parova kemijskih struktura"
+  },
+  "exam-108": {
+    "page": 135,
+    "box": [
+      114,
+      734,
+      280,
+      884
+    ],
+    "alt": "Strukturni prikaz spoja"
+  },
+  "exam-110": {
+    "page": 136,
+    "box": [
+      110,
+      131,
+      390,
+      333
+    ],
+    "alt": "Struktura acetilsalicilne kiseline"
+  },
+  "exam-112": {
+    "page": 136,
+    "box": [
+      108,
+      856,
+      454,
+      1209
+    ],
+    "alt": "Strukture spojeva A i B"
+  },
+  "exam-114": {
+    "page": 137,
+    "box": [
+      113,
+      437,
+      906,
+      580
+    ],
+    "alt": "Strukture triju amina"
+  },
+  "exam-115": {
+    "page": 137,
+    "box": [
+      113,
+      860,
+      567,
+      1215
+    ],
+    "alt": "Prikaz strukture iz zadatka"
+  },
+  "exam-117": {
+    "page": 138,
+    "box": [
+      88,
+      432,
+      892,
+      714
+    ],
+    "alt": "Struktura peptida"
+  },
+  "exam-119": {
+    "page": 139,
+    "box": [
+      111,
+      311,
+      768,
+      610
+    ],
+    "alt": "Pet epruveta s rasporedima otapala"
+  },
+  "exam-120": {
+    "page": 139,
+    "box": [
+      110,
+      901,
+      921,
+      1199
+    ],
+    "alt": "Strukture spojeva A do E"
+  }
+}

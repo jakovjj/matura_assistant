@@ -1,0 +1,43 @@
+70. Olovni akumulator je galvanski članak u kojem se odvija sljedeći re-
+doks-proces:
+Pb(s) + PbO₂(s) + 4H⁺(aq) + 2SO₄²⁻(aq) → 2PbSO₄(s) + 2H₂O(l).
+
+Koja od navedenih tvrdnji NIJE točna?
+
+A. Broj izmijenjenih elektrona u navedenom redoks-procesu iznosi 2.
+
+B. Anoda navedenoga galvanskog članka načinjena je od Pb(s).
+
+C. Navedeni redoks-proces primjer je reakcije disproporcioniranja.
+
+D. Katoda navedenoga galvanskog članka načinjena je od PbO₂(s).
+
+E. U navedenom redoks-procesu Pb(s) je reducens, a PbO₂(s) je oksidans.
+
+71. Bromtimolno modrilo je acidobazni indikator koji je žuto obojen u pro-
+toniranom obliku (pH < 6,0), a plavo obojen u deprotoniranom obli-
+ku (pH > 7,6). Izdvojite NETOČNU tvrdnju. Dodatkom bromtimolnog
+modrila u vodenu otopinu:
+
+A. RbBr, otopina će poprimiti zelenu boju.
+
+B. NH₄I, otopina će poprimiti žutu boju.
+
+C. CsF, otopina će poprimiti plavu boju.
+
+D. KNO₂, otopina će poprimiti žutu boju.
+
+E. Sr(NO₃)₂, otopina će poprimiti zelenu boju.
+72. Prikazane molekule su:
+
+[figure:chemistry-72]
+
+A. enantiomeri
+
+B. konfiguracijski izomeri
+
+C. konstitucijski izomeri
+
+D. konformacijski izomeri
+
+E. strukturni izomeri

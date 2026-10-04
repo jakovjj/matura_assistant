@@ -1,0 +1,38 @@
+101. Na svaki centimetar žice kojom teče struja jakosti 20 A djeluje sila ma-
+gnetnog polja od 0,08 N. Ako je žica okomita na silnice, magnetna in-
+dukcija polja iznosi:
+
+A. 400 mT
+B. 400T
+C. 0,4 mT
+D. 4mT
+
+E. 4T
+
+102. Koliki je hidrostatski tlak 15 cm iznad dna ako je visina vode u posudi
+75 cm. Izrazite tlak u kPa.
+
+A. 1471,5
+B. 1,47
+C. 5,886
+D. 7,357
+E. 5886
+
+103. Plin izotermno stlačimo na tri puta manji volumen, pri čemu iz cilindra
+„pobjegne“ jedna trećina mase plina. Konačan tlak plina je:
+
+A. tri puta veći od početnog
+B. tri puta manji od početnog
+C. dva puta veći od početnog
+D. dva puta manji od početnog
+E. nepromijenjen
+
+104. Dva čovjeka nose teret obješen na motku dugu 2 m. Gdje visi teret ako
+motka prvog čovjeka pritišće tri puta jače nego drugoga?
+A. na polovici
+
+B. 0,5 m od drugog
+C. 0,5 m od prvog
+
+D. 0,75 m od prvog
+E. 0,25 m od prvog

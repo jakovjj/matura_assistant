@@ -1,0 +1,22 @@
+98. Odaberite par soli A i B za koje vrijedi da miješanjem otopine soli A s
+otopinom soli B dolazi do nastajanja teško topljive soli C i u vodi topljive
+soli D prema sljedećoj jednadžbi reakcije:
+
+A(aq) + B(aq) ⇆ C(s) + D(aq)
+A. A=NH₄I; B = CH₃COONa
+B. A=KBr;B = Na₃PO₄
+C. A= MgCl₂; B= Ca(NO₃)₂
+D. A= NaCl; B = K₂CO₃
+E. A= CaCl₂; B = Na₂SO₄
+99. Amfoterna svojstva NEMA:
+A. natrijev hidrogenkarbonat
+B. voda
+C. kalijev palmitat
+D. amonijev dihidrogenfosfat
+E. serin
+100. Sumarna redoks-reakcija koja se odvija prilikom elektrolize vode je:
+A. H⁺(aq) + OH⁻(aq) → H₂O(l)
+B. 2H₂O(l) → 2H₂(g) + O₂(g)
+C. 2H⁺(aq) + 2e⁻ → H₂(g)
+D. 2H₂O(l) ⇆ H₃O⁺(aq) + OH⁻(aq)
+E. 4OH⁻(aq) − 4e⁻ → O₂(g) + 2H₂O(l)

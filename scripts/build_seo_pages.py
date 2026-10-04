@@ -24,7 +24,7 @@ from seo_urls import (
 
 INDEX_FILE = ROOT / "index.html"
 GENERATED_DIRS = [ROOT / "predmeti", ROOT / "ispiti"]
-SITE_NAME = "Asistent za Mature"
+SITE_NAME = "Maturomat"
 HOME_DESCRIPTION = (
     "Neslužbena arhiva prethodnih ispita državne mature s interaktivnim "
     "vježbama i lokalnim preslikama NCVVO paketa."
@@ -100,7 +100,7 @@ def app_shell_page(*, title: str, description: str, canonical_url: str, page_sch
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1045" />
     <meta property="og:image:height" content="1045" />
-    <meta property="og:image:alt" content="Asistent za Mature" />
+    <meta property="og:image:alt" content="Maturomat" />
     <meta name="twitter:card" content="summary" />
     <meta name="twitter:title" content="{esc(full_title)}" />
     <meta name="twitter:description" content="{esc(description)}" />
@@ -109,12 +109,12 @@ def app_shell_page(*, title: str, description: str, canonical_url: str, page_sch
     <link rel="canonical" href="{esc(canonical_url)}" />
     <link rel="sitemap" type="application/xml" href="{SITE_ORIGIN}/sitemap.xml" />
     <link rel="icon" type="image/webp" href="./assets/asistent_za_maturu.webp" />
-    <link rel="stylesheet" href="./styles.css?v=20260608-footer-coffee" />
+    <link rel="stylesheet" href="./styles.css?v=20261004-1100" />
     <script id="seo-structured-data" type="application/ld+json">{structured_data(page_schema)}</script>
     <script>
       document.documentElement.classList.add("is-app-subpage");
     </script>
-    <script src="./analytics.js?v=20260605-clarity-force-2"></script>
+    <script src="./analytics.js?v=20261004-1100"></script>
   </head>
 {app_body()}
 """
@@ -124,7 +124,7 @@ def subject_page(subject: str, exams: list[dict], archive: dict) -> str:
     canonical_url = site_url(subject_path(subject))
     title = f"{subject} državna matura: ispiti i vježba"
     description = (
-        f"{subject}: prethodni ispiti državne mature od 2013. do 2025., "
+        f"{subject}: prethodni ispiti državne mature od 2015. nadalje, "
         "službeni NCVVO paketi za preuzimanje i dostupne interaktivne vježbe."
     )
     sorted_exams = sorted(exams, key=compare_exams)
@@ -143,7 +143,7 @@ def subject_page(subject: str, exams: list[dict], archive: dict) -> str:
         "about": {"@type": "Thing", "name": subject},
         "isBasedOn": archive.get("officialArchiveUrl"),
         "breadcrumb": breadcrumb_schema(
-            [("Asistent za Mature", site_url("/")), (subject, canonical_url)]
+            [("Maturomat", site_url("/")), (subject, canonical_url)]
         ),
         "mainEntity": {
             "@type": "ItemList",
@@ -193,7 +193,7 @@ def exam_page(exam: dict, archive: dict) -> str:
         "dateModified": archive.get("generatedAt"),
         "breadcrumb": breadcrumb_schema(
             [
-                ("Asistent za Mature", site_url("/")),
+                ("Maturomat", site_url("/")),
                 (exam["subject"], site_url(subject_path(exam["subject"]))),
                 (name, canonical_url),
             ]

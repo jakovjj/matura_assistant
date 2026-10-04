@@ -90,11 +90,11 @@ function checkButtonClass() {
 }
 
 function icon(iconName, className) {
-  if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
+  if (window.renderPhosphorIcon) return window.renderPhosphorIcon(iconName, className);
 
   return `
     <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="./assets/lucide-icons.svg#${iconName}"></use>
+      <use href="./assets/phosphor-icons.svg#${iconName}"></use>
     </svg>
   `;
 }
@@ -455,9 +455,75 @@ function renderInlineGapCards(task) {
 
   return `
     <section class="english-completion-cards" aria-label="Tekst s prazninama za nadopunjavanje" data-card-task="${escapeHtml(task.number)}">
+      ${shared ? renderEnglishCompletionBank(task) : ""}
       ${sections}
     </section>
   `;
+}
+
+// Dijeljeni bank ponuđenih odgovora prikazuje se SAMO JEDNOM na vrhu zadatka.
+// Svaka praznina dolje dobije usku traku slova; ovdje stoji puni tekst svake opcije
+// i oznaka u koju je prazninu trenutačno smještena (→ 19).
+function renderEnglishCompletionBank(task) {
+  const options = Array.isArray(task.options) ? task.options : [];
+  if (!options.length) return "";
+
+  const optionMap = taskOptionTextMap(task);
+  const assignments = inlineChoiceAssignments(task);
+  const noun = inlineBankNoun(optionMap);
+  const range =
+    options.length > 1 ? `${options[0]}–${options[options.length - 1]}` : options[0];
+
+  return `
+    <details class="english-completion-bank" data-card-task="${escapeHtml(task.number)}" open>
+      <summary class="english-completion-bank__summary">
+        <span>Ponuđene ${noun}</span>
+        <span class="english-completion-bank__range">${escapeHtml(range)}</span>
+      </summary>
+      <ul class="english-completion-bank__list">
+        ${options
+          .map((option) => renderEnglishCompletionBankItem(option, optionMap, assignments))
+          .join("")}
+      </ul>
+    </details>
+  `;
+}
+
+function renderEnglishCompletionBankItem(option, optionMap, assignments) {
+  const usedBy = assignments.get(option) || [];
+  const usedClass = usedBy.length ? " english-completion-bank__item--used" : "";
+  return `
+    <li class="english-completion-bank__item${usedClass}" data-bank-option="${escapeHtml(option)}">
+      <span class="english-completion-bank__letter">${escapeHtml(option)}</span>
+      <span class="english-completion-bank__text">${escapeHtml(optionMap[option] || `Odgovor ${option}`)}</span>
+      <span class="english-completion-bank__assign" data-bank-assign="${escapeHtml(option)}">${
+        usedBy.length ? `→ ${escapeHtml(usedBy.join(", "))}` : ""
+      }</span>
+    </li>
+  `;
+}
+
+// Sva trenutačna smještanja opcija u praznine (opcija → [brojevi praznina]).
+function inlineChoiceAssignments(task) {
+  const optionSet = new Set(task.options || []);
+  const assignments = new Map();
+  taskQuestions(task)
+    .map(String)
+    .forEach((question) => {
+      const answer = String(responses[question] || "").trim();
+      if (!answer || !optionSet.has(answer)) return;
+      if (!assignments.has(answer)) assignments.set(answer, []);
+      assignments.get(answer).push(question);
+    });
+  return assignments;
+}
+
+// Riječi vs. rečenice: bank zna sadržavati i pojedinačne riječi i cijele rečenice.
+function inlineBankNoun(optionMap) {
+  const texts = Object.values(optionMap).filter(Boolean);
+  if (!texts.length) return "rečenice";
+  const sentenceLike = texts.filter((text) => /\s/.test(text.trim())).length;
+  return sentenceLike * 2 >= texts.length ? "rečenice" : "riječi";
 }
 
 function renderEnglishImageRows(task, source, imageIndex, shared) {
@@ -608,17 +674,76 @@ function renderEnglishCardControl(task, question, answer, shared) {
   const options = Array.isArray(task.options) && task.options.length
     ? task.options
     : ["A", "B", "C", "D"];
-  const usedOptions = shared ? inlineChoiceUsedOptions(task, question) : new Map();
   const resolved = isChecked(question) && correctAnswers(question).length > 0;
 
+  // Dijeljeni bank: puni tekst stoji jednom gore, ovdje su samo slova + odjek odabrane opcije.
+  if (shared) {
+    return renderEnglishCardChips(task, question, options, answer, optionMap, resolved);
+  }
+
   return `
-    <div class="english-completion-card__options" role="${shared ? "group" : "radiogroup"}" aria-label="Ponuđeni odgovori za prazninu ${escapeHtml(question)}">
+    <div class="english-completion-card__options" role="radiogroup" aria-label="Ponuđeni odgovori za prazninu ${escapeHtml(question)}">
       ${options
         .map((option) =>
-          renderEnglishCardOption(question, option, optionMap[option], answer, resolved, usedOptions),
+          renderEnglishCardOption(question, option, optionMap[option], answer, resolved, new Map()),
         )
         .join("")}
     </div>
+  `;
+}
+
+function renderEnglishCardChips(task, question, options, answer, optionMap, resolved) {
+  const assignments = inlineChoiceAssignments(task);
+  return `
+    <div class="english-completion-chips" role="group" aria-label="Odaberi odgovor za prazninu ${escapeHtml(question)}">
+      ${options
+        .map((option) => renderEnglishCardChip(question, option, answer, resolved, assignments))
+        .join("")}
+    </div>
+    ${renderEnglishCardPick(question, answer, optionMap)}
+  `;
+}
+
+function renderEnglishCardChip(question, option, answer, resolved, assignments) {
+  const selected = option === answer;
+  const correct = isCorrectAnswer(question, option);
+  let resultClass = "";
+  if (resolved && selected) {
+    resultClass = correct
+      ? " english-completion-chip--correct"
+      : " english-completion-chip--wrong";
+  } else if (resolved && correct) {
+    resultClass = " english-completion-chip--answer";
+  }
+  const selectedClass = selected ? " english-completion-chip--selected" : "";
+  const usedBy = (assignments.get(option) || []).filter((other) => other !== String(question));
+  const usedClass = usedBy.length && !selected ? " english-completion-chip--used" : "";
+  const label = usedBy.length
+    ? `Odgovor ${option}, već u praznini ${usedBy.join(", ")}`
+    : `Odgovor ${option}`;
+
+  return `
+    <button
+      type="button"
+      class="english-completion-chip${selectedClass}${usedClass}${resultClass}"
+      aria-pressed="${selected}"
+      aria-label="${escapeHtml(label)}"
+      data-english-card-question="${escapeHtml(question)}"
+      data-english-card-option="${escapeHtml(option)}"
+      ${simulation.inputDisabledAttribute()}
+    >${escapeHtml(option)}</button>
+  `;
+}
+
+function renderEnglishCardPick(question, answer, optionMap) {
+  if (!answer) {
+    return `<p class="english-completion-pick english-completion-pick--empty" data-english-pick="${escapeHtml(question)}">Dodirni slovo za odabir.</p>`;
+  }
+  return `
+    <p class="english-completion-pick" data-english-pick="${escapeHtml(question)}">
+      <span class="english-completion-pick__letter">${escapeHtml(answer)}</span>
+      <span class="english-completion-pick__text">${escapeHtml(optionMap[answer] || `Odgovor ${answer}`)}</span>
+    </p>
   `;
 }
 
@@ -677,6 +802,8 @@ function syncEnglishCompletionCards() {
   const rows = document.querySelectorAll(".english-completion-row[data-card-task]");
   if (!rows.length) return;
 
+  const syncedBanks = new Set();
+
   rows.forEach((row) => {
     const question = row.dataset.questionNumber;
     const taskNumber = Number(row.dataset.cardTask);
@@ -694,18 +821,61 @@ function syncEnglishCompletionCards() {
       `;
     }
 
-    const usedOptions = shared && task ? inlineChoiceUsedOptions(task, question) : new Map();
+    if (shared && task) {
+      syncEnglishChipRow(row, task, question, answer);
+      if (!syncedBanks.has(taskNumber)) {
+        syncEnglishCompletionBank(task);
+        syncedBanks.add(taskNumber);
+      }
+      return;
+    }
+
     row.querySelectorAll("[data-english-card-option]").forEach((button) => {
       const option = button.dataset.englishCardOption;
       const selected = option === answer;
       button.classList.toggle("english-completion-card__option--selected", selected);
       button.setAttribute("aria-pressed", String(selected));
-      const usedBy = usedOptions.get(option) || [];
-      button.classList.toggle(
-        "english-completion-card__option--used",
-        Boolean(usedBy.length) && !selected,
-      );
     });
+  });
+}
+
+// Dijeljeni bank: ažuriraj traku slova i odjek odabrane opcije bez punog re-rendera.
+function syncEnglishChipRow(row, task, question, answer) {
+  const assignments = inlineChoiceAssignments(task);
+  row.querySelectorAll("[data-english-card-option]").forEach((chip) => {
+    const option = chip.dataset.englishCardOption;
+    const selected = option === answer;
+    chip.classList.toggle("english-completion-chip--selected", selected);
+    chip.setAttribute("aria-pressed", String(selected));
+    const usedBy = (assignments.get(option) || []).filter((other) => other !== String(question));
+    chip.classList.toggle(
+      "english-completion-chip--used",
+      Boolean(usedBy.length) && !selected,
+    );
+    chip.setAttribute(
+      "aria-label",
+      usedBy.length ? `Odgovor ${option}, već u praznini ${usedBy.join(", ")}` : `Odgovor ${option}`,
+    );
+  });
+
+  const pick = row.querySelector(".english-completion-pick");
+  if (pick) pick.outerHTML = renderEnglishCardPick(question, answer, inlineChoiceOptionTextMap(task, question));
+}
+
+// Dijeljeni bank: osvježi oznake u koju je svaka opcija praznina smještena.
+function syncEnglishCompletionBank(task) {
+  const bank = document.querySelector(
+    `.english-completion-bank[data-card-task="${task.number}"]`,
+  );
+  if (!bank) return;
+  const assignments = inlineChoiceAssignments(task);
+  bank.querySelectorAll("[data-bank-assign]").forEach((span) => {
+    const option = span.dataset.bankAssign;
+    const usedBy = assignments.get(option) || [];
+    span.textContent = usedBy.length ? `→ ${usedBy.join(", ")}` : "";
+    span
+      .closest(".english-completion-bank__item")
+      ?.classList.toggle("english-completion-bank__item--used", Boolean(usedBy.length));
   });
 }
 
@@ -1564,7 +1734,7 @@ function renderPicker() {
           <h2>Odaberi ispit</h2>
         </div>
         <p>
-          Dostupne su obje razine i oba godišnja roka od 2013. do 2025. godine.
+          Dostupne su obje razine i oba godišnja roka od 2015. nadalje.
           Pitanja su izdvojena iz izvornih knjižica, a odabir odgovora prikazan
           je odmah uz pripadajuće pitanje.
         </p>

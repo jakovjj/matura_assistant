@@ -1,0 +1,32 @@
+45. Koja od navedenih tvrdnji NIJE točna za sljedeću reakciju?
+[figure:chemistry-45]
+A. Reaktanti reakcije su Brönstedova kiselina i Brönstedova baza.
+B. Radi se o reakciji neutralizacije.
+C. Nastala sol ne spada u grupu teško topljivih soli.
+D. Produkt reakcije je amonijev oksalat.
+E. U reakciji dolazi do prijenosa protona.
+
+46. Koliko iznosi pH-vrijednost otopine priređene miješanjem 580,0 mL
+otopine kalijeva hidroksida molariteta 0,36 mol/L i 140,0 mL otopine
+klorovodične kiseline molariteta 0,27 mol/L pri 25°C?
+
+A. 12,95
+B. 13,38
+C. 0,62
+D. 13,23
+E. 0,77
+47. Najnižu vrijednost pOH pri 25 °C imat će:
+A. 0,01 mol/L vodena otopina klorovodične kiseline
+B. 0,01 mol/L vodena otopina kalijeva hidroksida
+C. 0,01 mol/L vodena otopina natrijeva jodida
+D. 0,01 mol/L vodena otopina amonijaka
+E. 0,01 mol/L vodena otopina octene kiseline
+48. Odaberite par soli A i B za koje vrijedi da miješanjem otopine soli A s
+otopinom soli B dolazi do nastajanja teško topljive soli C i u vodi topljive
+soli D prema sljedećoj jednadžbi reakcije:
+A(aq) + B(aq) ⇆ C(s) + D(aq)
+A. A = MgCl₂; B = AgNO₃
+B. A = KBr; B = Na₂SO₄
+C. A = NH₄Cl; B = K₂CO₃
+D. A = CaI₂; B = CH₃COONa
+E. A = LiF; B = Na₃PO₄

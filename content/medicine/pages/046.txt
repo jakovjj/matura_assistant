@@ -1,0 +1,29 @@
+35. Pri beta-raspadu jezgra emitira jednu od navedenih čestica. Koju od na-
+vedenih?
+A. foton
+B. elektron
+C. proton
+D. neutron
+E. helijevu jezgru
+36. Kako zovemo navedenu nuklearnu reakciju?
+U²³⁵ + n → Ba¹⁴¹ + Kr⁹² + 3n
+A. fuzija
+B. alfa-raspad
+C. beta-raspad
+D. gama-zračenje
+E. fisija
+37. Koji od navedenih grafova nabolje prikazuje ovisnost sile o masi za danu
+akceleraciju?
+[figure:physics-37]
+A. graf 1
+B. graf2
+C. graf 3
+D. graf 4
+E. graf5
+38. Kako će se promijeniti period kružnog gibanja kad se centripetalna ak-
+celeracija utrostruči?
+A. smanjit će se 3 puta
+B. povećat će se 9 puta
+C. povećat će se 3¹ᐟ² puta
+D. povećat će se 3 puta
+E. smanjit će se 3¹ᐟ² puta

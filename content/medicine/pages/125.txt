@@ -1,0 +1,30 @@
+73. Dva koherentna izvora A i B, udaljena za 2 m, emitiraju valove valne duljine
+50 cm i amplitude 20 cm, kako je prikazano na slici ispod. Odredite ampli-
+tudu rezultantnog (interferiranog) vala na udaljenosti 225 m od točke B.
+[figure:exam-73]
+A. 20cm
+B. 40cm
+C. 4,5 cm
+D. 6,3 cm
+E. 0 cm
+
+74. Zraka svjetlosti prolazi iz optičkog sredstva 1 u sredstvo 2 i pritom se dje-
+lomično lomi i djelomično reflektira. Indeks loma prvog sredstva 2 puta
+je veći u odnosu na indeks loma drugog sredstva. Kako se promijeni fre-
+kvencija svjetlosti pri prijelazu svjetlosti iz sredstva 1 u sredstvo 2?
+
+A. ne promijeni se
+
+B. dva puta se smanji
+C. dva puta se poveća
+D. četiri puta se smanji
+E. četiri puta se poveća
+
+75. Na crtežu je prikazana ______ leća koja je stvorila ______ sliku predmeta.
+[figure:exam-75]
+
+A. konvergentna, realnu
+B. konvergentna, virtualnu
+C. divergentna, realnu
+D. divergentna, virtualnu
+E. konvergentna, umanjenu

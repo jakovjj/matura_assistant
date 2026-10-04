@@ -1,0 +1,34 @@
+85. Crveni lakmusov papir poprimit će plavu boju nakon uranjanja u vodenu
+otopinu ______ pri 25°C.
+A. magnezijeva klorida
+B. kalijeva fosfata
+C. amonijeva nitrata
+D. kalcijeva bromida
+E. natrijeva hidrogensulfata
+86. Što od navedenog NEĆE dovesti do povećanja brzine sljedeće reakcije?
+A(aq) + B(aq) → C(aq) + D(aq)
+A. povećanje temperature
+B. povećanje koncentracije reaktanta B
+C. dodatak katalizatora
+D. dodatak vode u reakcijsku smjesu
+E. povećanje koncentracije reaktanta A
+87. Izdvojite ispravnu tvrdnju!
+A. PO₄³⁻ je Brönstedova kiselina.
+B. NH₄⁺ je Brönstedova baza.
+C. HCO₃⁻ je i Brönstedova baza i Brönstedova kiselina.
+D. NH₄⁺ je i Brönstedova baza i Brönstedova kiselina.
+E. PO₄³⁻ je i Brönstedova baza i Brönstedova kiselina.
+88. Potpunom reakcijom neutralizacije koje od navedenih kiselina i baza kao
+jedan od produkata nastaje u vodi teško topljiva sol?
+A. etanske kiseline i amonijaka
+B. fosforne kiseline i kalijeva hidroksida
+C. sumporne kiseline i kalcijeva hidroksida
+D. dušične kiseline i magnezijeva hidroksida
+E. metanske kiseline i natrijeva hidroksida
+89. Što od navedenog NIJE točno za prikazanu reakciju?
+Na₂S₂O₃ + H₂SO₄ → Na₂SO₄ + SO₂ + H₂O + S
+A. U navedenoj redoks-reakciji sulfatni se ion istovremeno oksidira i reducira.
+B. Tiosulfatni ion otpuštanjem elektrona daje sumporov dioksid.
+C. Tiosulfatni ion je reducens.
+D. Tioslufatni ion primanjem elektrona daje elementarni sumpor.
+E. Tiosulfatni ion je oksidans.

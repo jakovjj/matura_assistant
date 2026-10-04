@@ -1,0 +1,25 @@
+84. Dopuni izjavu. Magnetni tok kroz poprečni presjek zavojnice kojom teče
+struja ______.
+A. ne ovisi o duljini i broju zavoja zavojnice
+B. jednak je nuli
+C. obrnuto je proporcionalan duljini zavojnice uz konstantan broj zavoja
+D. proporcionalan je polumjeru poprečnog presjeka zavojnice
+E. obrnuto je proporcionalan polumjeru poprečnog presjeka zavojnice
+85. Ravni vodič kojim prolazi struja jakosti I smješten je u prostoru u kojem
+djeluju dva homogena, međusobno okomita magnetna polja, kako je pri-
+kazano na slici. Indukcije magnetnih polja B₁ i B₂ su jednake. U kojem
+smjeru djeluje rezultantna sila na vodič?
+[figure:physics-85]
+A. smjer A
+B. smjer B
+C. smjer C
+D. smjer D
+E. smjer E
+86. Koja tvrdnja NIJE točna za transformator?
+A. Transformator se upotrebljava za promjenu izmjeničnog napona.
+B. Ako transformator povisi napon na sekundaru, struja na sekundaru mora
+se smanjiti.
+C. Vrijedi sljedeća relacija: U₁/U₂ = N₁/N₂.
+D. Rad transformatora se zasniva na principu elektromagnetne indukcije.
+E. Primar i sekundar spojeni su na izvor napona za vrijeme rada transforma-
+tora.

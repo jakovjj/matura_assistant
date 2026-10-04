@@ -1,0 +1,19 @@
+71. Izvor nepolarizirane svjetlosti postavljen je ispred dva polarizatora,
+kako je prikazano na slici ispod. Obratite pažnju na to da je drugi po-
+larizator zakrenut za 90° u odnosu na prvi polarizator. Odredite smjer
+titranja električnog polja u točki T u odnosu na smjer širenja svjetlosti.
+[figure:exam-71]
+A. smjer A
+B. smjer B
+C. smjer C
+D. smjer D
+E. svjetlost ne dopire do točke T
+72. Koje tvrdnje točno opisuju širenje elektromagnetnih valova kroz vakuum?
+I. Rendgenske zrake se šire brže od vidljive svjetlosti.
+II. Radiovalovi se šire brže od mikrovalova.
+III. Gama i rendgenske zrake se šire kroz vakuum brzinom od 300 000 km/s.
+A. I. i III.
+B. I., II.
+C. samo III.
+D. samo I.
+E. I., II. i III.

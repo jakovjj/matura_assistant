@@ -1,0 +1,29 @@
+KEMIJA
+81. Od svih elemenata periodnog sustava, na Zemlji najrjeđe dolaze kao ele-
+mentarna tvar u:
+A. atomarnom obliku
+B. tekućem agregatnom stanju
+C. plinovitom agregatnom stanju
+D. homomolekularnom obliku
+E. krutom agregatnom stanju
+82. U kojoj od sljedećih grupa svi navedeni atomi/ioni NEMAJU jednak broj
+elektrona?
+A. Al³⁺, N³⁻, F⁻
+B. Br, Kr, Rb⁺
+C. Ar, K⁺, Cl⁻
+D. Sc³⁺, P³⁻, S²⁻
+E. O²⁻, Mg²⁺, Ne
+83. Koja strukturna formula prikazuje Lewisovu strukturu sulfatnog iona?
+[figure:exam-83]
+A. strukturna formula A
+B. strukturna formula B
+C. strukturna formula C
+D. strukturna formula D
+E. strukturna formula E
+84. Koliku masu kalcijeva klorida treba odvagnuti da bi se priredilo 150 mL
+otopine u kojoj koncentracija kloridnog iona iznosi 0,250 mol/L?
+A. 8,32 g
+B. 2,08 g
+C. 2,83 g
+D. 1,42 g
+E. 4,16 g

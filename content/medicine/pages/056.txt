@@ -1,0 +1,21 @@
+66. Koja je od tvrdnji istinita za fotone plave i crvene svjetlosti u vakuumu?
+A. Foton plave svjetlosti ima manju energiju od fotona crvene svjetlosti.
+B. Foton plave svjetlosti ima veću količinu gibanja od fotona crvene svjetlosti.
+C. Oba fotona imaju jednake količine gibanja.
+D. Foton plave svjetlosti ima manju frekvenciju od fotona crvene svjetlosti.
+E. Brzina fotona plave svjetlosti veća je od brzine fotona crvene svjetlosti.
+67. Radionuklid emitira ionizirajuće zračenje koje se NE otklanja u stalnom
+magnetnom polju. O kojem se zračenju radi?
+A. beta-česticama i gama-zrakama
+B. alfa-česticama i pozitronima
+C. beta-česticama
+D. gama-zrakama
+E. alfa i beta-česticama
+68. Koji od ponuđenih elemenata ima najveći defekt mase? E_s je srednja
+energija vezanja po nukleonu.
+[figure:physics-68]
+A. Zn
+B. Fe
+C. He
+D. Hg
+E. H

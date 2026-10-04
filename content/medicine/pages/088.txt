@@ -1,0 +1,22 @@
+60. Koja od navedenih tvrdnji za prikazanu reakciju NIJE točna?
+[figure:chemistry-60]
+A. Reaktant reakcije ubraja se u fenole.
+B. I reaktant i produkt reakcije mogu postojati kao orto-, meta- i para-izomeri.
+C. Kod reaktanta reakcije prisutan je aromatski karakter.
+D. Kod produkta reakcije prisutna je konjugacija.
+E. Produkt reakcije je ciklički diketon.
+61. Za prikazanu strukturu NIJE točno?
+[figure:chemistry-61]
+A. Radi se o neutralnoj masti.
+B. Za potpunu hidrolizu 1 mola navedenog triglicerida potrebna su 3 mola vode.
+C. Spoj je akiralan.
+D. U reakciji prikazanog spoja s natrijevim hidroksidom kao produkti nastaju
+sapuni i glicerol.
+E. Naziv spoja je 1-palmitoil,2-oleoil,3-stearoil glicerol.
+62. Koja od sljedećih tvrdnji o prikazanoj molekuli NIJE točna?
+[figure:chemistry-62]
+A. Strukturna je komponenta RNA.
+B. Strukturni je izomer glukoze.
+C. Ciklizacijom daje: [figure:chemistry-62-c]
+D. Radi se o šećeru D-serije.
+E. Navedena pentoza može se okarakterizirati kao polihidroksialdehid.

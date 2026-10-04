@@ -5,6 +5,8 @@
   const practiceStoragePrefixes = [
     "asistent-za-mature:english-reading:",
     "asistent-za-mature:english-listening:",
+    "asistent-za-mature:german-reading:",
+    "asistent-za-mature:german-listening:",
     "asistent-za-mature:physics-choice:",
     "asistent-za-mature:math-choice:",
     "asistent-za-mature:croatian-choice:",
@@ -602,7 +604,33 @@
     ? Promise.resolve({ migrationStarted: true, synced: false })
     : syncPracticeProgress();
 
+  const subjectLevelsKey = "asistent-za-mature:subject-levels";
+  let subjectLevels = {};
+  try {
+    const stored = JSON.parse(localStorage.getItem(subjectLevelsKey) || "{}");
+    if (isPlainObject(stored)) subjectLevels = stored;
+  } catch {
+    // Preferences remain usable when storage is unavailable or invalid.
+  }
+
+  function getSubjectLevel(subject) {
+    const level = subjectLevels[subject];
+    return level === "A" || level === "B" ? level : "";
+  }
+
+  function setSubjectLevel(subject, level) {
+    if (!subject || !["", "A", "B"].includes(level)) return;
+    subjectLevels = { ...subjectLevels, [subject]: level };
+    try {
+      localStorage.setItem(subjectLevelsKey, JSON.stringify(subjectLevels));
+    } catch {
+      // Keep the preference for this page even if it cannot be saved.
+    }
+  }
+
   window.AsistentProfile = {
+    getSubjectLevel,
+    setSubjectLevel,
     clearPracticeProgress,
     getProfile,
     legacyMigrationStarted,

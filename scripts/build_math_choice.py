@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
@@ -24,6 +25,7 @@ from crop_utils import (
     source_image_metadata,
     trim_crop_bottom_whitespace,
 )
+from pdf_crop_layout import HorizontalRule, detect_horizontal_rules, solution_table_row_bounds
 from pdf_utils import pdftotext, png_dimensions, render_pdf_page_to_png
 
 
@@ -35,6 +37,29 @@ PAPER_URL_PREFIX = "./files/interactive/math-choice"
 ARCHIVE_PREFIX = "window.ASISTENT_ZA_MATURE_DATA="
 OUTPUT_PREFIX = "window.ASISTENT_ZA_MATURE_MATH_CHOICE="
 SUBJECT = "Matematika"
+# Hand-verified answer keys for exams whose only answer source is a hand-marked
+# bubble sheet (no machine-readable key). The pixel parser misreads those, both
+# flipping letters and dropping whole questions (the question set is derived from
+# the parsed answers), so we substitute a verified key. Keyed by exam id, mapping
+# question number -> correct letter. See math_choice_answer_overrides.json.
+ANSWER_OVERRIDES_PATH = ROOT / "scripts" / "math_choice_answer_overrides.json"
+ANSWER_OVERRIDES: dict[str, dict[str, str]] = (
+    json.loads(ANSWER_OVERRIDES_PATH.read_text(encoding="utf-8"))
+    if ANSWER_OVERRIDES_PATH.is_file()
+    else {}
+)
+
+# Open tasks whose official answer key prints an empty answer box (NCVVO left
+# the cell blank in the post-grading key, so there is nothing to crop). Listed
+# items get no solutionImage; the solver then reveals a short "no official
+# solution" note instead of an empty crop. Keyed by exam id -> question numbers.
+# See math_choice_blank_solutions.json.
+BLANK_SOLUTIONS_PATH = ROOT / "scripts" / "math_choice_blank_solutions.json"
+BLANK_SOLUTIONS: dict[str, list[str]] = (
+    json.loads(BLANK_SOLUTIONS_PATH.read_text(encoding="utf-8"))
+    if BLANK_SOLUTIONS_PATH.is_file()
+    else {}
+)
 MIN_CHOICE_QUESTIONS = 10
 SOURCE_RENDER_DPI = 144
 SOURCE_CROP_HORIZONTAL_MARGIN = 48
@@ -42,9 +67,33 @@ SOURCE_CROP_VERTICAL_PADDING = 9
 SOURCE_FOOTER_MARGIN = 65
 SOLUTION_FOOTER_MARGIN = 36
 SOLUTION_CROP_VERTICAL_PADDING = 8
+# Never let a solution crop begin in the preceding task's row. Table-rule
+# detection is useful for whitespace, but some official keys omit a rule
+# between adjacent rows (for example 2026 summer A, tasks 20 and 21).
+SOLUTION_MARKER_TOP_PADDING = 2
 SOLUTION_TABLE_RULE_MIN_WIDTH_RATIO = 0.45
 SOLUTION_TABLE_CROP_PADDING = 2
 SOLUTION_RULE_MARKER_TOLERANCE = 4
+# Two answer-key markers count as sharing a table row when their tops align
+# within this many PDF points. Within-row markers align within a few points;
+# the smallest gap between separate rows in these keys is ~30.
+SOLUTION_ROW_TOLERANCE = 14
+# A page is treated as a clean row grid (questions laid out left-to-right per
+# row, like the 2022+ keys) only when at least this fraction of its markers
+# share their row with a marker in another column. Column-flow keys (questions
+# stacked within columns) score well below this and keep the simple per-column
+# crop so a wide answer is never extended into a neighbouring question.
+SOLUTION_ROW_GRID_SHARE_MIN = 0.9
+# A merged cell's right edge is only pushed past the default per-column boundary
+# when a table border sits at least this many PDF points beyond it; smaller gaps
+# are just the regular column separator and must not trigger an extension.
+SOLUTION_MERGE_MIN = 16
+# A vertical dark run inside a cell's row counts as the bordering table rule when
+# it is darker than this and spans both the absolute and proportional minimums of
+# the row band.
+SOLUTION_MERGE_RULE_THRESHOLD = 160
+SOLUTION_MERGE_RULE_MIN_RUN = 40
+SOLUTION_MERGE_RULE_BAND_RATIO = 0.8
 TERM_ALIASES = {
     "prvi rok": "ljetni rok",
     "drugi rok": "jesenski rok",
@@ -118,14 +167,6 @@ class QuestionMarker:
 @dataclass(frozen=True)
 class QuestionCrop:
     page: PdfPage
-    x_min: float
-    y_min: float
-    x_max: float
-    y_max: float
-
-
-@dataclass(frozen=True)
-class HorizontalRule:
     x_min: float
     y_min: float
     x_max: float
@@ -566,19 +607,41 @@ def solution_points_from_blocks(markers: list[QuestionMarker]) -> dict[str, str]
     return points
 
 
-def solution_column_bounds(page: PdfPage, page_markers: list[QuestionMarker], marker: QuestionMarker) -> tuple[float, float, int]:
+def solution_column_clusters(page_markers: list[QuestionMarker]) -> list[float]:
     centers: list[list[float]] = []
     for x_min in sorted(item.x_min for item in page_markers):
         if not centers or x_min - centers[-1][-1] > 40:
             centers.append([x_min])
         else:
             centers[-1].append(x_min)
+    return [sum(cluster) / len(cluster) for cluster in centers]
 
-    cluster_centers = [sum(cluster) / len(cluster) for cluster in centers]
-    cluster_index = min(
+
+def marker_cluster_index(cluster_centers: list[float], x_min: float) -> int:
+    return min(
         range(len(cluster_centers)),
-        key=lambda index: abs(cluster_centers[index] - marker.x_min),
+        key=lambda index: abs(cluster_centers[index] - x_min),
     )
+
+
+def is_row_grid_page(page_markers: list[QuestionMarker], cluster_centers: list[float]) -> bool:
+    if len(page_markers) < 2 or len(cluster_centers) < 2:
+        return False
+    shared = 0
+    for marker in page_markers:
+        columns = {
+            marker_cluster_index(cluster_centers, item.x_min)
+            for item in page_markers
+            if abs(item.y_min - marker.y_min) <= SOLUTION_ROW_TOLERANCE
+        }
+        if len(columns) >= 2:
+            shared += 1
+    return shared / len(page_markers) >= SOLUTION_ROW_GRID_SHARE_MIN
+
+
+def solution_column_bounds(page: PdfPage, page_markers: list[QuestionMarker], marker: QuestionMarker) -> tuple[float, float, int]:
+    cluster_centers = solution_column_clusters(page_markers)
+    cluster_index = marker_cluster_index(cluster_centers, marker.x_min)
     left_bound = max(0, cluster_centers[cluster_index] - 12)
     right_bound = (
         page.width - 18
@@ -586,6 +649,97 @@ def solution_column_bounds(page: PdfPage, page_markers: list[QuestionMarker], ma
         else cluster_centers[cluster_index + 1] - 12
     )
     return left_bound, right_bound, cluster_index
+
+
+def is_merged_solution_cell(
+    page_markers: list[QuestionMarker],
+    cluster_centers: list[float],
+    marker: QuestionMarker,
+    cluster_index: int,
+) -> bool:
+    """A merged cell is one on a clean row-grid page that has no neighbouring
+    marker in any column to its right on the same row, i.e. its answer spans the
+    remaining columns (the 2022 A key's final task is the canonical case)."""
+    if not is_row_grid_page(page_markers, cluster_centers):
+        return False
+    if cluster_index + 1 >= len(cluster_centers):
+        return True
+    return not any(
+        abs(item.y_min - marker.y_min) <= SOLUTION_ROW_TOLERANCE
+        and marker_cluster_index(cluster_centers, item.x_min) > cluster_index
+        for item in page_markers
+    )
+
+
+def merged_cell_right_bound(
+    page: PdfPage,
+    page_image: "Image.Image | None",
+    default_x_max: float,
+    y_min: float,
+    y_max: float,
+    right_limit: float | None = None,
+) -> float:
+    """Snap a merged cell's right edge to the table border that bounds its row.
+    Scans the rendered page within the cell's own row band for the first
+    full-height vertical rule past the default per-column boundary. Falls back to
+    the default boundary when the nearest rule is just the regular column
+    separator (within ``SOLUTION_MERGE_MIN``) or absent, so a cell is never
+    extended into open space or a neighbouring column with no separator."""
+    if page_image is None:
+        return default_x_max
+    width, height = page_image.size
+    scale_x = width / page.width
+    scale_y = height / page.height
+    band_top = max(0, int(round(y_min * scale_y)))
+    band_bottom = min(height, int(round(y_max * scale_y)))
+    band = band_bottom - band_top
+    if band <= 0:
+        return default_x_max
+    needed_run = max(SOLUTION_MERGE_RULE_MIN_RUN, SOLUTION_MERGE_RULE_BAND_RATIO * band)
+    pixels = page_image.load()
+    scan_end = min(width - 2, int((right_limit or page.width) * scale_x))
+    for x in range(int(round(default_x_max * scale_x)) + 3, scan_end):
+        longest = current = 0
+        for y in range(band_top, band_bottom):
+            if pixels[x, y] < SOLUTION_MERGE_RULE_THRESHOLD:
+                current += 1
+                longest = max(longest, current)
+            else:
+                current = 0
+        if longest >= needed_run:
+            rule_x = x / scale_x
+            return rule_x + 1 / scale_x
+    return default_x_max
+
+
+def solution_cell_left_bound(
+    page: PdfPage,
+    page_image: "Image.Image",
+    default_x_min: float,
+    marker_x: float,
+    y_min: float,
+    y_max: float,
+) -> float:
+    """Remove the neighbouring cell's strip, retaining the actual left rule.
+
+    Only inspect the margin before the question number and require a rule
+    through nearly the entire row, so answer text cannot become a crop edge.
+    Borderless keys retain their original bounds.
+    """
+    scale_x = page_image.width / page.width
+    scale_y = page_image.height / page.height
+    top = max(0, math.ceil(y_min * scale_y) + 2)
+    bottom = min(page_image.height, math.floor(y_max * scale_y) - 2)
+    if bottom - top < 12:
+        return default_x_min
+    pixels = page_image.load()
+    for x in range(max(0, math.ceil(default_x_min * scale_x)),
+                   min(page_image.width, math.floor((marker_x - 2) * scale_x))):
+        dark = sum(pixels[x, y] < SOLUTION_MERGE_RULE_THRESHOLD
+                   for y in range(top, bottom))
+        if dark >= (bottom - top) * 0.9:
+            return x / scale_x
+    return default_x_min
 
 
 def horizontal_rule_overlaps_crop(rule: HorizontalRule, x_min: float, x_max: float) -> bool:
@@ -638,6 +792,7 @@ def solution_crop_from_marker(
     marker: QuestionMarker,
     page_markers: list[QuestionMarker],
     page_rules: list[HorizontalRule],
+    page_image: "Image.Image | None" = None,
 ) -> QuestionCrop:
     page = marker.page
     x_min, x_max, cluster_index = solution_column_bounds(page, page_markers, marker)
@@ -675,56 +830,85 @@ def solution_crop_from_marker(
         for rule in sorted(page_rules, key=lambda rule: rule.y_min)
         if horizontal_rule_overlaps_crop(rule, x_min, x_max)
     ]
-    previous_rule = next(
-        (
-            rule
-            for rule in reversed(overlapping_rules)
-            if rule.y_max <= marker.y_min - 3
-        ),
-        None,
-    )
-    next_rule = next(
-        (
-            rule
-            for rule in overlapping_rules
-            if rule.y_min >= marker.y_min + 14
-        ),
-        None,
-    )
-
-    y_min = max(0, marker.y_min - 10)
-    previous_rule_is_current_boundary = (
-        previous_rule is not None
-        and marker.y_min - previous_rule.y_min <= 140
-        and (previous_marker is None or previous_rule.y_min > previous_marker.y_min)
-    )
-    if previous_rule_is_current_boundary:
-        y_min = max(0, previous_rule.y_max + SOLUTION_TABLE_CROP_PADDING)
-
-    y_max = page.height - SOLUTION_FOOTER_MARGIN
-    if next_marker:
-        y_max = min(y_max, next_marker.y_min - SOLUTION_CROP_VERTICAL_PADDING)
-    if next_rule:
-        y_max = min(y_max, next_rule.y_min - SOLUTION_TABLE_CROP_PADDING)
-
-    if y_max <= marker.y_min + 18:
-        y_max = (
-            next_marker.y_min - SOURCE_CROP_VERTICAL_PADDING
-            if next_marker
-            else page.height - SOLUTION_FOOTER_MARGIN
+    # Prefer a complete, uniquely assigned table row. Question numbers are
+    # often vertically centred beside fractions or multiline answers, so their
+    # text coordinates are not the answer's top or bottom.
+    row_bounds = solution_table_row_bounds(marker, same_cluster_markers, overlapping_rules)
+    if row_bounds is not None:
+        y_min, y_max = row_bounds
+    else:
+        previous_rule = next(
+            (
+                rule
+                for rule in reversed(overlapping_rules)
+                if rule.y_max <= marker.y_min - 3
+            ),
+            None,
         )
-    if y_max <= y_min:
-        y_min = max(0, marker.y_min - 10)
-        y_max = min(page.height - SOLUTION_FOOTER_MARGIN, marker.y_min + 220)
+        next_rule = next(
+            (
+                rule
+                for rule in overlapping_rules
+                if rule.y_min >= marker.y_min + 14
+            ),
+            None,
+        )
 
-    y_max = trim_trailing_solution_separator(page, x_min, y_min, x_max, y_max, marker.y_min)
+        y_min = max(0, marker.y_min - 10)
+        previous_rule_is_current_boundary = (
+            previous_rule is not None
+            and marker.y_min - previous_rule.y_min <= 140
+            and (previous_marker is None or previous_rule.y_min > previous_marker.y_min)
+        )
+        if previous_rule_is_current_boundary:
+            y_min = max(0, previous_rule.y_max + SOLUTION_TABLE_CROP_PADDING)
+
+        # A detected table rule can belong to the preceding row when the official
+        # key does not draw a separator between every task. Keep the crop anchored
+        # to the current marker so the preceding answer can never be revealed.
+        y_min = max(y_min, marker.y_min - SOLUTION_MARKER_TOP_PADDING)
+
+        y_max = page.height - SOLUTION_FOOTER_MARGIN
+        if next_marker:
+            y_max = min(y_max, next_marker.y_min - SOLUTION_CROP_VERTICAL_PADDING)
+        if next_rule:
+            y_max = min(y_max, next_rule.y_min - SOLUTION_TABLE_CROP_PADDING)
+
+        if y_max <= marker.y_min + 18:
+            y_max = (
+                next_marker.y_min - SOLUTION_MARKER_TOP_PADDING
+                if next_marker
+                else page.height - SOLUTION_FOOTER_MARGIN
+            )
+        if y_max <= y_min:
+            y_min = max(0, marker.y_min - 10)
+            y_max = min(page.height - SOLUTION_FOOTER_MARGIN, marker.y_min + 220)
+
+        y_max = trim_trailing_solution_separator(page, x_min, y_min, x_max, y_max, marker.y_min)
+
+    # A merged cell (a wide answer that spans the columns to its right, like the
+    # 2022 A key's final task) is sliced by the per-column boundary. Push its
+    # right edge out to the table border that actually bounds its row.
+    if page_image is not None:
+        # Scoring guides mix ordinary columns and full-width merged cells on
+        # one page. Verify the border in this row instead of classifying the
+        # whole page as a grid. Never scan past another answer's marker.
+        right_limit = min(
+            (item.x_min - 2 for item in page_markers
+             if item.x_min > marker.x_min + 40 and y_min <= item.y_min < y_max),
+            default=page.width,
+        )
+        x_max = merged_cell_right_bound(page, page_image, x_max, y_min, y_max, right_limit)
+        x_min = solution_cell_left_bound(page, page_image, x_min, marker.x_min, y_min, y_max)
 
     return QuestionCrop(
         page=page,
         x_min=max(0, x_min),
         y_min=max(0, y_min),
         x_max=min(page.width, max(x_max, x_min + 40)),
-        y_max=min(page.height, max(y_max, y_min + 24)),
+        # Compact answer tables can have rows shorter than 24 points. A
+        # minimum height would override the next marker and reveal its answer.
+        y_max=min(page.height, y_max),
     )
 
 
@@ -990,7 +1174,12 @@ def find_solution_page_crops(
     points = solution_points_from_blocks(markers)
     crops: dict[str, QuestionCrop] = {}
     pages_by_number = {page.number: page for page in pages}
-    rules_by_page = detect_horizontal_rules(contents, pages_by_number)
+    rules_by_page = detect_horizontal_rules(
+        contents, pages_by_number,
+        dpi=SOURCE_RENDER_DPI,
+        minimum_width_ratio=SOLUTION_TABLE_RULE_MIN_WIDTH_RATIO,
+    )
+    page_images = render_solution_page_images(contents, pages_by_number)
     layout_markers_by_page: dict[int, list[QuestionMarker]] = {}
     for marker in layout_markers:
         layout_markers_by_page.setdefault(marker.page.number, []).append(marker)
@@ -1016,6 +1205,7 @@ def find_solution_page_crops(
                 marker,
                 page_markers,
                 rules_by_page.get(marker.page.number, []),
+                page_images.get(marker.page.number),
             )
     return crops, points
 
@@ -1150,82 +1340,28 @@ def write_if_changed(path: Path, contents: bytes) -> None:
     path.write_bytes(contents)
 
 
-def longest_dark_run(row: bytes, threshold: int = 180) -> tuple[int, int, int]:
-    best_start = 0
-    best_length = 0
-    current_start: int | None = None
-
-    for index, value in enumerate(row):
-        if value < threshold:
-            if current_start is None:
-                current_start = index
-            continue
-
-        if current_start is not None:
-            length = index - current_start
-            if length > best_length:
-                best_start = current_start
-                best_length = length
-            current_start = None
-
-    if current_start is not None:
-        length = len(row) - current_start
-        if length > best_length:
-            best_start = current_start
-            best_length = length
-
-    return best_start, best_start + best_length, best_length
-
-
-def detect_horizontal_rules(contents: bytes, pages: dict[int, PdfPage]) -> dict[int, list[HorizontalRule]]:
-    rules_by_page: dict[int, list[HorizontalRule]] = {}
+def render_solution_page_images(contents: bytes, pages: dict[int, PdfPage]) -> dict[int, "Image.Image"]:
+    """Render each solution page to a grayscale image so merged answer cells can
+    be snapped to the table border that bounds their row."""
+    images: dict[int, Image.Image] = {}
     with tempfile.TemporaryDirectory() as temporary_directory:
         temporary_root = Path(temporary_directory)
         pdf_path = temporary_root / "source.pdf"
         pdf_path.write_bytes(contents)
 
-        for page_number, page in sorted(pages.items()):
-            temporary_prefix = temporary_root / f"rules-{page_number}"
+        for page_number in sorted(pages):
+            temporary_prefix = temporary_root / f"columns-{page_number}"
             render_pdf_page_to_png(
                 pdf_path,
                 temporary_prefix,
                 page_number,
                 SOURCE_RENDER_DPI,
-                required_message="pdftocairo is required to locate Mathematics solution rows",
-                failure_prefix="pdftocairo failed while locating solution rows",
+                required_message="pdftocairo is required to locate Mathematics solution columns",
+                failure_prefix="pdftocairo failed while locating solution columns",
             )
+            images[page_number] = Image.open(temporary_prefix.with_suffix(".png")).convert("L").copy()
 
-            image = Image.open(temporary_prefix.with_suffix(".png")).convert("L")
-            width, height = image.size
-            scale_x = width / page.width
-            scale_y = height / page.height
-            minimum_run = int(width * SOLUTION_TABLE_RULE_MIN_WIDTH_RATIO)
-            candidates: list[tuple[int, int, int]] = []
-            pixels = image.load()
-            for y in range(height):
-                row = bytes(pixels[x, y] for x in range(width))
-                x_min, x_max, run_length = longest_dark_run(row)
-                if run_length >= minimum_run:
-                    candidates.append((y, x_min, x_max))
-
-            groups: list[list[tuple[int, int, int]]] = []
-            for candidate in candidates:
-                if groups and candidate[0] <= groups[-1][-1][0] + 1:
-                    groups[-1].append(candidate)
-                else:
-                    groups.append([candidate])
-
-            rules_by_page[page_number] = [
-                HorizontalRule(
-                    x_min=min(candidate[1] for candidate in group) / scale_x,
-                    y_min=min(candidate[0] for candidate in group) / scale_y,
-                    x_max=max(candidate[2] for candidate in group) / scale_x,
-                    y_max=(max(candidate[0] for candidate in group) + 1) / scale_y,
-                )
-                for group in groups
-            ]
-
-    return rules_by_page
+    return images
 
 
 def render_source_pages(
@@ -1807,13 +1943,17 @@ def build_open_tasks(
     context_images: dict[str, dict[str, Any]],
     solution_images: dict[str, dict[str, Any]],
     points: dict[str, str],
+    blank_solutions: set[str] | None = None,
 ) -> list[dict[str, Any]]:
+    blank_solutions = blank_solutions or set()
     question_numbers = sorted(question_images, key=question_sort_key)
     if not question_numbers:
         return []
 
     missing_solutions = [
-        number for number in question_numbers if number not in solution_images
+        number
+        for number in question_numbers
+        if number not in solution_images and number not in blank_solutions
     ]
     if missing_solutions:
         raise ValueError(f"Missing Mathematics solution images for {missing_solutions}")
@@ -1825,8 +1965,9 @@ def build_open_tasks(
             "number": number,
             "groupNumber": group_number,
             "sourceImage": question_images[number],
-            "solutionImage": solution_images[number],
         }
+        if number in solution_images:
+            question["solutionImage"] = solution_images[number]
         if group_number in context_images and number == next(
             item for item in question_numbers if item.split(".", 1)[0] == group_number
         ):
@@ -1869,13 +2010,21 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     last_choice_error: Exception | None = None
     for _, key_contents in key_contents_items:
         candidate_text = pdf_text(key_contents)
+        if not key_text:
+            key_text = candidate_text
         try:
             answers = parse_choice_answers(candidate_text)
             key_text = candidate_text
             break
         except ValueError as exc:
             last_choice_error = exc
-    if answers is None:
+    override = ANSWER_OVERRIDES.get(identifier)
+    if override is not None:
+        # Verified key wins over the unreliable bubble-sheet parse. Driving the
+        # question set from this complete key lets the paper-driven crop logic
+        # below reconstruct every question (including ones the parser dropped).
+        answers = {question: [override[question]] for question in override}
+    elif answers is None:
         if not answer_sheet_contents:
             assert last_choice_error is not None
             raise last_choice_error
@@ -1953,6 +2102,13 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
     write_if_changed(solution_key_destination, scoring_contents)
     expected_assets.add("solutions.pdf")
     solution_crops, _solution_points = find_solution_page_crops(scoring_contents, open_question_numbers)
+    blank_solution_numbers = {
+        number
+        for number in BLANK_SOLUTIONS.get(identifier, [])
+        if number in open_question_numbers
+    }
+    for number in blank_solution_numbers:
+        solution_crops.pop(number, None)
     solution_images = render_source_pages(
         solution_key_destination,
         identifier,
@@ -1988,6 +2144,7 @@ def build_exam(exam: dict[str, Any]) -> dict[str, Any]:
             open_context_images,
             solution_images,
             open_question_points,
+            blank_solution_numbers,
         ),
         "answers": answers,
     }
@@ -2001,19 +2158,7 @@ def remove_orphaned_papers(expected_ids: set[str]) -> None:
             shutil.rmtree(path)
 
 
-def main() -> None:
-    archive_index = load_archive_index()
-    math_exams = [
-        exam for exam in archive_index["exams"] if exam["subject"] == SUBJECT
-    ]
-    exams = []
-    for exam in math_exams:
-        try:
-            exams.append(build_exam(exam))
-        except Exception as exc:
-            raise RuntimeError(f"{exam_id(exam)}: {exc}") from exc
-    remove_orphaned_papers({exam["id"] for exam in exams})
-
+def write_payload(exams: list[dict[str, Any]]) -> None:
     payload = {
         "version": 1,
         "exams": exams,
@@ -2021,7 +2166,60 @@ def main() -> None:
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     OUTPUT.write_text(f"{OUTPUT_PREFIX}{serialized};\n", encoding="utf-8")
+    # The CDN caches JavaScript even when the origin requests revalidation.
+    # Change both entry points whenever the generated data changes so corrected
+    # crops cannot remain hidden behind an older cached index.
+    revision = hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:12]
+    for entrypoint in (ROOT / "matematika.html", ROOT / "app.js"):
+        text = entrypoint.read_text(encoding="utf-8")
+        updated = re.sub(
+            r"\./data/math-choice\.js(?:\?v=[^\s\"']+)?",
+            f"./data/math-choice.js?v={revision}",
+            text,
+        )
+        if updated != text:
+            entrypoint.write_text(updated, encoding="utf-8")
 
+
+def main() -> None:
+    archive_index = load_archive_index()
+    math_exams = [
+        exam for exam in archive_index["exams"] if exam["subject"] == SUBJECT
+    ]
+
+    target_ids = set(sys.argv[1:])
+    if target_ids:
+        # Scoped rebuild: regenerate only the requested exam ids and merge them
+        # into the existing output, leaving every other exam (and its assets)
+        # untouched. Does NOT prune orphaned papers.
+        existing_text = OUTPUT.read_text(encoding="utf-8")
+        existing = json.loads(existing_text[len(OUTPUT_PREFIX):].strip().rstrip(";"))
+        by_id = {entry["id"]: entry for entry in existing["exams"]}
+        order = [entry["id"] for entry in existing["exams"]]
+        rebuilt: list[str] = []
+        for exam in math_exams:
+            identifier = exam_id(exam)
+            if identifier in target_ids:
+                try:
+                    by_id[identifier] = build_exam(exam)
+                except Exception as exc:
+                    raise RuntimeError(f"{identifier}: {exc}") from exc
+                rebuilt.append(identifier)
+        missing = target_ids - set(rebuilt)
+        if missing:
+            raise RuntimeError(f"unknown Mathematics exam ids: {sorted(missing)}")
+        write_payload([by_id[identifier] for identifier in order])
+        print(f"Rebuilt {len(rebuilt)} Mathematics exams (scoped): {', '.join(rebuilt)}")
+        return
+
+    exams = []
+    for exam in math_exams:
+        try:
+            exams.append(build_exam(exam))
+        except Exception as exc:
+            raise RuntimeError(f"{exam_id(exam)}: {exc}") from exc
+    remove_orphaned_papers({exam["id"] for exam in exams})
+    write_payload(exams)
     print(f"Wrote {len(exams)} Mathematics practice exams to {OUTPUT.relative_to(ROOT)}")
 
 

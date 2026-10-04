@@ -8,6 +8,7 @@ const path = require("node:path");
 const { DatabaseSync } = require("node:sqlite");
 
 const rootDir = __dirname;
+const cropStore = require("./crop-store.js").createCropStore(rootDir);
 loadEnvFile(path.join(rootDir, ".env"));
 
 const config = {
@@ -67,6 +68,11 @@ const config = {
     rootDir,
     process.env.PAGEVIEW_VISITORS_FILE || "var/pageviews-visitors.json",
   ),
+  previewCookieName: process.env.PUNI_PRISTUP_COOKIE_NAME || "azm_puni_pristup_preview",
+  previewPassword: process.env.PUNI_PRISTUP_PASSWORD || "",
+  previewTtlMs: readPositiveNumber(process.env.PUNI_PRISTUP_TTL_HOURS, 12) * 60 * 60 * 1000,
+  purchasesTextFile: path.resolve(rootDir, process.env.PURCHASES_TEXT_FILE || "var/users/purchases.txt"),
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
   visitorCookieName: process.env.VISITOR_COOKIE_NAME || "azm_vid",
   visitorTtlMs: readPositiveNumber(process.env.VISITOR_TTL_DAYS, 365) * 24 * 60 * 60 * 1000,
 };
@@ -83,6 +89,10 @@ const rateLimit = {
   pageview: createRateLimiter({
     max: Number(process.env.PAGEVIEW_IP_LIMIT_PER_MINUTE || 60),
     windowMs: 60 * 1000,
+  }),
+  preview: createRateLimiter({
+    max: Number(process.env.PUNI_PRISTUP_IP_LIMIT_PER_HOUR || 20),
+    windowMs: 60 * 60 * 1000,
   }),
 };
 const englishEssayIndex = {
@@ -294,9 +304,11 @@ const historyEchoStopwords = new Set([
 
 let store = {
   sessions: {},
+  stripeEvents: {},
   users: {},
 };
 let database;
+let billing;
 // Brojači pregleda (svi pogledi, uključujući ponovljene) i skupovi jedinstvenih
 // posjetitelja (hash kolačića po predmetu/stranici) iz kojih izvodimo "users".
 let pageviewViews = { total: 0, subjects: {}, pages: {} };
@@ -312,6 +324,11 @@ main().catch((error) => {
 async function main() {
   await initializeDatabase();
   store = loadStore();
+  billing = require("./billing.js").createBilling({
+    database, secretKey: process.env.STRIPE_SECRET_KEY || "",
+    webhookSecret: config.stripeWebhookSecret, priceId: process.env.STRIPE_PRICE_ID || "",
+    baseUrl: config.publicBaseUrl, getUser: (id) => store.users[id],
+  });
   await migrateLegacyStore();
   pruneExpiredRecords();
   await persistStore();
@@ -351,6 +368,31 @@ async function main() {
 
 async function handleRequest(request, response) {
   const url = new URL(request.url, requestBaseUrl(request));
+
+  if (url.pathname === "/plus") {
+    if (!["GET", "HEAD"].includes(request.method)) {
+      sendJson(response, 405, { error: "Metoda nije dopuštena." });
+      return;
+    }
+    await sendProtectedHtml(response, path.join(rootDir, "private", "puni-pristup.html"), request.method === "HEAD");
+    return;
+  }
+
+  if (url.pathname === "/api/admin/crop") {
+    const session = currentSession(request);
+    const user = session ? store.users[session.userId] : null;
+    if (!userIsAdmin(user)) return sendJson(response, user ? 403 : 401, { error: "Samo administratori mogu uređivati izreze." });
+    if (request.method !== "POST") return sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
+    if (request.headers['sec-fetch-site'] === 'cross-site' || (request.headers.origin && request.headers.origin !== new URL(config.publicBaseUrl || requestBaseUrl(request)).origin)) return sendJson(response, 403, { error: "Pristup nije dopušten." });
+    if (!String(request.headers['content-type']).startsWith('application/json')) return sendJson(response, 415, { error: "Potreban je JSON zapis." });
+    try {
+      const body = await readJsonBody(request, 4096);
+      const crop = cropStore.save(body.id, body.crop, body.previous, user.email);
+      return sendJson(response, 200, { crop });
+    } catch (error) {
+      return sendJson(response, error.status || 400, { error: error.code ? "Izrez nije moguće spremiti." : error.message });
+    }
+  }
 
   if (url.pathname === "/api/auth/config") {
     handleAuthConfig(request, response);
@@ -397,6 +439,11 @@ async function handleRequest(request, response) {
     return;
   }
 
+  if (url.pathname === "/api/pageviews") {
+    handlePageviewSummary(request, response);
+    return;
+  }
+
   if (
     url.pathname === "/api/english-essay/grade" ||
     url.pathname === "/api/english-essay/ocr" ||
@@ -427,7 +474,240 @@ async function handleRequest(request, response) {
     return;
   }
 
+  if (["/api/billing/status", "/api/billing/checkout", "/api/billing/portal"].includes(url.pathname)) {
+    await handleBilling(request, response, url);
+    return;
+  }
+
+  if (url.pathname === "/api/stripe/webhook") {
+    await handleStripeWebhook(request, response);
+    return;
+  }
+
   await serveStaticFile(request, response, url);
+}
+
+async function handlePuniPristupPreview(request, response) {
+  if (!config.previewPassword) {
+    response.writeHead(404, { "Cache-Control": "no-store" });
+    response.end("Stranica nije dostupna.");
+    return;
+  }
+
+  if (request.method === "POST") {
+    if (!rateLimit.preview.check(clientIp(request) || "unknown")) {
+      sendPuniPristupGate(response, true, 429);
+      return;
+    }
+
+    let submittedPassword = "";
+    try {
+      const body = await readRequestBody(request, 4 * 1024);
+      submittedPassword = new URLSearchParams(body).get("password") || "";
+    } catch {
+      sendPuniPristupGate(response, true, 400);
+      return;
+    }
+
+    if (!safeEqual(submittedPassword, config.previewPassword)) {
+      sendPuniPristupGate(response, true, 401);
+      return;
+    }
+
+    redirect(response, "/plus", {
+      "Set-Cookie": cookie(
+        config.previewCookieName,
+        createPuniPristupPreviewToken(),
+        Math.floor(config.previewTtlMs / 1000),
+        "/",
+      ),
+    });
+    return;
+  }
+
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    response.writeHead(405, { Allow: "GET, HEAD, POST" });
+    response.end("Metoda nije dopuštena.");
+    return;
+  }
+
+  const suppliedToken = parseCookies(request.headers.cookie || "")[config.previewCookieName];
+  if (!validPuniPristupPreviewToken(suppliedToken)) {
+    sendPuniPristupGate(response, false, 200, request.method === "HEAD");
+    return;
+  }
+
+  await sendProtectedHtml(
+    response,
+    path.join(rootDir, "private", "puni-pristup.html"),
+    request.method === "HEAD",
+  );
+}
+
+function createPuniPristupPreviewToken() {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  return `${issuedAt}.${puniPristupPreviewSignature(issuedAt)}`;
+}
+
+function validPuniPristupPreviewToken(token) {
+  if (typeof token !== "string") return false;
+  const [issuedAtRaw, suppliedSignature, extra] = token.split(".");
+  if (extra !== undefined || !/^\d{10}$/.test(issuedAtRaw || "")) return false;
+
+  const issuedAt = Number(issuedAtRaw);
+  const ageMs = Date.now() - issuedAt * 1000;
+  if (ageMs < -60 * 1000 || ageMs > config.previewTtlMs) return false;
+  return safeEqual(suppliedSignature, puniPristupPreviewSignature(issuedAt));
+}
+
+function puniPristupPreviewSignature(issuedAt) {
+  return crypto
+    .createHmac("sha256", config.authSecret || config.previewPassword)
+    .update(`puni-pristup-preview:${config.previewPassword}:${issuedAt}`)
+    .digest("base64url");
+}
+
+// Stripe billing is isolated in billing.js; legacy annual access remains on users.
+const billingRateLimit = createRateLimiter({ max: 60, windowMs: 60 * 1000 });
+async function handleBilling(request, response, url) {
+  const isStatus = url.pathname === "/api/billing/status";
+  if (request.method !== (isStatus ? "GET" : "POST")) {
+    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: isStatus ? "GET" : "POST" });
+    return;
+  }
+  const session = currentSession(request);
+  const user = session && store.users[session.userId];
+  if (!user) return sendJson(response, 401, { error: "Prijava je potrebna." });
+  if (!isStatus && (request.headers.origin !== config.publicBaseUrl || request.headers["sec-fetch-site"] === "cross-site")) {
+    return sendJson(response, 403, { error: "Pristup nije dopušten." });
+  }
+  if (!billingRateLimit.check(user.id)) return sendJson(response, 429, { error: "Previše zahtjeva. Pokušaj za minutu." });
+  if (!billing.configured) return sendJson(response, 503, { error: "Pretplate trenutačno nisu dostupne." });
+  try {
+    if (isStatus) return sendJson(response, 200, await billing.status(user));
+    const result = url.pathname.endsWith("/checkout") ? await billing.checkout(user) : await billing.portal(user);
+    sendJson(response, 200, { url: result.url });
+  } catch (error) {
+    console.error("Billing request failed:", error.stripeCode || error.message);
+    sendJson(response, 503, { error: error.message });
+  }
+}
+
+async function handleStripeWebhook(request, response) {
+  if (!billing.configured) return sendJson(response, 503, { error: "Pretplate trenutačno nisu dostupne." });
+  if (request.method !== "POST") return sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
+  let body;
+  try { body = await readRequestBody(request, 256 * 1024); }
+  catch { return sendJson(response, 400, { error: "Neispravan zahtjev." }); }
+  try {
+    await billing.webhook(body, request.headers["stripe-signature"]);
+    sendJson(response, 200, { received: true });
+  } catch (error) {
+    console.error("Billing webhook failed:", error.stripeCode || error.message);
+    sendJson(response, error.status || 500, { error: "Obrada potvrde nije uspjela." });
+  }
+}
+
+async function appendPurchaseLogLine(line) {
+  try {
+    await fsp.mkdir(path.dirname(config.purchasesTextFile), { recursive: true });
+    await fsp.appendFile(config.purchasesTextFile, `${new Date().toISOString()} ${line}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    });
+  } catch (error) {
+    console.error("Zapis u purchases.txt nije uspio:", error.message);
+  }
+}
+
+async function sendProtectedHtml(response, filePath, headOnly = false) {
+  let body;
+  try {
+    body = await fsp.readFile(filePath);
+  } catch {
+    response.writeHead(404, { "Cache-Control": "no-store" });
+    response.end("Stranica nije dostupna.");
+    return;
+  }
+
+  response.writeHead(200, {
+    "Cache-Control": "no-store, private",
+    "Content-Length": body.length,
+    "Content-Type": "text/html; charset=UTF-8",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+    "X-Robots-Tag": "noindex, nofollow, noarchive",
+  });
+  response.end(headOnly ? undefined : body);
+}
+
+function sendPuniPristupGate(response, hasError, statusCode = 200, headOnly = false) {
+  const message =
+    statusCode === 429
+      ? "Previše pokušaja. Pričekaj i pokušaj ponovno."
+      : "Lozinka nije ispravna.";
+  const errorMarkup = hasError
+    ? `<p class="preview-gate__error" role="alert">${message}</p>`
+    : "";
+  const body = Buffer.from(`<!doctype html>
+<html lang="hr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="theme-color" content="#001d4d" />
+    <title>Zaštićeni pregled | Asistent za Mature</title>
+    <link rel="icon" type="image/webp" href="./assets/asistent_za_maturu.webp" />
+    <link rel="stylesheet" href="./styles.css?v=20260609-skeletons" />
+    <style>
+      .preview-gate { padding: 58px 0 72px; }
+      .preview-gate__panel { max-width: 520px; padding: 28px; background: var(--surface); border: 1px solid var(--line-dark); border-top: 3px solid var(--blue); }
+      .preview-gate__panel h1 { margin: 7px 0 10px; font-size: 30px; line-height: 1.12; }
+      .preview-gate__panel > p:not(.eyebrow, .preview-gate__error) { margin-bottom: 22px; color: var(--muted); }
+      .preview-gate__form { display: grid; gap: 8px; }
+      .preview-gate__form label { color: var(--heading); font-size: 13px; font-weight: 700; }
+      .preview-gate__form input { width: 100%; min-height: 42px; padding: 8px 10px; color: var(--ink); background: var(--surface); border: 1px solid var(--line-dark); }
+      .preview-gate__form input:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
+      .preview-gate__form .primary-button { width: max-content; margin-top: 6px; padding: 10px 15px; }
+      .preview-gate__error { margin: 0 0 14px; color: #8f1d1d; font-size: 13px; font-weight: 700; }
+      @media (max-width: 600px) { .preview-gate { padding: 32px 0 48px; } .preview-gate__panel { padding: 22px 18px; } }
+    </style>
+  </head>
+  <body>
+    <script src="./lucide-icons.js?v=20260604-inline-paths"></script>
+    <a class="skip-link" href="#main">Preskoči na sadržaj</a>
+    <div data-site-header></div>
+    <script src="./site-header.js?v=20260616-nav-icons"></script>
+    <main id="main" class="preview-gate">
+      <div class="container">
+        <section class="preview-gate__panel" aria-labelledby="preview-title">
+          <p class="eyebrow">Interni pregled</p>
+          <h1 id="preview-title">Ova stranica još nije javna</h1>
+          <p>Unesi lozinku za pregled radne verzije ponude Matura+.</p>
+          ${errorMarkup}
+          <form class="preview-gate__form" method="post" action="/plus">
+            <label for="preview-password">Lozinka</label>
+            <input id="preview-password" name="password" type="password" autocomplete="current-password" required autofocus />
+            <button class="primary-button" type="submit">Otvori pregled</button>
+          </form>
+        </section>
+      </div>
+    </main>
+    <div data-site-footer></div>
+    <script src="./site-footer.js?v=20260608-footer-coffee"></script>
+    <script src="./auth-client.js?v=20260605-auth-ui"></script>
+  </body>
+</html>`);
+
+  response.writeHead(statusCode, {
+    "Cache-Control": "no-store, private",
+    "Content-Length": body.length,
+    "Content-Type": "text/html; charset=UTF-8",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+    "X-Robots-Tag": "noindex, nofollow, noarchive",
+  });
+  response.end(headOnly ? undefined : body);
 }
 
 function handleAuthConfig(request, response) {
@@ -543,6 +823,23 @@ async function handlePageview(request, response) {
     normalizePageviewPage(body?.page),
   );
   sendJson(response, 202, { ok: true }, headers);
+}
+
+// Javni sažetak: broj pregleda po predmetu za uživo brojač na naslovnici.
+// Vraća samo agregirane preglede (bez podataka o posjetiteljima) iz memorije,
+// pa je vrijednost trenutačna i ne čeka spremanje na disk.
+function handlePageviewSummary(request, response) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "GET" });
+    return;
+  }
+
+  const subjects = {};
+  for (const [subject, views] of Object.entries(pageviewViews.subjects)) {
+    if (subject && views) subjects[subject] = views;
+  }
+
+  sendJson(response, 200, { subjects });
 }
 
 // Jedinstvenog posjetitelja prepoznajemo po first-party kolačiću (bez prijave).
@@ -1584,7 +1881,8 @@ function normalizeCorrectAnswer(value) {
 }
 
 function userAiUnlimited(user) {
-  return config.aiUnlimitedEmails.has(String(user?.email || "").trim().toLowerCase());
+  if (config.aiUnlimitedEmails.has(String(user?.email || "").trim().toLowerCase())) return true;
+  return Boolean(user && billing.summary(user).active);
 }
 
 // Administrator (mail iz ADMIN_EMAILS): smije regenerirati objašnjenja i ima
@@ -1989,6 +2287,7 @@ function publicUser(user) {
     displayName: user.displayName,
     email: user.email,
     id: user.id,
+    premiumUntil: billing.summary(user).premiumUntil,
   };
 }
 
@@ -2026,8 +2325,20 @@ async function serveStaticFile(request, response, url) {
     return;
   }
 
+  if (pathname !== path.posix.normalize(pathname)) {
+    response.writeHead(400);
+    response.end("Neispravna putanja.");
+    return;
+  }
+
   if (pathname === "/") {
     pathname = "/index.html";
+  } else if (pathname === "/profil") {
+    pathname = "/profil.html";
+  } else if (pathname === "/profil/") {
+    response.writeHead(308, { Location: `/profil${url.search}` });
+    response.end();
+    return;
   } else if (isGeneratedSeoDirectoryPath(pathname)) {
     const redirectLocation = `${pathname}/${url.search}`;
     response.writeHead(308, { Location: redirectLocation });
@@ -2040,6 +2351,16 @@ async function serveStaticFile(request, response, url) {
   if (!isPublicPath(pathname)) {
     response.writeHead(404);
     response.end("Datoteka nije pronađena.");
+    return;
+  }
+
+  const plusProtected = requiresMaturaPlus(pathname, url);
+  if (plusProtected && !hasMaturaPlus(request)) {
+    response.writeHead(302, {
+      "Cache-Control": "private, no-store",
+      Location: `/plus?next=${encodeURIComponent(url.pathname + url.search)}`,
+    });
+    response.end();
     return;
   }
 
@@ -2065,6 +2386,20 @@ async function serveStaticFile(request, response, url) {
     return;
   }
 
+  if (/^\/data\/[a-z-]+\.js$/.test(pathname)) {
+    const original = await fsp.readFile(filePath, "utf8");
+    const transformed = cropStore.parse(original, path.basename(filePath));
+    if (transformed || pathname !== "/data/exams.js") {
+      let source = transformed?.text || original;
+      if (pathname !== "/data/exams.js" && !hasMaturaPlus(request)) {
+        source = redactLegacyExamData(source);
+      }
+      response.writeHead(200, { "Content-Type": "text/javascript; charset=UTF-8", "Cache-Control": "private, no-store", "Content-Length": Buffer.byteLength(source), "X-Content-Type-Options": "nosniff" });
+      response.end(request.method === "HEAD" ? undefined : source);
+      return;
+    }
+  }
+
   // Transparently upgrade source-image PNGs to a pre-generated WebP sibling
   // when the browser advertises support. HTML/data keep requesting `.png`;
   // run `python3 scripts/optimize_images.py` to (re)generate the `.webp`
@@ -2085,11 +2420,17 @@ async function serveStaticFile(request, response, url) {
   }
 
   const headers = {
-    "Cache-Control": cacheHeaderFor(filePath),
+    "Cache-Control": plusProtected ? "private, no-store" : cacheHeaderFor(filePath),
     "Content-Length": stat.size,
     "Content-Type": contentType(filePath),
     "X-Content-Type-Options": "nosniff",
   };
+  // One-time browser cache reset after the October 2026 site update. Keep
+  // cookies and localStorage (including saved practice answers) untouched.
+  if (path.extname(filePath).toLowerCase() === ".html" && !parseCookies(request.headers.cookie || "").azm_cache_reset_20261004_1100) {
+    headers["Clear-Site-Data"] = '"cache"';
+    headers["Set-Cookie"] = `azm_cache_reset_20261004_1100=1; Path=/; Max-Age=31536000; SameSite=Lax${config.cookieSecure ? "; Secure" : ""}; HttpOnly`;
+  }
   if (negotiated) {
     headers.Vary = "Accept";
   }
@@ -2101,6 +2442,66 @@ async function serveStaticFile(request, response, url) {
   }
 
   fs.createReadStream(filePath).pipe(response);
+}
+
+function hasMaturaPlus(request) {
+  const session = currentSession(request);
+  const user = session ? store.users[session.userId] : null;
+  return Boolean(user && billing.summary(user).active);
+}
+
+function redactLegacyExamData(source) {
+  const assignment = source.match(/^(window\.[A-Z0-9_]+\s*=\s*)([\s\S]*?);?\s*$/);
+  if (!assignment) return source;
+  const data = JSON.parse(assignment[2]);
+  if (!Array.isArray(data.exams)) return source;
+  data.exams = data.exams.map((exam) => {
+    const year = Number(exam.year);
+    if (year < 2015 || year > 2022) return exam;
+    // Keep only the fields used to list and link an exam. The solver content,
+    // answer keys and image metadata are sent only with an active Plus session.
+    const fields = ["id", "subject", "year", "schoolYear", "term", "level", "kind", "partLabel", "archiveUrl", "durationMinutes", "checkingSupported"];
+    const preview = Object.fromEntries(fields.filter((field) => Object.hasOwn(exam, field)).map((field) => [field, exam[field]]));
+    return { ...preview, tasks: [], openTasks: [], questions: [], openQuestions: [] };
+  });
+  return `${assignment[1]}${JSON.stringify(data)};`;
+}
+
+let archiveAccessIndex;
+let archiveAccessMtime;
+
+function archiveYearForPath(pathname) {
+  const indexPath = path.join(rootDir, "data", "exams.js");
+  const mtime = fs.statSync(indexPath).mtimeMs;
+  if (mtime !== archiveAccessMtime) {
+    const source = fs.readFileSync(indexPath, "utf8");
+    const archive = JSON.parse(source.replace(/^window\.ASISTENT_ZA_MATURE_DATA\s*=\s*/, "").replace(/;\s*$/, ""));
+    archiveAccessIndex = new Map(archive.exams.map((exam) => [new URL(exam.url, "https://matura.com.hr/").pathname, Number(exam.year)]));
+    archiveAccessMtime = mtime;
+  }
+  return archiveAccessIndex.get(pathname);
+}
+
+function requiresMaturaPlus(pathname, url) {
+  const examPage = pathname.match(/^\/ispiti\/[^/]+\/(20\d{2})-[^/]+\/index\.html$/);
+  if (examPage) return Number(examPage[1]) >= 2015 && Number(examPage[1]) <= 2022;
+
+  const interactiveFile = pathname.match(/^\/files\/interactive\/[^/]+\/[^/]*-(20\d{2})-[^/]+\//);
+  if (interactiveFile) return Number(interactiveFile[1]) >= 2015 && Number(interactiveFile[1]) <= 2022;
+
+  if (pathname.startsWith("/files/ncvvo/")) {
+    const year = archiveYearForPath(pathname);
+    // Only indexed NCVVO packages are public; older unindexed mirrors must
+    // not provide an alternative route around the subscription check.
+    return year === undefined || (year >= 2015 && year <= 2022);
+  }
+
+  if (pathname !== "/medicina.html" && /^\/[a-z-]+\.html$/.test(pathname)) {
+    const examId = url.searchParams.get("exam") || "";
+    const year = examId.match(/(?:^|-)(20\d{2})(?:-|$)/);
+    return Boolean(year && Number(year[1]) >= 2015 && Number(year[1]) <= 2022);
+  }
+  return false;
 }
 
 // ---- Vijesti o maturi sa srednja.hr (homepage scroller) ----
@@ -2327,6 +2728,11 @@ function abortSignalWithTimeout(signal, timeoutMs) {
 }
 
 async function readJsonBody(request, maxBytes = 64 * 1024) {
+  const raw = (await readRequestBody(request, maxBytes)).trim();
+  return raw ? JSON.parse(raw) : {};
+}
+
+async function readRequestBody(request, maxBytes = 64 * 1024) {
   let size = 0;
   const chunks = [];
 
@@ -2336,8 +2742,7 @@ async function readJsonBody(request, maxBytes = 64 * 1024) {
     chunks.push(chunk);
   }
 
-  const raw = Buffer.concat(chunks).toString("utf8").trim();
-  return raw ? JSON.parse(raw) : {};
+  return Buffer.concat(chunks).toString("utf8");
 }
 
 function normalizeFeedbackPayload(body) {
@@ -2419,6 +2824,7 @@ function writeUserLoginReport() {
     lines.push(`   Kreiran: ${formatFeedbackTimestamp(user.createdAt)}`);
     lines.push(`   Zadnja prijava: ${formatFeedbackTimestamp(user.lastLoginAt)}`);
     lines.push(`   Zadnja aktivnost: ${formatFeedbackTimestamp(user.updatedAt)}`);
+    lines.push(`   Zadnja IP adresa: ${reportText(lastUserIp(user)) || "-"}`);
     lines.push(`   AI korištenja: ${aiUnlockCount(user)}`);
   });
 
@@ -2447,6 +2853,22 @@ function compareUsersForReport(left, right) {
 function reportTimestamp(value) {
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+// Zadnja korištena IP adresa korisnika (iz najnovije sesije po lastSeenAt).
+function lastUserIp(user) {
+  if (!user) return "";
+  let bestIp = "";
+  let bestTime = -Infinity;
+  for (const session of Object.values(store.sessions || {})) {
+    if (session.userId !== user.id || !session.ipAddress) continue;
+    const seen = reportTimestamp(session.lastSeenAt || session.createdAt);
+    if (seen >= bestTime) {
+      bestTime = seen;
+      bestIp = session.ipAddress;
+    }
+  }
+  return bestIp;
 }
 
 function reportText(value, maxLength = 300) {
@@ -3986,7 +4408,19 @@ async function initializeDatabase() {
       created_at TEXT NOT NULL,
       PRIMARY KEY (user_id, unlock_key)
     );
+
+    CREATE TABLE IF NOT EXISTS stripe_events (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
   `);
+
+  try {
+    database.exec("ALTER TABLE users ADD COLUMN premium_until TEXT");
+  } catch (error) {
+    if (!/duplicate column/i.test(error.message)) throw error;
+  }
 }
 
 function loadStore() {
@@ -4004,6 +4438,7 @@ function loadStore() {
       practiceProgress: [],
       simulationAttempts: [],
       aiUnlocked: {},
+      premiumUntil: row.premium_until || null,
       updatedAt: row.updated_at,
     };
   }
@@ -4086,7 +4521,14 @@ function loadStore() {
     };
   }
 
-  return { sessions, users };
+  const stripeEvents = {};
+  const stripeEventCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  for (const row of database.prepare("SELECT * FROM stripe_events").all()) {
+    if (row.created_at < stripeEventCutoff) continue;
+    stripeEvents[row.id] = { type: row.type, createdAt: row.created_at };
+  }
+
+  return { sessions, stripeEvents, users };
 }
 
 async function migrateLegacyStore() {
@@ -4152,15 +4594,15 @@ function normalizeStore(parsed) {
     sessions[id] = session;
   }
 
-  return { sessions, users };
+  return { sessions, stripeEvents: {}, users };
 }
 
 function persistStore() {
   const insertUser = database.prepare(`
     INSERT INTO users (
       id, auth_provider, created_at, display_name, email, email_verified,
-      google_subject, last_login_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      google_subject, last_login_at, updated_at, premium_until
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   const insertSession = database.prepare(`
     INSERT INTO sessions (
@@ -4187,6 +4629,9 @@ function persistStore() {
   const insertAiUnlock = database.prepare(`
     INSERT INTO ai_unlocks (user_id, unlock_key, created_at) VALUES (?, ?, ?)
   `);
+  const insertStripeEvent = database.prepare(`
+    INSERT INTO stripe_events (id, type, created_at) VALUES (?, ?, ?)
+  `);
 
   database.exec("BEGIN IMMEDIATE");
   try {
@@ -4195,9 +4640,14 @@ function persistStore() {
       DELETE FROM practice_progress;
       DELETE FROM agent_keys;
       DELETE FROM ai_unlocks;
+      DELETE FROM stripe_events;
       DELETE FROM sessions;
       DELETE FROM users;
     `);
+
+    for (const [id, stripeEvent] of Object.entries(store.stripeEvents || {})) {
+      insertStripeEvent.run(id, stripeEvent.type, stripeEvent.createdAt);
+    }
 
     for (const user of Object.values(store.users)) {
       insertUser.run(
@@ -4210,6 +4660,7 @@ function persistStore() {
         user.googleSubject,
         sqlValue(user.lastLoginAt),
         user.updatedAt,
+        sqlValue(user.premiumUntil),
       );
 
       const agentKey = normalizeEncryptedAgentKey(user.agentKey);
@@ -4361,6 +4812,13 @@ function isPublicPath(pathname) {
     "/art-choice.js",
     "/asistent_za_maturu.png",
     "/auth-client.js",
+    "/biologija.html",
+    "/medicina.html",
+    "/medicine.js",
+    "/medicine-core.js",
+    "/medicine.css",
+    "/biology-choice.js",
+    "/billing-client.js",
     "/chemistry-choice.js",
     "/croatian-choice.js",
     "/croatian-writing.js",
@@ -4378,6 +4836,9 @@ function isPublicPath(pathname) {
     "/fizika.html",
     "/geografija.html",
     "/geography-choice.js",
+    "/german-essay.js",
+    "/german-listening.js",
+    "/german-reading.js",
     "/history-choice.js",
     "/home-news.js",
     "/hrvatski.html",
@@ -4390,12 +4851,14 @@ function isPublicPath(pathname) {
     "/lucide-icons.js",
     "/matematika.html",
     "/math-choice.js",
+    "/njemacki-citanje.html",
+    "/njemacki-esej.html",
+    "/njemacki-slusanje.html",
     "/philosophy-choice.js",
     "/physics-choice.js",
     "/politics-choice.js",
     "/politika.html",
     "/povijest.html",
-    "/pretplata.html",
     "/prijava.html",
     "/profil.html",
     "/profile-page.js",
@@ -4412,6 +4875,7 @@ function isPublicPath(pathname) {
     "/solver-header.js",
     "/solver-self-check.js",
     "/source-image-viewer.js",
+    "/crop-editor.js",
     "/styles.css",
     "/llms.txt",
   ]);

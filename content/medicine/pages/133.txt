@@ -1,0 +1,16 @@
+101. Što od navedenog o galvanskom članku prikazanom na shemi NIJE toč-
+no ako je E°(Ni²⁺ | Ni) = −0,25 V i E°(Ag⁺ | Ag) = 0,80 V?
+[figure:exam-101]
+A. Prikazani članak je Ni(s) | Ni²⁺(aq)| | Ag⁺(aq) | Ag(s).
+B. Standardna razlika potencijala članka iznosi 1,05 V.
+C. Elektroni putuju metalnom žicom od niklove prema srebrovoj elektrodi.
+D. Masa srebrove elektrode se tijekom reakcije smanjuje.
+E. U članku se odvija reakcija 2Ag⁺(aq) + Ni(s) → 2Ag(s) + Ni²⁺(aq).
+
+102. Koji od navedenih metalnih iona u organizmu čovjeka nalazimo u više
+od jednog oksidacijskog stanja?
+A. natrijev ion
+B. magnezijev ion
+C. željezov ion
+D. kalcijev ion
+E. kalijev ion

@@ -1,0 +1,27 @@
+30. Opća molekulska formula monosaharida glasi:
+A. C_{n}H_{n}O_{n}
+B. C_{2n}H_{n}O_{n}
+C. C_{2n}H_{n}O_{2n}
+D. C_{n}H_{2n}O_{n}
+E. C_{n}H_{n}O_{2n}
+31. U ljudskom organizmu glukoza se pohranjuje u obliku:
+A. amiloze
+B. škroba
+C. amilopektina
+D. celuloze
+E. glikogena
+32. Koja od navedenih tvrdnji o dvadeset uobičajenih aminokiselina NIJE
+točna?
+A. U vodenoj otopini sadržavaju nabijene funkcionalne skupine.
+B. Dvije aminokiseline se povezuju u dipeptid amidnom vezom.
+C. Amfoterni su spojevi.
+D. Zwitterion je ionska forma aminokiseline u kojoj je ukupni naboj jednak
+nuli.
+E. Amino-skupina je vezana na ugljikov atom karboksilne skupine.
+33. Na slici se raspoznaje:
+[figure:chemistry-33]
+A. tripeptid
+B. tri polarne aminokiseline
+C. aminokiselina glicin
+D. dvije aminokiseline čiji bočni ogranci mogu ostvarivati vodikove veze
+E. četiri aminokiseline s asimetričnim ugljikovim atomom

@@ -15,6 +15,7 @@ from crop_utils import (
     trim_crop_bottom_whitespace,
 )
 from pdf_utils import png_dimensions, render_pdf_page_to_png
+from pdf_crop_layout import detect_horizontal_rules, solution_table_row_bounds
 
 
 # NCVVO answer-key pages repeat the same page chrome: a logo and the table
@@ -41,6 +42,7 @@ class SolutionCrop:
     y_min: float
     x_max: float
     y_max: float
+    table_aligned: bool = False
 
 
 def build_manual_solution_images(
@@ -64,28 +66,48 @@ def build_manual_solution_images(
     if not wanted_questions or not key_documents:
         return {}
 
-    selected = max(
-        (
+    documents = [
+        (contents, pdf_bbox_pages(contents)) for contents in key_documents
+    ]
+
+    def select(relax: bool):
+        return max(
             (
-                contents,
-                pages,
-                _find_solution_markers(
+                (
+                    contents,
                     pages,
-                    wanted_questions,
-                    open_answers,
-                    parse_question_token,
-                    question_sort_key,
-                ),
-            )
-            for contents in key_documents
-            for pages in [pdf_bbox_pages(contents)]
-        ),
-        key=lambda item: len(item[2]),
-    )
-    solution_contents, pages, markers = selected
+                    _find_solution_markers(
+                        pages,
+                        wanted_questions,
+                        open_answers,
+                        parse_question_token,
+                        question_sort_key,
+                        relax=relax,
+                    ),
+                )
+                for contents, pages in documents
+            ),
+            key=lambda item: len(item[2]),
+        )
+
     # Questions that carry an official model answer must be located; image-only
     # subitems (such as drawing tasks) may legitimately have no detectable label.
-    required = (set(open_answers) & wanted_questions)
+    required = set(open_answers) & wanted_questions
+
+    # Strict pass first: a bare number is the question only when it sits in the
+    # left margin. Legacy keys (e.g. 2014 Informatics jesenski) place the whole
+    # number column further right and carry no period markers, so the strict
+    # pass leaves required questions unlocated — only then fall back to matching
+    # a bare number to its wanted question anywhere. That fallback would
+    # otherwise be hijacked by answer values beginning with a question number
+    # (e.g. ``30 000``), so it is used solely to recover questions strict missed.
+    selected = select(relax=False)
+    relaxed = False
+    if required - selected[2].keys():
+        relaxed_selected = select(relax=True)
+        if (required - relaxed_selected[2].keys()) < (required - selected[2].keys()):
+            selected, relaxed = relaxed_selected, True
+    solution_contents, pages, markers = selected
     missing = sorted(required - markers.keys(), key=question_sort_key)
     if missing:
         raise ValueError(
@@ -97,11 +119,23 @@ def build_manual_solution_images(
     solution_pdf = destination / "solutions.pdf"
     _write_if_changed(solution_pdf, solution_contents)
     all_markers = (
-        _collect_all_markers(pages, parse_question_token) if group_aware else None
+        _collect_all_markers(
+            pages, parse_question_token, wanted_questions if relaxed else None
+        )
+        if group_aware
+        else None
     )
     crops = _solution_crops(
         pages, markers, all_markers, open_answers, question_sort_key
     )
+    # Use the same table geometry for every subject. Keep all numbered rows as
+    # guards, including image answers and closed questions not being rendered.
+    if not relaxed:
+        boundaries = _collect_all_markers(pages, parse_question_token)
+        rules = detect_horizontal_rules(
+            solution_contents, {page.number: page for page in pages}, dpi=render_dpi,
+        )
+        crops = _align_table_crops(crops, markers, boundaries, rules)
     images = _render_solution_pages(
         solution_pdf,
         destination,
@@ -113,6 +147,41 @@ def build_manual_solution_images(
     )
     _remove_unexpected_solution_pages(destination, images)
     return images
+
+
+def _align_table_crops(crops, markers, boundaries, rules):
+    """Prefer complete table rows; preserve continuations and shared context.
+
+    An ambiguous row is left to the existing content-based cropper. Never
+    silently replace a multi-page answer or a parent-plus-subitem crop with
+    just the row containing its question number.
+    """
+    result = dict(crops)
+    for number, parts in crops.items():
+        marker = markers[number]
+        if len(parts) != 1 or parts[0].page.number != marker.page.number:
+            continue
+        page_markers = [item for item in boundaries.values()
+                        if item.page.number == marker.page.number]
+        page_rules = rules.get(marker.page.number, [])
+        bounds = solution_table_row_bounds(marker, page_markers, page_rules)
+        if bounds is None:
+            continue
+        top, bottom = bounds
+        # A crop beginning in a preceding row can contain shared parent context.
+        if parts[0].y_min < top - 8:
+            continue
+        edges = [rule for rule in page_rules
+                 if rule.y_min == top or rule.y_max == bottom]
+        left = min(rule.x_min for rule in edges)
+        right = max(rule.x_max for rule in edges)
+        # Keep a one-pixel-scale margin around the border strokes themselves.
+        result[number] = [SolutionCrop(
+            page=marker.page, x_min=max(0, left - 0.5),
+            y_min=max(0, top - 0.5), x_max=min(marker.page.width, right + 0.5),
+            y_max=min(marker.page.height, bottom + 0.5), table_aligned=True,
+        )]
+    return result
 
 
 def attach_manual_solution_images(
@@ -131,7 +200,9 @@ def attach_manual_solution_images(
 def _iter_numbered_lines(
     pages: list[Any],
     parse_question_token: Callable[[str], str],
+    wanted_questions: set[str] | None = None,
 ):
+    wanted_questions = wanted_questions or set()
     ordered_lines = [
         (page, line)
         for page in pages
@@ -139,12 +210,30 @@ def _iter_numbered_lines(
     ]
     for page, line in ordered_lines:
         number_text = line.first_word.strip()
+        # NCVVO answer keys label produženi-odgovor subitems as ``26.1.:`` — the
+        # trailing colon belongs to the label, not the answer, so accept it.
         match = re.fullmatch(
-            r"(?P<number>\d{1,3}(?:[\.,]\d{1,2})?)[\.\"”]+",
+            r"(?P<number>\d{1,3}(?:[\.,]\d{1,2})?)[\.\"”]+:?",
             number_text,
         )
-        if not match and line.x_min <= page.width * 0.20:
-            match = re.fullmatch(r"(?P<number>\d{1,3})", number_text)
+        if not match:
+            bare = re.fullmatch(r"(?P<number>\d{1,3})", number_text)
+            if bare:
+                # Bare numbers (no trailing period) appear in both the left-hand
+                # question-number column and the answer column. Accept one in the
+                # usual left band, or — for legacy keys whose number column sits
+                # further right (e.g. 2014 Informatics jesenski at ~30% width) —
+                # anywhere it exactly names a question we are looking for. The
+                # wanted guard keeps stray answer values from becoming markers.
+                if line.x_min <= page.width * 0.20:
+                    match = bare
+                elif wanted_questions:
+                    try:
+                        candidate = parse_question_token(bare.group("number"))
+                    except (TypeError, ValueError):
+                        candidate = None
+                    if candidate in wanted_questions:
+                        match = bare
         if not match:
             continue
         try:
@@ -157,6 +246,7 @@ def _iter_numbered_lines(
 def _collect_all_markers(
     pages: list[Any],
     parse_question_token: Callable[[str], str],
+    wanted_questions: set[str] | None = None,
 ) -> dict[str, SolutionMarker]:
     """Every numbered row in the key, including unscored parent headings.
 
@@ -164,7 +254,9 @@ def _collect_all_markers(
     vertical boundaries so a question's crop never bleeds into a neighbour.
     """
     markers: dict[str, SolutionMarker] = {}
-    for number, page, line in _iter_numbered_lines(pages, parse_question_token):
+    for number, page, line in _iter_numbered_lines(
+        pages, parse_question_token, wanted_questions
+    ):
         markers.setdefault(
             number, SolutionMarker(number=number, page=page, y_min=line.y_min)
         )
@@ -177,6 +269,7 @@ def _find_solution_markers(
     open_answers: dict[str, dict[str, Any]],
     parse_question_token: Callable[[str], str],
     question_sort_key: Callable[[str], tuple[int, int]],
+    relax: bool = False,
 ) -> dict[str, SolutionMarker]:
     direct: dict[str, list[SolutionMarker]] = {}
     ordered_lines = [
@@ -185,7 +278,9 @@ def _find_solution_markers(
         for line in sorted(page.lines, key=lambda item: (item.y_min, item.x_min))
     ]
 
-    for number, page, line in _iter_numbered_lines(pages, parse_question_token):
+    for number, page, line in _iter_numbered_lines(
+        pages, parse_question_token, wanted_questions if relax else None
+    ):
         if number in wanted_questions:
             direct.setdefault(number, []).append(
                 SolutionMarker(number=number, page=page, y_min=line.y_min)
@@ -519,6 +614,8 @@ def _find_answer_start(
     candidates: list[str] = []
     for line in answer_text.splitlines():
         normalized = _normalize_line(line)
+        if not _is_answer_anchor(normalized):
+            continue
         if re.match(r"^(?:Izvor|Prilagođeno prema):", normalized, flags=re.IGNORECASE):
             break
         # A short scoring header such as `3 boda` legitimately opens a rubric
@@ -558,6 +655,8 @@ def _find_answer_end(
     candidates = []
     for line in answer_text.splitlines():
         normalized = _normalize_line(line)
+        if not _is_answer_anchor(normalized):
+            continue
         if re.match(r"^(?:Izvor|Prilagođeno prema):", normalized, flags=re.IGNORECASE):
             break
         if len(normalized) >= 8:
@@ -627,17 +726,12 @@ def _render_solution_pages(
                 y_min = max(0, math.floor(crop.y_min * scale_y))
                 x_max = min(image_width, math.ceil(crop.x_max * scale_x))
                 y_max = min(image_height, math.ceil(crop.y_max * scale_y))
-                x_min, y_min, x_max, y_max = trim_crop_bottom_whitespace(
-                    page_image,
-                    x_min,
-                    y_min,
-                    x_max,
-                    y_max,
-                    padding=14,
-                    min_height=28,
-                    min_trim=10,
-                    detect_legacy_answer_frame=False,
-                )
+                if not crop.table_aligned:
+                    x_min, y_min, x_max, y_max = trim_crop_bottom_whitespace(
+                        page_image, x_min, y_min, x_max, y_max,
+                        padding=14, min_height=28, min_trim=10,
+                        detect_legacy_answer_frame=False,
+                    )
                 if x_max <= x_min or y_max <= y_min:
                     continue
                 images.setdefault(number, []).append(
@@ -665,6 +759,14 @@ def _remove_unexpected_solution_pages(
     for path in destination.glob("solution-page-*.png"):
         if path.name not in expected:
             path.unlink()
+
+
+def _is_answer_anchor(text: str) -> bool:
+    # PDF extraction can append table rules and page counters to model answers.
+    # These repeat elsewhere on the page and cannot locate answer content.
+    return bool(re.search(r"[^\W_]", text)) and not bool(
+        re.fullmatch(r"\d+\s*/\s*\d+", text)
+    )
 
 
 def _normalize_line(value: str) -> str:

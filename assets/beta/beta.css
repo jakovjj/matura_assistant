@@ -1,0 +1,87 @@
+.beta-banner { background: var(--pale-blue); border-bottom: 1px solid var(--line); font-size: 12px; color: var(--heading); }
+.beta-banner .container { display: flex; align-items: center; gap: 16px; padding-top: 8px; padding-bottom: 8px; }
+.beta-banner a { margin-left: auto; color: var(--link); }
+.beta-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.beta-filters label { display: grid; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.beta-filters select, .beta-filters input { border: 1px solid var(--line-dark); border-radius: 5px; min-height: 40px; padding: 8px 10px; background: var(--surface); color: var(--ink); font: inherit; font-size: 14px; width: 100%; }
+.beta-search { flex: 1; min-width: 140px; }
+.beta-filters .secondary-button { min-height: 40px; font-size: 12px; }
+.beta-instruction, .beta-count { color: var(--muted); font-size: 13px; }
+.beta-count { margin: 8px 0 4px; }
+.beta-year { scroll-margin-top: 95px; margin-bottom: 20px; }
+.beta-year > h3 { font-size: 20px; margin: 12px 0 6px; color: var(--heading); }
+.beta-exam { border: 1px solid var(--line); border-radius: 6px; background: var(--surface); margin-bottom: 8px; scroll-margin-top: 95px; }
+.beta-exam-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 12px; background: var(--soft); border-radius: 6px 6px 0 0; }
+.beta-exam-heading > div { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.beta-exam-heading h4 { font-size: 15px; margin: 0; color: var(--heading); }
+.beta-level { color: var(--muted); font-size: 12px; }
+.beta-download { font-size: 12px; flex-shrink: 0; min-height: 36px; }
+.beta-download svg { width: 15px; height: 15px; }
+.beta-parts-caption { margin: 0; color: var(--muted); font-size: 12px; }
+.beta-parts { padding: 0 12px; }
+.beta-part { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 7px 0; }
+.beta-part + .beta-part { border-top: 1px solid var(--line); }
+.beta-part-name { min-width: 0; }
+.beta-part-name > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; }
+.beta-part-name strong { font-size: 14px; color: var(--heading); }
+.beta-duration { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.beta-part-name small { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
+.beta-part-name small strong { font-size: inherit; }
+.beta-part .practice-exam-row__actions { flex-shrink: 0; gap: 8px; }
+.beta-part .primary-button, .beta-part .secondary-button { min-height: 32px; min-width: 0; font-size: 12px; padding: 6px 10px; }
+.beta-exam-footer { position: relative; padding: 5px 12px; border-top: 1px solid var(--line); }
+.beta-progress { position: absolute; top: 10px; left: 12px; font-size: 12px; color: var(--muted); }
+.beta-details { margin-top: 0; font-size: 12px; }
+.beta-details summary, .beta-unavailable summary { cursor: pointer; color: var(--link); width: fit-content; padding: 5px 0; }
+.beta-details > summary { margin-left: auto; }
+.beta-help { margin-top: 6px; font-size: 12px; color: var(--muted); }
+.beta-help summary { cursor: pointer; width: fit-content; padding: 4px 0; color: var(--link); }
+.beta-help .simulation-note { margin: 4px 0 8px; font-size: 12px; }
+.beta-detail-content { display: grid; grid-template-columns: minmax(200px, 1fr) minmax(0, 1.2fr); gap: 20px; margin-top: 14px; }
+.beta-detail-content .grade-thresholds { position: static; width: auto; }
+.beta-detail-content .exam-statistics { margin: 0; align-self: start; }
+.beta-exam > .simulation-note { margin: 0; padding: 0 18px 12px; font-size: 11px; line-height: 1.6; }
+.beta-unavailable { font-size: 12px; max-width: 240px; }
+.beta-unavailable p { color: var(--muted); }
+.beta-exam summary:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
+@media (max-width: 1100px) {
+  .beta-part { flex-wrap: wrap; gap: 10px; }
+  .beta-part .practice-exam-row__actions { margin-left: auto; }
+}
+@media (max-width: 600px) {
+  .beta-banner .container { gap: 8px; flex-wrap: wrap; }
+  .beta-banner .container > span { display: none; }
+  .beta-filters label:not(.beta-search) { flex: 1; }
+  .beta-search { flex-basis: 100%; }
+  .beta-exam-heading { padding: 8px 12px; align-items: start; }
+  .beta-exam-heading > div { gap: 6px; }
+  .beta-exam-heading h4 { font-size: 14px; }
+  .beta-parts { padding: 0 12px; }
+  .beta-parts-caption { margin: 0; }
+  .beta-part-name { width: 100%; }
+  .beta-part .practice-exam-row__actions { margin-left: 0; width: 100%; justify-content: flex-start; flex-wrap: wrap; }
+  .beta-part .primary-button, .beta-part .secondary-button { min-height: 42px; }
+  .beta-detail-content { grid-template-columns: 1fr; }
+  .beta-exam-footer { padding: 6px 12px; }
+  .beta-progress { position: static; display: block; }
+  .beta-details > summary { margin-left: 0; }
+  .beta-part { gap: 6px; }
+  .beta-exam > .simulation-note { padding: 0 12px 12px; }
+}
+
+/* Subject-wide thresholds replace repeated exam grading tables. */
+.subject-page .practice-filters { display: block; max-height: calc(100dvh - 40px); overflow-y: auto; }
+.practice-filters .year-jump-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; }
+.practice-filters .year-jump-link { padding: 7px 5px; text-align: center; }
+.beta-subject-grades { margin-top: 16px; border-top: 1px solid var(--line-dark); padding-top: 12px; }
+.beta-subject-grades > summary { cursor: pointer; color: var(--heading); font-size: 14px; font-weight: 700; }
+.beta-subject-grades .grade-thresholds { margin-top: 10px; border-top-width: 1px; }
+.beta-subject-grades .grade-thresholds__heading h3 { display: none; }
+.beta-subject-grades .grade-thresholds__heading { padding: 7px 10px; }
+.beta-exam-footer { min-height: 34px; }
+.beta-detail-content { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 760px) {
+  .subject-page .practice-filters { position: static; max-height: none; overflow: visible; padding: 12px; }
+  .practice-filters .year-jump-list { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .beta-subject-grades { margin-top: 10px; padding-top: 10px; }
+}

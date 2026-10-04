@@ -12,6 +12,9 @@ INTERNAL_GAP_THRESHOLD = 248
 INTERNAL_GAP_MIN_HEIGHT = 120
 INTERNAL_GAP_MIN_WIDTH_RATIO = 0.18
 INTERNAL_GAP_KEEP_HEIGHT = 36
+PAGE_FOOTER_MAX_HEIGHT = 90
+PAGE_FOOTER_BOTTOM_RATIO = 0.9
+PAGE_FOOTER_MAX_DARK_RATIO = 0.06
 
 
 def grayscale_image_from_png(contents: bytes) -> Image.Image:
@@ -253,6 +256,12 @@ def trim_shaded_answer_strip(
             trimmed_y_max = y_max
 
         if right_strip_contains_task_content(
+            region,
+            strip_x_min,
+            0,
+            end_y=max(0, block_y_min - 8),
+            threshold=threshold,
+        ) or right_strip_contains_task_content(
             region,
             strip_x_min,
             block_y_max + 8,
@@ -667,6 +676,117 @@ def compact_vertical_whitespace_segments(
     return segments
 
 
+def trim_isolated_page_footer(
+    image: Image.Image,
+    x_min: int,
+    y_min: int,
+    x_max: int,
+    y_max: int,
+    *,
+    threshold: int = INTERNAL_GAP_THRESHOLD,
+    minimum_gap_height: int = INTERNAL_GAP_MIN_HEIGHT,
+    minimum_gap_width_ratio: float = INTERNAL_GAP_MIN_WIDTH_RATIO,
+    maximum_footer_height: int = PAGE_FOOTER_MAX_HEIGHT,
+    bottom_ratio: float = PAGE_FOOTER_BOTTOM_RATIO,
+    maximum_dark_ratio: float = PAGE_FOOTER_MAX_DARK_RATIO,
+    padding: int = 18,
+    scan_margin: int = 12,
+) -> tuple[int, int, int, int]:
+    """Remove a sparse running footer separated from a crop by a large blank band.
+
+    PDF text extraction occasionally extends the final task on a page down to the
+    running page number or document code. Internal-gap compaction would otherwise
+    keep that footer as a tiny second segment and place it directly below the task.
+    The conservative page-edge and density checks keep ordinary task continuations.
+    """
+
+    image_width, image_height = image.size
+    width = x_max - x_min
+    height = y_max - y_min
+    if (
+        width <= 0
+        or height <= 0
+        or y_max < image_height * bottom_ratio
+        or y_max > image_height
+        or x_min < 0
+        or x_max > image_width
+    ):
+        return x_min, y_min, x_max, y_max
+
+    margin = min(scan_margin, max(0, (width - 1) // 4))
+    scan_x_min = x_min + margin
+    scan_x_max = x_max - margin
+    if scan_x_max <= scan_x_min:
+        return x_min, y_min, x_max, y_max
+
+    region = image.crop((scan_x_min, y_min, scan_x_max, y_max)).convert("L")
+    scan_width, scan_height = region.size
+    data = region.tobytes()
+    maximum_dark_pixels = max(1, int(scan_width * 0.0015))
+    blank_rows = []
+    for row_index in range(scan_height):
+        offset = row_index * scan_width
+        row = data[offset : offset + scan_width]
+        if sum(value < threshold for value in row) <= maximum_dark_pixels:
+            blank_rows.append(row_index)
+
+    minimum_gap = max(minimum_gap_height, int(width * minimum_gap_width_ratio))
+    gaps = [
+        (start, end + 1)
+        for start, end in grouped_indices(blank_rows)
+        if end - start + 1 >= minimum_gap and start > 0 and end < scan_height - 1
+    ]
+    if not gaps:
+        return x_min, y_min, x_max, y_max
+
+    gap_start, gap_end = gaps[-1]
+    footer_height = scan_height - gap_end
+    footer_y = y_min + gap_end
+    if (
+        footer_height <= 0
+        or footer_height > maximum_footer_height
+        or footer_y < image_height * bottom_ratio
+    ):
+        return x_min, y_min, x_max, y_max
+
+    footer = region.crop((0, gap_end, scan_width, scan_height))
+    footer_data = footer.tobytes()
+    dark_ratio = sum(value < threshold for value in footer_data) / len(footer_data)
+    if dark_ratio <= 0 or dark_ratio > maximum_dark_ratio:
+        return x_min, y_min, x_max, y_max
+
+    trimmed_y_max = min(y_max, y_min + gap_start + padding)
+    if trimmed_y_max <= y_min:
+        return x_min, y_min, x_max, y_max
+    return x_min, y_min, x_max, trimmed_y_max
+
+
+def left_booklet_border_end(image: Image.Image) -> int | None:
+    """Find the long outer booklet rule, away from question text and diagrams."""
+    width, height = image.size
+    columns = []
+    for x in range(int(width * 0.075), int(width * 0.12)):
+        histogram = image.crop((x, 0, x + 1, height)).histogram()
+        if sum(histogram[:190]) >= height * 0.6:
+            columns.append(x)
+    if not columns or columns[-1] - columns[0] > 4:
+        return None
+    return columns[-1] + 2
+
+
+def trim_left_booklet_border(
+    image: Image.Image, crop_box: tuple[int, int, int, int], border_end: int | None
+) -> tuple[int, int, int, int]:
+    x_min, y_min, x_max, y_max = crop_box
+    if border_end is None or not x_min < border_end < x_min + 0.06 * image.width:
+        return crop_box
+    # The strip outside the frame must be blank; retain any real content there.
+    outside = image.crop((x_min, y_min, max(x_min + 1, border_end - 6), y_max))
+    if sum(outside.histogram()[:190]) > outside.width * 4:
+        return crop_box
+    return border_end, y_min, x_max, y_max
+
+
 def source_image_metadata(
     image: Image.Image,
     *,
@@ -677,7 +797,8 @@ def source_image_metadata(
     page: int | None = None,
     compact_internal_whitespace: bool = True,
 ) -> dict[str, Any]:
-    x_min, y_min, x_max, y_max = crop_box
+    crop_box = trim_left_booklet_border(image, crop_box, left_booklet_border_end(image))
+    x_min, y_min, x_max, y_max = trim_isolated_page_footer(image, *crop_box)
     metadata: dict[str, Any] = {
         "url": url,
         "width": image_width,

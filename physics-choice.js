@@ -60,11 +60,11 @@ function escapeHtml(value) {
 }
 
 function icon(iconName, className) {
-  if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
+  if (window.renderPhosphorIcon) return window.renderPhosphorIcon(iconName, className);
 
   return `
     <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="./assets/lucide-icons.svg#${iconName}"></use>
+      <use href="./assets/phosphor-icons.svg#${iconName}"></use>
     </svg>
   `;
 }
@@ -779,7 +779,16 @@ function bindResponseListeners() {
     input.addEventListener("change", () => updateResponse(input.dataset.question, input.value));
   });
   document.querySelectorAll("[data-open-score]").forEach((input) => {
-    input.addEventListener("input", () => updateOpenScore(input.dataset.openScore, input.value, input));
+    const markFullScore = () =>
+      input.classList.toggle(
+        "physics-open-score__input--full",
+        input.value !== "" && Number(input.max) > 0 && Number(input.value) === Number(input.max),
+      );
+    markFullScore();
+    input.addEventListener("input", () => {
+      updateOpenScore(input.dataset.openScore, input.value, input);
+      markFullScore();
+    });
   });
   document.querySelectorAll("[data-open-solution]").forEach((button) => {
     button.addEventListener("click", () => toggleOpenSolution(button));

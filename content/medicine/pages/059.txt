@@ -1,0 +1,26 @@
+76. Kamen je bačen vertikalno uvis početnom brzinom v₀ i nakon vremena
+t = t_max pada na tlo. Koji graf približno opisuje ovisnost brzine o vremenu
+za opisanu situaciju?
+
+[figure:physics-76]
+A. graf1
+B. graf2
+C. graf 3
+D. graf 4
+E. graf 5
+77. Čovjek stoji s obje noge na tlu. Ako digne jednu nogu u zrak, pritiskat će
+tlo ______ tlakom.
+A. istim
+B. dvostruko većim
+C. dvostruko manjim
+D. četverostruko manjim
+E. četverostruko većim
+78. Idealna tekućina teče u naznačenom smjeru kroz horizontalno postav-
+ljenu cijev različitih presjeka. Na slici su prikazana 4 područja različita
+presjeka brojevima od 1 do 4. Zaokruži točnu tvrdnju.
+[figure:physics-78]
+A. Statički tlak na stijenku cijevi najveći je u području 1.
+B. Statički tlak na stijenku cijevi najveći je u području 4.
+C. Dinamički tlak najveći je u području 4.
+D. Statički i dinamički tlak jednaki su u svim područjima.
+E. Statički tlak u području 4 je nula.

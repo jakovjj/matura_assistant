@@ -1,0 +1,26 @@
+82. Grijač spojen u strujni krug (kao što je prikazano na slici) zagrije 0,7 kg
+vode za 3° C u 105 s. Koliki je napon između točaka A i B ako grijačem
+prolazi struja od 4 A? Pretpostavite da je korisnost grijača 100 %. Spe-
+cifični toplinski kapacitet vode iznosi 4200 J/kgK.
+[figure:physics-82]
+
+A. 220V
+
+B. 1,9kV
+
+C. 4,7 V
+
+D. 88,2 V
+
+E. 21V
+
+83. Tri jednake žaruljice spojene su na izvor napona kao što je prikazano na
+
+slici. Što možemo zaključiti o sjaju žaruljica?
+[figure:physics-83]
+
+A. najjače svijetli žaruljica 1
+B. najjače svijetli žaruljica 2
+C. žaruljice 1 i 3 svijetle jednako, ali slabije od žaruljice 2
+D. najjače svijetli žaruljica 3
+E. žaruljice 1 i 2 svijetle jednako, ali jače od žaruljice 3

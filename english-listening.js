@@ -33,13 +33,13 @@ const audioSettingsStorageKey = "asistent-za-mature:english-listening:audio-sett
 const audioPlaybackRates = [1, 1.5];
 
 const audioIcons = {
-  play: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.54.84l10.79-6.86a1 1 0 0 0 0-1.68L9.54 4.3A1 1 0 0 0 8 5.14Z"/></svg>',
+  play: '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="./assets/phosphor-icons.svg#play"></use></svg>',
   pause:
-    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
+    '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="./assets/phosphor-icons.svg#pause"></use></svg>',
   volume:
-    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 9v6h4l5 5V4L8 9H4Z"/><path d="M16.5 8.5a5 5 0 0 1 0 7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M19 6a8 8 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="./assets/phosphor-icons.svg#speaker-high"></use></svg>',
   muted:
-    '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 9v6h4l5 5V4L8 9H4Z"/><path d="m16 9 5 5m0-5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
+    '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="./assets/phosphor-icons.svg#speaker-slash"></use></svg>',
 };
 
 let solverExam;
@@ -93,11 +93,11 @@ function checkButtonClass() {
 }
 
 function icon(iconName, className) {
-  if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
+  if (window.renderPhosphorIcon) return window.renderPhosphorIcon(iconName, className);
 
   return `
     <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="./assets/lucide-icons.svg#${iconName}"></use>
+      <use href="./assets/phosphor-icons.svg#${iconName}"></use>
     </svg>
   `;
 }

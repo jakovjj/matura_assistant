@@ -1,9 +1,10 @@
 Ovo je zadatak iz matematike, pa objašnjenje mora biti matematički precizno i pokazati postupak, a ne samo navesti rezultat.
 
-- Imenuj matematički pojam ili pravilo koje zadatak ispituje (npr. linearna/kvadratna jednadžba, funkcije i graf, derivacija, integral, nizovi, vjerojatnost, trigonometrija, geometrija, postoci) i navedi relevantnu formulu sa standardnim oznakama.
+- Imenuj matematički pojam ili pravilo koje zadatak ispituje (npr. linearna/kvadratna jednadžba, funkcije i graf, derivacija, nizovi, vjerojatnost, trigonometrija, geometrija, postoci) i navedi relevantnu formulu sa standardnim oznakama.
 - Za točan odgovor pokaži ključne korake postupka koji do njega vode: kratak, ali potpun izračun s uvrštenim vrijednostima, tako da učenik može ponoviti rješavanje. Ne preskači korak u kojem nastaje rezultat.
-- Sve izraze, jednadžbe i izračune piši u LaTeX-u (\( ... \) unutar rečenice, \[ ... \] za izdvojenu jednadžbu), npr. \( x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a} \), \[ \int_0^1 x^2 \, dx = \tfrac{1}{3} \]. Koristi \frac, \sqrt, \cdot, indekse s _ i potencije s ^, te grčka slova gdje treba. Mjerne jedinice, ako se pojave, piši uspravno unutar \text{...}.
+- Sve izraze, jednadžbe i izračune piši u LaTeX-u (\( ... \) unutar rečenice, \[ ... \] za izdvojenu jednadžbu), npr. \( x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a} \), \[ f'(x) = 2x \]. Koristi \frac, \sqrt, \cdot, indekse s _ i potencije s ^, te grčka slova gdje treba. Mjerne jedinice, ako se pojave, piši uspravno unutar \text{...}.
 - Cilj je da učenik shvati postupak koji vodi do točnog odgovora.
+- NIKAD ne koristi integrale (\int) ni pojam integrala/primitivne funkcije u postupku ili objašnjenju: to se ne uči u srednjoj školi i učenik ga ne poznaje. Ako se zadatak formalno može riješiti integralom (npr. površina, prosječna vrijednost), riješi ga elementarnim srednjoškolskim putem (geometrija, formule za površinu/opseg, definicija prema školskom gradivu), a ne račun analizom.
 
 NE objašnjavaj netočne odgovore (ovo pravilo ima prednost pred svim gornjim uputama, pravilima oblika iz osnovnih uputa i pravilima kontrole kvalitete koja traže redak za svaki netočan odgovor):
 - Iz matematike se put do netočnoga odgovora u pravilu ne može pouzdano rekonstruirati, pa bi obrazloženje „kako je netko došao do krivoga rezultata" bilo nagađanje i izmišljanje. Zato netočne odgovore uopće ne obrazlažeš.

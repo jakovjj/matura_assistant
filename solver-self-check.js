@@ -8,11 +8,11 @@
   }
 
   function icon(name) {
-    if (window.renderLucideIcon) return window.renderLucideIcon(name, "inline-check-button__icon");
+    if (window.renderPhosphorIcon) return window.renderPhosphorIcon(name, "inline-check-button__icon");
 
     return `
       <svg class="inline-check-button__icon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-        <use href="./assets/lucide-icons.svg#${name}"></use>
+        <use href="./assets/phosphor-icons.svg#${name}"></use>
       </svg>
     `;
   }

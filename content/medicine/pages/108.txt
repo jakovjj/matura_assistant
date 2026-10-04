@@ -1,0 +1,31 @@
+16. Koja nukleinska kiselina ulazi u translaciju?
+A. mRNA
+B. pre-mRNA
+C. rRNA
+D. hnRNA
+E. sve vrste RNA
+17. Koji od navedenih je STOP kodon?
+A. AUG
+B. UUU
+C. UAC
+D. UAA
+E. UUG
+18. Krajnji cilj proizvodnje genetičkim inženjerstvom u bakterijskoj stanici
+jest proizvodnja:
+A. DNA
+B. RNA
+C. proteina
+D. mRNA
+E. pre-mRNA
+19. Prije translacije primarni transkript se mora obraditi. Pri tome gubi:
+A. egzone
+B. introne
+C. poliA rep
+D. kapu
+E. 5-metilgvanozin kapu
+20. ATP se proizvodi:
+A. aktivnim transportom elektrona
+B. aktivnim transportom protona
+C. samo u prokariotskoj stanici
+D. samo u eukariotskoj stanici
+E. oksidativnom fosforilacijom

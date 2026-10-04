@@ -31,6 +31,7 @@ from open_answer_validation import (
     is_excluded_task_text,
     repair_open_answer_boundaries,
 )
+from generated_data_revision import update_data_revision
 from manual_solution_images import (
     attach_manual_solution_images,
     build_manual_solution_images,
@@ -286,7 +287,9 @@ def is_key_name(name: str) -> bool:
     normalized = normalized_name(name)
     if "list" in normalized or "prag" in normalized:
         return False
-    return bool(re.search(r"klju|kljuc|rje[šs]enja|rjesenja", normalized))
+    # ".?" absorbs the stray char when a ZIP stores "rješenja" without the UTF-8
+    # flag and Python decodes the diacritic via cp437 (e.g. 2026 "Rjeτenja...").
+    return bool(re.search(r"klju|kljuc|rje.?enja|rjesenja", normalized))
 
 
 def find_key_name(names: list[str]) -> str:
@@ -960,6 +963,7 @@ def main() -> None:
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     serialized = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     OUTPUT.write_text(f"{OUTPUT_PREFIX}{serialized};\n", encoding="utf-8")
+    update_data_revision(ROOT, OUTPUT, serialized)
 
     print(f"Wrote {len(exams)} Politics practice exams to {OUTPUT.relative_to(ROOT)}")
     if skipped:

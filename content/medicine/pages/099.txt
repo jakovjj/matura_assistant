@@ -1,0 +1,14 @@
+101. Što od navedenoga NIJE točno za vanilin prikazan na slici?
+[figure:chemistry-101]
+A. Sadržava etersku, karbonilnu i hidroksilnu (fenolnu) funkcionalnu skupinu.
+B. Redukcijom daje 1,4-dihidroksi-3-metoksibenzen.
+C. Sustavno ime mu je 4-hidroksi-3-metoksibenzaldehid.
+D. Redukcijom daje 4-hidroksimetil-2-metoksifenol.
+E. Oksidacijom daje 4-hidroksi-3-metoksibenzojevu kiselinu.
+102. Što od navedenoga NIJE točno za prikazanu molekulu?
+[figure:chemistry-102]
+A. Strukturna je komponenta saharoze.
+B. Strukturni je izomer fruktoze.
+C. Enantiomer je: [figure:chemistry-102-c]
+D. Strukturna je komponenta laktoze.
+E. Dijastereoizomer je glukoze.

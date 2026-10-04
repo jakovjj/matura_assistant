@@ -24,6 +24,7 @@ from crop_utils import (
     source_image_metadata,
     trim_crop_bottom_whitespace,
 )
+from pdf_crop_layout import HorizontalRule, detect_horizontal_rules
 from pdf_utils import pdftotext, png_dimensions, render_pdf_page_to_png
 
 
@@ -141,14 +142,6 @@ class OpenQuestionMarker:
 @dataclass(frozen=True)
 class QuestionCrop:
     page: PdfPage
-    x_min: float
-    y_min: float
-    x_max: float
-    y_max: float
-
-
-@dataclass(frozen=True)
-class HorizontalRule:
     x_min: float
     y_min: float
     x_max: float
@@ -510,6 +503,8 @@ def find_solution_page_crops(
     rules_by_page = detect_horizontal_rules(
         contents,
         {marker.page.number: marker.page for marker in markers},
+        dpi=SOURCE_RENDER_DPI,
+        minimum_width_ratio=SOLUTION_TABLE_RULE_MIN_WIDTH_RATIO,
     )
     crops: dict[int, QuestionCrop] = {}
     points: dict[int, str] = {}
@@ -652,84 +647,6 @@ def write_if_changed(path: Path, contents: bytes) -> None:
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(contents)
-
-
-def longest_dark_run(row: bytes, threshold: int = 180) -> tuple[int, int, int]:
-    best_start = 0
-    best_length = 0
-    current_start: int | None = None
-
-    for index, value in enumerate(row):
-        if value < threshold:
-            if current_start is None:
-                current_start = index
-            continue
-
-        if current_start is not None:
-            length = index - current_start
-            if length > best_length:
-                best_start = current_start
-                best_length = length
-            current_start = None
-
-    if current_start is not None:
-        length = len(row) - current_start
-        if length > best_length:
-            best_start = current_start
-            best_length = length
-
-    return best_start, best_start + best_length, best_length
-
-
-def detect_horizontal_rules(contents: bytes, pages: dict[int, PdfPage]) -> dict[int, list[HorizontalRule]]:
-    rules_by_page: dict[int, list[HorizontalRule]] = {}
-    with tempfile.TemporaryDirectory() as temporary_directory:
-        temporary_root = Path(temporary_directory)
-        pdf_path = temporary_root / "source.pdf"
-        pdf_path.write_bytes(contents)
-
-        for page_number, page in sorted(pages.items()):
-            temporary_prefix = temporary_root / f"rules-{page_number}"
-            render_pdf_page_to_png(
-                pdf_path,
-                temporary_prefix,
-                page_number,
-                SOURCE_RENDER_DPI,
-                required_message="pdftocairo is required to locate Physics solution rows",
-                failure_prefix="pdftocairo failed while locating solution rows",
-            )
-
-            image = Image.open(temporary_prefix.with_suffix(".png")).convert("L")
-            width, height = image.size
-            scale_x = width / page.width
-            scale_y = height / page.height
-            minimum_run = int(width * SOLUTION_TABLE_RULE_MIN_WIDTH_RATIO)
-            candidates: list[tuple[int, int, int]] = []
-            pixels = image.load()
-            for y in range(height):
-                row = bytes(pixels[x, y] for x in range(width))
-                x_min, x_max, run_length = longest_dark_run(row)
-                if run_length >= minimum_run:
-                    candidates.append((y, x_min, x_max))
-
-            groups: list[list[tuple[int, int, int]]] = []
-            for candidate in candidates:
-                if groups and candidate[0] <= groups[-1][-1][0] + 1:
-                    groups[-1].append(candidate)
-                else:
-                    groups.append([candidate])
-
-            rules_by_page[page_number] = [
-                HorizontalRule(
-                    x_min=min(candidate[1] for candidate in group) / scale_x,
-                    y_min=min(candidate[0] for candidate in group) / scale_y,
-                    x_max=max(candidate[2] for candidate in group) / scale_x,
-                    y_max=(max(candidate[0] for candidate in group) + 1) / scale_y,
-                )
-                for group in groups
-            ]
-
-    return rules_by_page
 
 
 def render_source_pages(
@@ -950,6 +867,15 @@ def parse_question(block: str, number: int) -> ParsedQuestion:
 
     for line in lines:
         option_matches = list(re.finditer(r"(?<!\S)([A-D])\.\s*", line))
+        if not option_matches and option_items:
+            # Some official numeric options omit the label's dot (2026 autumn,
+            # question 20: "B 2"). Require the next label, at the start of a
+            # line, followed by a number so prose/variables are not options.
+            next_label = chr(ord(option_items[-1]["label"]) + 1)
+            if next_label in "BCD":
+                missing_dot = re.match(rf"^\s*({next_label})\s+(?=\d)", line)
+                if missing_dot:
+                    option_matches = [missing_dot]
 
         if option_matches:
             prefix = line[: option_matches[0].start()].strip()

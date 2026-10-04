@@ -1,0 +1,29 @@
+39. Kolika je razlika težine čovjeka kada se nalazi na površini Zemlje u od-
+nosu na njegovu težinu kad se nalazi na vrhu planine visoke 8000 m?
+Polumjer Zemlje je 6371 km. Težina se na površini Zemlje:
+
+A. poveća za 0,25 %
+B. smanji za 0,25 %
+C. poveća za 2,5 %
+D. neće promijeniti
+E. smanji za 2,5 %
+
+40. Paket je privezan za padobran i ispušten je iz aviona. Kada se nalazi 300
+m ispod aviona, padobran se otvara i paket pada 6 s do površine Zemlje.
+Akceleracija paketa se smanjila za čak 8 m/s² zbog otvaranja padobrana.
+Na kojoj se visini u odnosu na tlo nalazio avion kad je paket ispušten?
+(g=10 m/s²).
+
+A. 336 m
+B. 909m
+C. 800m
+D. 500m
+E. 609m
+41. Štap je učvršćen u točci O oko koje može rotirati. U kojem od navedenih
+slučajeva štap NEĆE rotirati?
+[figure:physics-41]
+A. u prvom i petom slučaju
+B. u drugom i trećem slučaju
+C. u prvom i drugom slučaju
+D. u petom i šestom slučaju
+E. u četvrtom i šestom slučaju

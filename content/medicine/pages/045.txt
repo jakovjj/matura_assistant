@@ -1,0 +1,38 @@
+31. Odredite udaljenost na kojoj se nalazi slika predmeta dobivena konver-
+gentnom lećom žarišne duljine f ako se predmet nalazi na udaljenosti
+3f/2 od leće!
+
+A. f
+
+B. f/3
+C. 2f/3
+D. 3f
+E. 3f/5
+
+32. Elektron mase m i naboja q ubrzan u električnom polju ima valnu duljinu
+
+λ. Odredite napon kojim je elektron ubrzan!
+A. h²/(2qmλ²)
+B. h/(2qλ)
+C. mh²/(qλ)
+D. h/(qλ)
+E. q/(2hλ)
+
+33. Valna duljina jedne od linija iz Balmerova niza vodikova spektra iznosi
+656 nm. Iz kojeg je dijela elektromagnetnog spektra?
+
+A. infracrvenog
+B. vidljivog
+C. mikrovalnog
+D. ultraljubičastog
+E. rendgenskog
+
+34. Energija potrebna za fotokemijsku reakciju iznosi 5·10⁻¹⁹ J po mo-
+lekuli. Koliko približno iznosi valna duljina apsorbiranog fotona?
+(h = 6,626·10⁻³⁴ Js)
+
+A. 200 μm
+B. 500 μm
+C. 400 nm
+D. 200 nm
+E. 500 nm

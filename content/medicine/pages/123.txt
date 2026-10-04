@@ -1,0 +1,16 @@
+69. Elongacija tijela koje harmonijski titra u ovisnosti o vremenu prikazana
+je na grafu. Koja od ponuđenih jednadžbi opisuje elongaciju tijela?
+[figure:exam-69]
+A. y(t) = 4 m sin ((3π/4) s⁻¹ t)
+B. y(t) = 16 m sin ((8π/3) s⁻¹ t)
+C. y(t) = 4 m sin (π s⁻¹ t)
+D. y(t) = 4 m sin (2 s⁻¹ t)
+E. y(t) = 8 m sin (4 s⁻¹ t)
+70. Na glazbenom koncertu slušatelj se nalazi na određenoj udaljenosti
+od zvučnika. Čestice zraka pokrenute titranjem membrane zvučnika
+______ do uha slušatelja.
+A. gibaju se pravocrtno od zvučnika
+B. titraju okomito na smjer širenja zvuka
+C. titraju u smjeru širenja zvuka i na taj način dođu
+D. titraju u smjeru širenja zvuka i na taj način prenose energiju zvuka
+E. titraju okomito na smjer širenja zvuka i na taj način prenose energiju zvuka

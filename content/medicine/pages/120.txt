@@ -1,0 +1,22 @@
+61. Strujni krug se sastoji od dvije paralelne grane vezane na izvor napona
+od 12 V. U jednoj grani se nalazi otpornik R1 otpora 6 Ω, a u drugoj su
+dva serijski spojena otpornika R2 = 4 Ω i R3 = 8 Ω. Kolika je toplina pro-
+izvedena na otporniku R1 tijekom vremenskog intervala od 3 s, ako se
+50 % električne energije pretvori u toplinu?
+
+A. 2J
+
+B. 12J
+C. 24 J
+D. 36J
+E. 72 J
+
+62. Elektron se giba u blizini duge ravne žice kojom teče električna struja.
+Na elektron djeluje Lorentzova sila paralelna vodiču kako je prikazano
+na slici. Smjer brzine elektrona je ______.
+[figure:exam-62]
+A. prema žici
+B. od žice
+C. jednak smjeru električne struje
+D. suprotan smjeru električne struje
+E. okomit na ravninu u kojoj se nalaze žica i Lorentzova sila

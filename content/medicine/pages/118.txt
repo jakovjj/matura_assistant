@@ -1,0 +1,18 @@
+55. Koje su od navedenih tvrdnji točne?
+I. Tijekom izotermnog procesa plin ne izmjenjuje toplinu s okolinom, što
+je opisano jednadžbom: Q = 0.
+II. Tijekom izohornog procesa volumen plina je nepromijenjen.
+III. Unutarnja energija idealnog plina ovisi o temperaturi.
+A. samo II.
+B. samo III.
+C. I. i III.
+D. II. i III.
+E. I., II. i III.
+56. Grafički prikazi međusobne ovisnosti termodinamičkih veličina dane su
+na slikama ispod. Koji je odgovor točan?
+[figure:exam-56]
+A. graf 1:a — izoterma, b — izobara
+B. graf 2: b - izohora, c — izoterma
+C. graf 3: a — izoterma, c — izohora
+D. graf 4: a — izobara, c — izoterma
+E. graf 5: b — izobara, c — izohora

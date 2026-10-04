@@ -44,8 +44,6 @@ EXCLUDED_SUBJECTS = {
     "Njemački jezik",
     "Psihologija",
     "Sociologija",
-    "Talijanski jezik",
-    "Talijanski jezik i književnost",
     "Vjeronauk",
 }
 DURATION_FALLBACKS = {

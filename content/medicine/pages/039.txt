@@ -1,0 +1,22 @@
+11. Na slici su prikazane promjene stanja plina u pV dijagramu. Odredite o
+kojim se promjenama stanja plina radi redom: A → B, B → C, C → D!
+[figure:physics-11]
+A. adijabatska, izobarna, izotermna
+B. izobarna, izohorna, adijabatska
+C. izobarna, izobarna, izohorna
+D. izotermna, izobarna, izohorna
+E. izotermna, izobarna, adijabatska
+12. Ovisnost srednje kinetičke energije molekula plina o temperaturi je:
+A. linearna funkcija prikazana pravcem čiji nagib ovisi o masi molekule
+B. linearna funkcija prikazana pravcem koji prolazi kroz točku (0,3/2)
+C. eksponencijalna funkcija
+D. linearna funkcija prikazana pravcem koji prolazi kroz ishodište
+E. kvadratna funkcija
+13. Koliko je vremena potrebno za zagrijavanje 50 L vode u električnom boj-
+leru od 10 °C do vrelišta, ako grijač ima snagu 2 kW? (specifični toplinski
+kapacitet vode je 4200 J/kgK)
+A. 18900 s
+B. 2h37 min
+C. 157h
+D. 18,9 s
+E. 9min

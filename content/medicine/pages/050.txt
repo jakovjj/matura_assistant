@@ -1,0 +1,42 @@
+46. Posuda oblika kvadra pregradom je podijeljena u dva dijela tako da se
+visine tih dijelova odnose kao 4:1. U većem dijelu je vakuum, a u manjem
+dijelu je plin pod tlakom p. Koliki će biti tlak u posudi nakon uklanjanja
+pregrade ako se temperatura pri tome ne mijenja?
+
+A. p/4
+B. p/2
+C. p/5
+D. p
+
+E. p/3
+
+47. Plin se izobarno ohladio za 70 K, pri čemu se volumen smanjio za 20 %.
+Odredite konačnu temperaturu plina!
+
+A. 300 K
+B. 87K
+C. 350K
+D. 157K
+E. 280 K
+
+48. Baterija se puni 15 minuta na izvoru napona od 12 V i jakosti struje od
+11 A. Tijekom punjenja baterija se grije i izgubi 12 kJ topline. Kolika je
+promjena unutarnje energije baterije?
+
+A. 130,8 kJ
+B. -10,02 kJ
+C. 106,8 kJ
+D. 144 kJ
+
+E. 132 kJ
+
+49. Slika prikazuje tri pozitivna točkasta naboja. Ako je rezultanta elek-
+trična sila na središnji naboj jednaka nuli, kolika je omjer udaljenosti
+između naboja y/x?
+
+[figure:physics-49]
+A. 4/9
+B. (3/2)¹ᐟ²
+C. (2/3)¹ᐟ²
+D. 3/2
+E. 9/4

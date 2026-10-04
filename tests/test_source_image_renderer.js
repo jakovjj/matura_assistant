@@ -30,6 +30,23 @@ if (!compact.includes("source-crop--segmented") || !compact.includes("800 / 220"
   throw new Error("Segmented source crop was not rendered");
 }
 
+const footerSource = {
+  ...source,
+  height: 1684,
+  crop: { x: 100, y: 200, width: 800, height: 1412 },
+  segments: [
+    { x: 100, y: 200, width: 800, height: 120 },
+    { x: 100, y: 1576, width: 800, height: 36 },
+  ],
+};
+const withoutFooter = context.window.renderSourceImageCrop(footerSource, "Rješenje");
+const renderedSegments = withoutFooter.match(/class="source-crop-segment"/g) || [];
+if (!withoutFooter.includes("source-crop--segmented") ||
+    !withoutFooter.includes("800 / 120") ||
+    renderedSegments.length !== 1) {
+  throw new Error("A legacy footer-only segment was not ignored safely");
+}
+
 const overlay = context.window.renderSourceImageCrop(source, "Zadatak", {
   overlayHtml: "<button>Odgovor</button>",
 });

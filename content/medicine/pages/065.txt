@@ -1,0 +1,26 @@
+94. Na valnoj duljini od 589 nm pleksiglas ima indeks loma približno 50 %
+veći od zraka. Kolika je otprilike brzina ove crvenonarančaste svjetlosti
+u pleksiglasu?
+A. ista je kao brzina svjetlosti u vakuumu
+B. za trećinu je manja od brzine svjetlosti u vakuumu
+C. za 50 % je manja od brzine svjetlosti u vakuumu
+D. za dvije trećine je manja od brzine svjetlosti u vakuumu
+E. za dvije trećine je manja od brzine svjetlosti u vakuumu
+95. Leća stvara oštru, obrnutu sliku svjetlećeg objekta na udaljenom zasto-
+ru, kao što je prikazano na slici. Što će se vidjeti na zastoru ako se leća
+ukloni?
+[figure:physics-95]
+A. slika objekta bit će obrnuta i mutna
+B. slika objekta bit će uspravna i oštra
+C. slika objekta bit će uspravna i mutna
+D. slika objekta ostat će obrnuta i oštra
+E. neće biti slike objekta
+96. Ultraljubičasti fotoni energija 4,14 eV mogu utjecati na rast i razvoj sta-
+nica u organizmu, dok fotoni energija 4,7 eV prekidaju kemijske veze u
+molekulama vode. Kolika je razlika u valnoj duljini spomenutih fotona?
+(h = 6,624·10⁻³⁴ Js)
+A. 12,4nm
+B. 3,58 nm
+C. 124 nm
+D. 35,8 nm
+E. 1,24 nm

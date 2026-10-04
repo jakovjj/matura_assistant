@@ -1,0 +1,33 @@
+16. Transformaciju možete spriječiti ako:
+A. bakterije prethodno uzgajate na hranjivoj podlozi
+B. potičete vezivanje bakteriofaga na stijenku bakterija
+C. onemogućite stvaranje citoplazmatskog mostića tijekom konjugacije
+D. u medij u kojemu uzgajate bakterije dodate enzim DNazu
+E. uklonite plazmide iz bakterije
+17. Primijetili ste da se radioaktivni uracil nakuplja u jezgri i potom ide u
+citoplazmu. Zahvaljujući tome možete zaključiti da:
+A. se sinteza DNA i RNA odvija u jezgri
+B. su ribosomi građeni od RNA
+C. RNA nakon sinteze u jezgri odlazi u citoplazmu
+D. su ribosomi vezani uz membranu endoplazmatskog retikuluma
+E. je RNA molekula evolucijski starija od DNA
+18. Uloga tRNA je da:
+A. omogući mjesto za sintezu proteina
+B. transportira aminokiseline do ribosoma
+C. putuje do ribosoma i upravlja sintezom proteina
+D. prepiše DNA
+E. prevodi DNA
+19. Parentalna generacija u autosomno-recesivne bolesti uzrokovane muta-
+cijom m je:
+A. MM x Mm
+B. MmxMm
+C. Mm x mm
+D. MM x mm
+E. mm x Mm
+20. Međusobnim križanjem F1 generacije kod dihibridnog križanja nastaju
+potomci s genotipovima:
+A. Aa, Bb
+B. aa, Aa, AA
+C. AB, Ab, BB
+D. AB, Ab, aB, ab
+E. AABB, AAbb, AABb, AaBb, AaBB, Aabb, aabb, aaBB, aaBb

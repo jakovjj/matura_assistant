@@ -1,0 +1,21 @@
+63. Kroz dva vodiča, prikazana na slici, teku struje jednakog iznosa, a su-
+protnog smjera. Što se može zaključiti o magnetnom polju u točki T,
+točno u sredini između dva vodiča?
+
+[figure:exam-63]
+A. usmjereno je prema sjeveru
+B. usmjereno je prema jugu
+C. usmjereno je prema zapadu
+D. usmjereno je prema istoku
+E. jakost magnetnog polja je nula
+
+64. Prsten debljine 1 mm i promjera 1,6 cm nalazi se u magnetnom polju
+10 mT. Koliki je magnetni tok kroz površinu omeđenu prstenom (obo-
+jano sivo) ako silnice magnetnog polja izlaze iz ravnine papira? (Napo-
+mena: označene dimenzije na slici nisu prikazane realno.)
+[figure:exam-64]
+A. 25,6 mWb
+B. 1,54 mWb
+C. 80,4 mWb
+D. 31,4 nWb
+E. 7,07 mWb

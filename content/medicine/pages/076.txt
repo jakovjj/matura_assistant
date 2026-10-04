@@ -1,0 +1,28 @@
+17. Koja je od sljedećih tvrdnji vezanih za navedeni galvanski članak točna?
+Ag(s) | Ag⁺(aq) || Au³⁺(aq) | Au(s)
+E°(Ag⁺/Ag) = 0,799 V; E°(Au³⁺/Au) = 1,520 V
+A. Au³⁺(aq) je reducens, a Ag(s) je oksidans.
+B. Na katodi se odvija sljedeća polureakcija: Ag⁺(aq) + e⁻ → Ag(s).
+C. Na anodi se odvija sljedeća polureakcija: Au(s) → Au³⁺(aq) + 3e⁻.
+D. Broj izmijenjenih elektrona iznosi tri.
+E. Napon članka iznosi -0,721 V.
+18. Koji od sljedećih metala tvori okside u kojima može imati više od jednog
+oksidacijskog stanja?
+A. rubidij
+B. mangan
+C. aluminij
+D. stroncij
+E. zlato
+19. Za oksokiseline klora vrijedi da:
+A. jakost kiseline opada s porastom oksidacijskog broja klora
+B. jakost kiseline raste s porastom broja atoma kisika u molekuli kiseline
+C. su sve gotovo jednako jake jer sadržavaju jedan atom vodika
+D. jakost kiseline raste sa smanjenjem broja atoma kisika u molekuli kiseline
+E. jakost kiseline raste sa smanjenjem oksidacijskog broja klora
+20. Koja skupina periodnog sustava elemenata sadržava elemente u sva tri
+agregatna stanja (pri 25°C i 100 kPa)?
+A. halkogeni elementi
+B. zemnoalkalijski metali
+C. cinkova skupina
+D. halogeni elementi
+E. ugljikova skupina

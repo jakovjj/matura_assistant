@@ -1,0 +1,44 @@
+4. Jednoliko kružno gibanje je gibanje sa stalnom akceleracijom, ali i stal-
+nim iznosom brzine. Što možemo zaključiti?
+
+A. II. Newtonov zakon se ne može primijeniti na kružno gibanje jer zakon
+vrijedi samo za pravocrtno gibanje.
+
+B. Na tijelo koje se giba kružno djeluju centripetalna i centrifugalna sila jed-
+nakog iznosa.
+
+C. Smjer obodne brzine se mijenja.
+
+D. I. Newtonov zakon se ne može primijeniti na kružno gibanje s obzirom na
+to da je iznos obodne brzine stalan, a centripetalna sila je različita od nule.
+
+E. Na jednoliko kružno gibanje se može primijeniti samo III. Newtonov zakon
+jer je on valjan i za pravocrtno i kružno gibanje.
+
+5. Sara se vrijedno pripremala za razredbeni ispit na medicini. Prvu če-
+tvrtinu priprema je rješavala 80 zadataka dnevno, a u drugom dijelu
+priprema je uspijevala samo 40 zadataka na dan. Koliko je prosječno
+zadataka rješavala na dan tijekom priprema?
+
+A. 60
+B. 50
+C. 70
+D. 45
+E. 55
+
+6. Lucija je bacila loptu uvis početnom brzinom v₀. Na maksimal-
+
+noj visini lopta ima: potencijalnu energiju ______, brzinu
+______ i akceleraciju ______. Dopuni rečenicu!
+
+A. maksimalnu, različitu od nule i manju od v₀, manju od akceleracije slobod-
+
+nog pada
+
+B. jednaku nuli, jednaku nuli, jednaku nuli
+
+C. maksimalnu, jednaku nuli, jednaku negativnoj akceleraciji slobodnog pada
+
+D. maksimalnu, jednaku nuli, jednaku akceleraciji slobodnog pada
+
+E. maksimalnu, maksimalnu, maksimalnu

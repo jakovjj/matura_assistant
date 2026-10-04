@@ -1,0 +1,35 @@
+14. Držimo li negativno nabijenu kuglu kraj neutralne metalne šipke, one
+će se međusobno privlačiti. To se događa zbog:
+A. magnetnog učinka
+B. prelaska elektrona s kugle na šipku
+C. razdvajanja naboja u metalnoj šipci
+D. suprotnog naboja kugle i šipke
+E. prelaska pozitivnih iona s metalne šipke na kuglu
+15. Tri identične žarulje spojene su u paraleli na izvor napona. Što će se
+dogoditi ako srednja žarulja pregori?
+A. sve žarulje će se ugasiti
+B. sjaj druge dvije žarulje će oslabjeti, ali se neće ugasiti
+C. sjaj druge dvije žarulje će se pojačati
+D. sjaj druge dvije žarulje neće se promijeniti
+E. krugom će poteći veća struja
+16. Ukupan otpor paralelno spojenih otpornika u strujnom krugu je:
+A. jednak zbroju otpora svih otpornika
+B. veći od otpora bilo kojeg otpornika
+C. jednak prosječnom otporu svih otpornika
+D. jednak otporu najmanjeg otpornika
+E. manji od otpora bilo kojeg otpornika
+17. Negativno nabijena čestica giba se u bilizini duge ravne žice kojom prola-
+zi struja. Na česticu će djelovati sila paralelna smjeru struje ako je smjer
+gibanja čestice:
+A. prema žici
+B. od žice
+C. u istom smjeru kao i struja
+D. u smjeru suprotnom od struje
+E. okomitom na ravninu u kojoj se nalazi vodič i Lorentzova sila
+18. Što se događa s paralelnim žicama kroz koje prolazi struja u suprotnim
+smjerovima?
+A. odbijaju se
+B. privlače se
+C. ništa se ne događa
+D. struja u žicama prestaje teći
+E. struje mijenjaju smjer

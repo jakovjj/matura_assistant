@@ -1,0 +1,26 @@
+69. Na tijelo djeluju sile F₁ od 10 N i F₂ od 8 N, kako je prikazano na slici.
+Odredite x-komponentu ukupne sile na tijelo!
+[figure:physics-69]
+A. F_x = 1N
+B. F_x = 10 N
+C. F_x = 9N
+D. F_x = 8N
+E. F_x = 2 N
+
+70. Iznos magnetne indukcije od 1 μT odgovara:
+
+A. 10⁻³ Wb/m²
+B. 10⁻¹⁰ Wb/cm²
+C. 10⁻⁹ Wb·cm²
+D. 10⁻⁶ Wb·m²
+E. 10⁻¹⁰ Wb/m²
+
+71. Na krajevima homogene daske mase 20 kg i duljine 4 m njišu se dva dje-
+čaka masa 15 kg i 20 kg. Na kojoj približnoj udaljenosti od težišta daske
+treba poduprijeti dasku da bi bila u ravnoteži?
+
+A. 2,30 m
+B. 30 cm
+C. 2,20 m
+D. 20cm
+E. 0 cm

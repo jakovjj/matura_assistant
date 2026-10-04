@@ -1,0 +1,35 @@
+66. Zagrijavanjem prirodnog gipsa na temperaturi između 100 °C i 120 °C
+(proces kalcinacije) dolazi do njegove djelomične dehidratacije i nasta-
+janja pečenog gipsa koji se u medicini rabi za imobilizaciju lomova.
+CaSO₄·2H₂O(s) ⇆ CaSO₄·0,5H₂O(s) + 1,5H₂O(g)
+
+Izračunajte masu vodene pare koja nastaje uslijed zagrijavanja 35 kg
+prirodnog gipsa.
+A. 2,44 kg
+B. 7,32 kg
+C. 3,66 kg
+D. 1,83 kg
+E. 5,49 kg
+67. Fiziološka otopina je vodena otopina natrijeva klorida masenog udjela
+0,9 %. To znači da sadržava:
+A. 90 mg soli u 1000 mg otapala
+B. 0,90 g soli u 100 g otopine
+C. 0,0090 g soli u 100 g otopine
+D. 0,0090 g soli u 1,0090 mL otopine
+E. 0,90 g soli u 100 mL otopine
+68. Pomak položaja ravnoteže ulijevo navedene egzotermne reakcije uzro-
+kovat će:
+CO₂(g) + H₂(g) ⇆ CO(g) + H₂O(g)
+A. zagrijavanje
+B. povišenje tlaka
+C. dodatak katalizatora
+D. sniženje tlaka
+E. hlađenje
+69. Znatno različite osmotske tlakove pri 25°C imat će vodene otopine
+______ i ______ jednakih koncentracija, 0,01 mol/L. (Pretpostavite
+potpunu disocijaciju elektrolita.)
+A. fruktoze; etanola
+B. magnezijeva sulfata; natrijeva acetata
+C. kalijeva hidrogenfosfata; kalcijeva klorida
+D. glukoze; ureje
+E. glicerola; amonijeva nitrata

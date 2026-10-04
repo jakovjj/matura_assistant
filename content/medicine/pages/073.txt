@@ -1,0 +1,26 @@
+5. Što od navedenog NIJE čista tvar?
+A. bronca
+B. bijeli fosfor
+C. suhi led
+D. tekući dušik
+E. dijamant
+6. Broj kiralnih ugljikovih atoma u lančastom obliku molekule fruktoze
+iznosi A, dok je u cikličkom furanoznom obliku molekule fruktoze jed-
+nak B.
+A. A=6;B=6
+B. A=4;B=4
+C. A=3;B=4
+D. A=4; B=3
+E. A=3;B=3
+7. Voda (V), dimetilsulfoksid (D) i cikloheksan (C) otapala su čije gustoće
+pri 20 °C iznose ρ(C₆H₁₂) = 0,78 g/mL, ρ(H₂O) = 1,00 g/mL i ρ(C₂H₆OS) =
+1,10 g/mL. Poznato je da se voda i dimetilsulfoksid međusobno miješaju,
+dok se cikloheksan ne miješa ni s vodom niti s dimetilsulfoksidom. Koja
+od sljedećih slika prikazuje smjesu pripravljenu miješanjem 1 mL vode,
+1 mL dimetilsulfoksida i 1 mL cikloheksana nakon izmućkivanja?
+[figure:chemistry-7]
+A. Prikaz A
+B. Prikaz B
+C. Prikaz C
+D. Prikaz D
+E. Prikaz E

@@ -46,11 +46,11 @@ function escapeHtml(value) {
 }
 
 function icon(iconName, className) {
-  if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
+  if (window.renderPhosphorIcon) return window.renderPhosphorIcon(iconName, className);
 
   return `
     <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="./assets/lucide-icons.svg#${iconName}"></use>
+      <use href="./assets/phosphor-icons.svg#${iconName}"></use>
     </svg>
   `;
 }
@@ -253,7 +253,7 @@ function renderMissingExam() {
 }
 
 function renderSolver(exam) {
-  document.title = `Asistent za Mature - ${exam.subject}`;
+  document.title = `Maturomat - ${exam.subject}`;
   document.body.classList.add("solver-page", "abcd-solver-page");
   app.classList.add("abcd-solver-active");
   solverExam = exam;

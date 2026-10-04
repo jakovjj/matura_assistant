@@ -1,0 +1,4 @@
+{
+ "exam-77":{"caption":"Energije elektrona na višim stazama","headers":["Staza","Energija / eV"],"rows":[["2","−3,40"],["3","−1,51"],["4","−0,85"],["5","−0,54"],["6","−0,38"],["7","−0,28"],["8","−0,21"],["9","−0,17"],["10","−0,14"]]},
+ "exam-88":{"caption":"Reakcije i promjene entalpije","headers":["Reakcija","ΔH / kJ"],"rows":[["C(dijamant) + O₂(g) → CO₂(g)","−395,4"],["2CO₂(g) → 2CO(g) + O₂(g)","566,0"],["C(grafit) + O₂(g) → CO₂(g)","−393,5"],["2CO(g) → C(grafit) + CO₂(g)","−172,5"]]}
+}

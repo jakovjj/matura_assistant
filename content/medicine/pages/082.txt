@@ -1,0 +1,48 @@
+39. Kemijskom analizom masne kiseline, kojoj relativna molekulska masa
+iznosi 278,43, utvrđeno je da maseni udio ugljika iznosi 77,64 %, a vo-
+dika 10,86 %. Koliko je dvostrukih veza u molekuli kiseline?
+
+A. nijedna
+B. jedna
+C. dvije
+
+D. tri
+
+E. četiri
+
+40. Na temelju sljedećih podataka izračunajte ΔH° za reakciju:
+C₂H₄(g) + H₂(g) → C₂H₆(g)
+2CO(g) + O₂(g) → 2CO₂(g)   ΔH° = −566,0 kJ
+2H₂(g) + O₂(g) → 2H₂O(l)   ΔH° = −571,5 kJ
+2C₂H₆(g) + 7O₂(g) → 4CO₂(g) + 6H₂O(l)   ΔH° = −3120 kJ
+2C(s) + 2H₂(g) → C₂H₄(g)   ΔH° = 52,3 kJ
+C₂H₄(g) + 3O₂(g) → 2CO₂(g) + 2H₂O(l)   ΔH° = −1411 kJ
+A. 19,0 kJ
+B. 1137,5 kJ
+C. −5,62·10⁶ J
+D. -136,7 kJ
+E. 1,222·10⁶ J
+
+41. Tlak pare čiste vode iznosi 0,0555 atm pri 35°C. Koliko iznosi tlak pare
+idealne otopine nehlapljivog neelektrolita (pri 35°C) ako je množinski
+udio otopljene tvari 8,50 %?
+
+A. 478 Pa
+
+B. 0,0508 atm
+C. 35,8 mmHg
+D. 51,5 kPa
+
+E. 32,5 Torr
+
+42. Kvantitativni sastav otopine iskazan množinom otopljene tvari po masi
+otapala odgovara:
+
+A. molarnosti, tj. množinskoj koncentraciji otopljene tvari
+B. masenom udjelu otopljene tvari
+
+C. množinskom udjelu otopljene tvari
+
+D. masenoj koncentraciji otopljene tvari
+
+E. molalnosti otopljene tvari

@@ -1,0 +1,26 @@
+81. Pri 37°C osmotski tlak otopine magnezijeva klorida koncentracije
+0,1 mol/L i stupnja disocijacije 1 je ______ od osmotskog
+tlaka otopine glukoze iste koncentracije.
+A. 2 puta viši
+B. 3 puta viši
+C. isti kao osmotski tlak glukoze
+D. 3 puta niži
+E. 2 puta niži
+82. Izomerni oblici ksilena (dimetilbenzena) su:
+A. E-ksilen i Z-ksilen
+B. orto-ksilen, meta-ksilen i para-ksilen
+C. L-ksilen i D-ksilen
+D. cis-ksilen i trans-ksilen
+E. R-ksilen i S-ksilen
+83. Što će od navedenoga smanjiti topljivost kisika u vodi ako je ΔH_{otapanja} < 0?
+A. smanjenje tlaka i temperature
+B. povećanje temperature i tlaka
+C. smanjenje tlaka i povećanje temperature
+D. povećanje tlaka i smanjenje temperature
+E. dodatak plinovitog kisika u sustav
+84. Izdvojite točan izraz:
+A. K_a = [H⁺][Cl⁻]/[HCl]
+B. K_p = p²(NH₃)/(p³(H₂)p(N₂))
+C. K_{SO} = [Na⁺][Cl⁻]
+D. K = [KCl][H₂O]/([HCl][KOH])
+E. K_{SO} = [Ca²⁺][PO₄³⁻]

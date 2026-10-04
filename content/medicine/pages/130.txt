@@ -1,0 +1,54 @@
+89. ______ je nakupljanje molekula vode oko iona.
+
+A. Oksigenacija
+
+B. Hidratacija
+
+C. Adsorpcija
+
+D. Hidroliza
+
+E. Hidrogenacija
+90. Koja je od navedenih tvrdnji točna? Ako se u 100,00 mL čiste vode otopi
+
+2,00 g kalijeva bromida, tada će priređena otopina:
+
+A. vreti pri temperaturi nižoj od 373,15 K
+
+B. imati viši tlak pare otapala u odnosu na čistu vodu
+
+C. lediti se pri temperaturi višoj od 273,15 K
+
+D. imati niži osmotski tlak u odnosu na čistu vodu
+
+E. imati istu pH-vrijednost kao i čista voda pri 298,15 K
+91. Kemijska ravnoteža je postignuta kada ______.
+
+A. se potroše svi reaktanti
+
+B. se potroši polovica reaktanata
+
+C. su koncentracije reaktanata i produkata stalne
+
+D. su koncentracije reaktanata i produkata jednake
+
+E. se reakcija odvija samo u jednom smjeru
+92. Metanska (mravlja) kiselina u vodenoj otopini ionizira prema sljedećoj
+
+jednadžbi reakcije:
+
+HCOOH(aq) ⇆ HCOO⁻(aq) + H⁺(aq).
+
+Što od navedenog NIJE točno za 0,01 M otopinu metanske kiseline pri
+
+25 °C?
+
+A. pH-vrijednost otopine iznosi 2.
+
+B. Koncentracija H⁺ iona veća je od koncentracije OH⁻ iona.
+
+C. Koncentracija HCOOH veća je od koncentracije HCOO⁻ iona.
+
+D. Koncentracija H⁺ iona manja je od koncentracije HCOOH.
+
+E. Koncentracija HCOO⁻ iona jednaka je koncentraciji H⁺ iona.

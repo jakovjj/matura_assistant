@@ -1,0 +1,33 @@
+93. Ako se pH-vrijednost smanji sa 7 na 3, koncentracija vodikovih iona će
+se povećati:
+A. 40 puta
+B. 1000 puta
+C. 100 puta
+D. 4 puta
+E. 10000 puta
+94. Koja od navedenih formula NIJE točna?
+A. CaC₂O₄
+B. (NH₄)₂SO₄
+C. NaH₂PO₄
+D. (CH₃COO)₂Be
+E. CH₃(CH₂)₁₆COOMg
+95. Maseni udio kalijeva cijanida u vodenoj otopini iznosi 5,70 %. Kolika je
+molalnost soli?
+A. 8,75 mmol/g
+B. 0,254 mol/g
+C. 60,4 mmol kg⁻¹
+D. 0,928 mol kg⁻¹
+E. 0,355 mol/kg
+96. Konstanta brzine reakcije ______ reda ima dimenziju vrijeme⁻¹.
+A. nultog
+B. prvog
+C. drugog
+D. trećeg
+E. razlomljenog
+97. Kolika je masa kalijeva hidroksida potrebna za potpunu neutralizaciju
+25,00 mL 0,3400 mol/L otopine sumporne kiseline?
+A. 0,4769 g
+B. 0,3616 g
+C. 0,2385 g
+D. 0,9538 g
+E. 0,7521 g

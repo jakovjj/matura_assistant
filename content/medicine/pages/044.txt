@@ -1,0 +1,27 @@
+29. Štap je sačinjen od prozirnog materijala indeksa loma n₁ = 1,6, a izvana
+je presvučen tankim slojem materijala indeksa loma n₂ = 1,4. Svjetlosni
+snop pod kutom od α=51° upada na granicu sredstava indeksa loma n₁ i
+n₂. Može li se ostvariti totalna refleksija pod navedenim uvjetima?
+
+[figure:physics-29]
+A. ne, jer granični kut totalne refleksije iznosi 29°
+B. da, jer granični kut totalne refleksije iznosi 90°
+C. da, jer granični kut totalne refleksije iznosi 29°
+D. ne, jer granični kut totalne refleksije iznosi 61°
+E. da, jer granični kut totalne refleksije iznosi 61°
+
+30. Na slici je prikazan put zrake svjetlosti kroz tri optička sredstva. Odre-
+
+dite međusobne odnose optičkih gustoća pojedinih sredstava!
+
+[figure:physics-30]
+
+A. n₁ < n₂ < n₃
+
+B. n₂ < n₁ < n₃
+
+C. n₁ < n₃ < n₂
+
+D. n₁ = n₃ > n₂
+
+E. n₁ > n₂ > n₃

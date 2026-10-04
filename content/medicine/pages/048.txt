@@ -1,0 +1,26 @@
+42. Tijelo A ispaljeno je brzinom v₀ u horizontalnom smjeru, a tijelo B iste
+mase i s iste visine pušteno je slobodno padati. Otpor zraka je zanema-
+riv. Koja tvrdnja istinito opisuje gibanje tijela?
+
+A. Tijelo B će imati veću kinetičku energiju od tijela A.
+
+B. Oba tijela će istovremeno dotaknuti tlo.
+
+C. Tijelo A dotaknut će tlo nakon kraćeg vremena u odnosu na tijelo B.
+
+D. U trenutku doticanja tla tijelo A ima veću kinetičku energiju zato jer je na
+početku imalo veću potencijalnu energiju.
+
+E. Tijelo B dotaknut će tlo nakon kraćeg vremena u odnosu na tijelo A.
+
+43. Ako se sila na bubnjić poveća za 1,5 N u odnosu na silu pri atmosferskom
+tlaku, može doći do pucanja bubnjića. Koliko duboko ronilac može za-
+roniti sa sigurnošću da neće oštetiti bubnjić? Bubnjić kod odrasla čovje-
+ka je membrana kružnog presjeka promjera 8,2 mm, a gustoća mora je
+1030 kg/m³.
+
+A. 0,7 m
+B. 1,4m
+C. 12,7 m
+D. 2,8 m
+E. 8,1 m

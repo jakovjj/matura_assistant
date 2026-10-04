@@ -1,0 +1,26 @@
+103. Koju od prikazanih struktura NE ubrajamo ni u derivate karboksilnih
+kiselina niti u supstituirane karboksilne kiseline?
+[figure:chemistry-103]
+A. I.
+B. II.
+C. III.
+D. IV.
+E. V.
+104. Za koji je od navedenih polisaharida točno naveden tip glikozidne veze?
+A. celuloza — β(1,6)
+B. glikogen - α(1,4) i β(1,6)
+C. amilopektin - α(1,4) i α(1,6)
+D. amiloza - β(1,4)
+E. škrob — α(1,6) i β(1,4)
+105. Svakoj od sljedećih tvrdnji pridružite odgovarajuću aminokiselinu.
+(1) Blagom oksidacijom daje disulfid.
+(2) Nije optički aktivna.
+(3) U bočnom lancu sadržava karboksilnu skupinu.
+(4) U otopini pri pH = 6,0 pozitivno je nabijena.
+(A) Gly; (B) fenilalanin; (C) cistein; (D) [figure:chemistry-105-d]
+(E) Glu; (F) serin; (G) [figure:chemistry-105-g]
+A. 1C, 2A, 3E, 4G
+B. 1F, 2A, 3C, 4B
+C. 1C, 2E, 3A, 4D
+D. 1B, 2E, 3D, 4C
+E. 1F, 2C, 3A, 4B

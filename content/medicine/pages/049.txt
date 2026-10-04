@@ -1,0 +1,21 @@
+44. Voda ulazi u kuću pod statičkim tlakom od 4·10⁵ Pa, kad je brzina protje-
+canja vode kroz cijev 1,5 m/s do kuće. U kupaonici na katu, 4 m iznad tla,
+brzina protjecanja vode kroz cijev poveća se 9 puta. Koliki je tlak vode
+na stijenke cijevi u kupaonici? Primijenite model idealne tekućine.
+
+[figure:physics-44]
+A. 2,7·10⁵ Pa
+B. 3,55·10⁵ Pa
+C. 3,7·10⁵ Pa
+D. 4,5·10⁵ Pa
+E. 2,0·10⁵ Pa
+
+45. Izračunajte volumen kamena težine 39,8 N, ako znate da mu težina u
+vodi iznosi 28,4 N u slučaju kad je potpuno uronjen.
+A. 0,0014 dm³
+
+B. 7·10⁻³ m³
+C. 1,14 L
+
+D. 2,9·10⁻³ m³
+E. 0,07L

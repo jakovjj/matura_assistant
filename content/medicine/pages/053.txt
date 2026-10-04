@@ -1,0 +1,28 @@
+56. Izračunajte brzinu promjene struje u zavojnici induktivnosti 2 mH ako
+je inducirani napon na krajevima zavojnice 15 mV!
+A. 30 m/s
+B. 7,5 m/s
+C. 15A
+D. 7,5 A/s
+E. 2mA/s
+57. Kako se odnose duljine matematičkih njihala A i B ako se periodi njihaja
+odnose kao T_A : T_B = 3 : 2?
+A. l_A : l_B = 4 : 9
+B. l_A : l_B = 4 : 9
+C. l_A : l_B = 9 : 4
+D. l_A : l_B = 2 : 3
+E. l_A : l_B = 1 : 1
+58. Stojni valovi se šire žicom duljine 50 cm između 2 učvršćena kraja. Koji
+od navedenih stojnih valova mogu nastati u tom slučaju?
+A. 2 trbuha; λ = 25 cm
+B. 4 trbuha; λ = 50 cm
+C. 1 trbuh; λ = 100 cm
+D. 3 trbuha; λ = 100 cm
+E. 5 trbuha; λ = 25 cm
+59. Kako se mijenjaju frekvencija i valna duljina monokromatske svjetlosti
+pri prijelazu iz zraka u staklo?
+A. frekvencija se smanjuje, a valna duljina se povećava
+B. frekvencija se povećava, a valna duljina se smanjuje
+C. frekvencija ostaje ista, a valna duljina se smanjuje
+D. frekvencija ostaje ista, a valna duljina se povećava
+E. i frekvencija i valna duljina ostaju nepromijenjene

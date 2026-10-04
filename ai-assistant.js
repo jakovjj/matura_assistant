@@ -1,4 +1,4 @@
-// Asistent za maturu: objašnjenja rješenja za zadatke višestrukoga izbora.
+// Maturomat: objašnjenja rješenja za zadatke višestrukoga izbora.
 // Predmeti koji su službeno dostupni pozivaju renderButton()/bind() s
 // { official: true }; ostali se prikazuju samo kad URL ima ?beta=1. Solver
 // poziva renderButton() uz svaki zadatak i bind() da poveže gumbe s kontekstom
@@ -94,7 +94,7 @@
         <img class="ai-login-modal__logo" src="${LOGO_SRC}" alt="" width="56" height="56" />
         <h2>Prijavi se za objašnjenje</h2>
         <p>
-          Objašnjenja Asistenta za maturu dostupna su samo prijavljenim korisnicima.
+          Objašnjenja Maturomata dostupna su samo prijavljenim korisnicima.
         </p>
         <a class="primary-button ai-login-modal__action" href="${escapeHtml(loginHref)}">Prijavi se</a>
       </div>
@@ -130,7 +130,7 @@
           <div class="ai-drawer__brand">
             <img class="ai-drawer__logo" src="${LOGO_SRC}" alt="" width="40" height="40" />
             <div class="ai-drawer__heading">
-              <strong>Asistent za maturu</strong>
+              <strong>Maturomat</strong>
               <span class="ai-drawer__subtitle" data-ai-subtitle></span>
             </div>
           </div>
@@ -139,11 +139,11 @@
         <div class="ai-drawer__body" data-ai-body></div>
         <footer class="ai-drawer__footer">
           <button class="ai-drawer__report" type="button" data-ai-report>
-            ${window.renderLucideIcon ? window.renderLucideIcon("triangle-alert", "ai-drawer__report-icon") : ""}
+            ${window.renderPhosphorIcon ? window.renderPhosphorIcon("triangle-alert", "ai-drawer__report-icon") : ""}
             <span>Prijavi loše objašnjenje</span>
           </button>
           <button class="ai-drawer__regenerate" type="button" data-ai-regenerate hidden>
-            ${window.renderLucideIcon ? window.renderLucideIcon("rotate-ccw", "ai-drawer__regenerate-icon") : ""}
+            ${window.renderPhosphorIcon ? window.renderPhosphorIcon("rotate-ccw", "ai-drawer__regenerate-icon") : ""}
             <span>Regeneriraj</span>
           </button>
           <span class="ai-drawer__report-status" data-ai-report-status></span>
@@ -248,7 +248,7 @@
   // čekamo da stigne do kraja prije nego što odlučimo.
   const ABSTAIN_MARKER = "[[NEDOVOLJNO]]";
   const ABSTAIN_MESSAGE =
-    "Asistent za mature trenutno nije u mogućnosti odgovoriti na ovo pitanje jer traži poznavanje sadržaja konkretnoga književnog djela koje ne može pouzdano provjeriti.";
+    "Maturomat trenutno nije u mogućnosti odgovoriti na ovo pitanje jer traži poznavanje sadržaja konkretnoga književnog djela koje ne može pouzdano provjeriti.";
 
   function abstentionState(text) {
     const trimmed = text.trimStart();
@@ -286,10 +286,28 @@
     { open: "$", close: "$", display: false },
   ];
 
+  // Model povremeno emitira valjan LaTeX koji KaTeX ne zna iscrtati. Popravi
+  // poznate slučajeve prije renderiranja da formula ne završi kao crveni tekst:
+  //  1) Eksponent/indeks izravno na razmaku (\, \; \: \! \quad …) — npr.
+  //     "20\,^\circ\text{C}" — puca s "group of unknown type: 'internal'";
+  //     KaTeX treba bazu, pa umetni prazan {} bez gubitka tankog razmaka.
+  //  2) Srednja točka (·) unutar \text{} (npr. "\text{N·dm}") mapira se na
+  //     nedefiniran \cdotp u text-modu; razbij na \text{N}\cdot\text{dm}.
+  function sanitizeTex(tex) {
+    return tex
+      .replace(
+        /(\\(?:[,;:!> ]|q?quad|thinspace|medspace|thickspace|enspace|neg(?:thin|med|thick)space))\s*(?=[_^])/g,
+        "$1{}",
+      )
+      .replace(/\\text\{([^{}]*·[^{}]*)\}/g, (match, inner) =>
+        "\\text{" + inner.split("·").join("}\\cdot\\text{") + "}",
+      );
+  }
+
   function renderMath(tex, displayMode) {
     if (!window.katex) return null;
     try {
-      return window.katex.renderToString(tex.trim(), {
+      return window.katex.renderToString(sanitizeTex(tex.trim()), {
         displayMode,
         throwOnError: false,
       });
@@ -318,11 +336,10 @@
         break;
       }
 
-      out += renderTextSegment(text.slice(index, match.start));
-
       const contentStart = match.start + match.delimiter.open.length;
       const closeIndex = text.indexOf(match.delimiter.close, contentStart);
       if (closeIndex === -1) {
+        out += renderTextSegment(text.slice(index, match.start));
         out += renderTextSegment(text.slice(match.start));
         break;
       }
@@ -336,21 +353,34 @@
       if (open !== close) {
         const nextOpen = text.indexOf(open, contentStart);
         if (nextOpen !== -1 && nextOpen < closeIndex) {
-          out += renderTextSegment(text.slice(match.start, contentStart));
+          out += renderTextSegment(text.slice(index, contentStart));
           index = contentStart;
           continue;
         }
       }
 
+      // Ako model omota cijelu formulu zvjezdicama (npr. **\( ... \)**), svaka
+      // zvjezdica upadne u svoj (tekstni) odsječak prije/poslije formule i se
+      // ne uparuje s regexom u renderTextSegment, pa ostanu kao doslovan
+      // tekst. Prepoznaj taj slučaj eksplicitno i podebljaj iscrtanu formulu.
+      const closeEnd = closeIndex + close.length;
+      const boldWrapped =
+        match.start - 2 >= index &&
+        text.slice(match.start - 2, match.start) === "**" &&
+        text.slice(closeEnd, closeEnd + 2) === "**";
+
+      out += renderTextSegment(
+        text.slice(index, boldWrapped ? match.start - 2 : match.start),
+      );
+
       const tex = text.slice(contentStart, closeIndex);
       const rendered = renderMath(tex, match.delimiter.display);
-      out +=
+      const renderedHtml =
         rendered != null
           ? rendered
-          : renderTextSegment(
-              text.slice(match.start, closeIndex + match.delimiter.close.length),
-            );
-      index = closeIndex + match.delimiter.close.length;
+          : renderTextSegment(text.slice(match.start, closeEnd));
+      out += boldWrapped ? `<strong>${renderedHtml}</strong>` : renderedHtml;
+      index = boldWrapped ? closeEnd + 2 : closeEnd;
     }
     return out;
   }
@@ -487,6 +517,13 @@
           data.error || "Potrošio si sva besplatna objašnjenja.",
           "error",
         );
+        if (data.code === "quota_exceeded") {
+          const plusLink = document.createElement("a");
+          plusLink.className = "primary-button";
+          plusLink.href = "/plus";
+          plusLink.textContent = "Pogledaj Matura Plus";
+          drawer.querySelector("[data-ai-body]").append(plusLink);
+        }
         drawer.querySelector("[data-ai-report]").disabled = true;
       } else {
         setBodyMessage(data.error || "Objašnjenje trenutačno nije dostupno.", "error");
@@ -646,7 +683,7 @@
           type="button"
           data-ai-explain="${escapeHtml(question)}"
           aria-label="Objašnjenje rješenja zadatka ${escapeHtml(question)}"
-          title="Objašnjenje rješenja (Asistent za maturu)"
+          title="Objašnjenje rješenja (Maturomat)"
         >
           <img class="ai-explain-button__logo" src="${LOGO_SRC}" alt="" width="22" height="22" />
         </button>

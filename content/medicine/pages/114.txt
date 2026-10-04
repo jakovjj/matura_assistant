@@ -1,0 +1,14 @@
+44. Na tijelo određene mase djeluje sila F. Koji od ponuđenih grafova opisuje II. Newtonov zakon?
+[figure:exam-44]
+A. graf I
+B. graf II
+C. graf III
+D. graf IV
+E. graf V
+45. Disk rotira kutnom brzinom ω oko središta (na slici označenog otvorenim kružićem) u ravnini crtnje. Poredajte točke A, B i C po obodnim brzinama od manje prema većoj.
+[figure:exam-45]
+A. C, A, B
+B. B, C, A
+C. A, C, B
+D. B, A, C
+E. A, B, C

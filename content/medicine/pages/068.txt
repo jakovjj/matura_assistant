@@ -1,0 +1,37 @@
+105. Jednoliko kružno gibanje odvija se pod djelovanjem stalne sile F. Koliki
+je rad te sile potreban da bi tijelo mase m načinilo jedan obilazak po
+kružnici polumjera r?
+
+A. 0
+
+B. F/r
+
+C. 2rπF
+D. F/(2rπ)
+E. 2rπmF
+
+106. Top s horizontalno postavljenom cijevi ispaljuje tane. Top se nalazi na
+brijegu nadmorske visine od 100 m. Koliko će se promijeniti vrijeme
+potrebno da tane padne na tlo ako se brzina izlaska iz cijevi poveća dva
+puta?
+
+A. poveća se dva puta
+B. smanji se dva puta
+C. ostaje isto
+D. poveća se za faktor √2
+E. smanji se za faktor √2
+107. Vrijeme poluživota izotopa je 15 sati. Ako je u jednom trenutku izmje-
+rena aktivnost od 20 otkucaja u sekundi, kolika je aktivnost bila 60 sati
+ranije?
+A. 320 Bq
+B. 120 Bq
+C. 80 Bq
+D. 10 Bq
+E. 5Bq
+108. Kolika sila ubrzava tijelo mase 2 μg tako da nakon 4 s ima brzinu od
+0,4 m/s?
+A. 2pN
+B. 2 μN
+C. 200 pN
+D. 2nN
+E. 200 nN

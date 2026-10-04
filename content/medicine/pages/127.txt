@@ -1,0 +1,15 @@
+79. Odredite približno energiju vezanja jezgre kisika ¹⁶O na osnovi grafičkog
+prikaza ovisnosti energije vezanja po nukleonu o masenom broju jezgara.
+[figure:exam-79]
+A. 8 MeV
+B. 1 MeV
+C. 128 MeV
+D. 0,5 MeV
+E. 0,18 MeV
+80. Izotop kisika ¹⁵O ima vrijeme poluraspada od 2 min. Ako je početni broj
+jezgara kisika N₀, koliko jezgara ostane neraspadnuto nakon 6 min?
+A. 0,125N₀
+B. 0,333N₀
+C. 0,25N₀
+D. 0,5N₀
+E. 0,0625N₀

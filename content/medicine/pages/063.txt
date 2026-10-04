@@ -1,0 +1,24 @@
+87. Koji od ponuđenih grafova opisuje ovisnost napona samoindukcije o
+promjeni struje u vremenu za zavojnicu induktiviteta 3 mH?
+[figure:physics-87]
+A. graf I
+B. graf II
+C. graf III
+D. graf IV
+E. graf V
+88. Pad napona na otporniku otpora 50 Ω spojenom u strujni krug dan je
+jednadžbom: U(t) = 70 V sin (314 s⁻¹t). Odredite izraz za izmjeničnu
+struju koja prolazi otpornikom.
+A. I(t) = 1,4 A sin (314 s⁻¹t + π/2)
+B. I(t) =0,7 Asin (157 s⁻¹t)
+C. I(t) = 1,4 A sin (314 s⁻¹t − π/2)
+D. I(t) = 3500 A sin (314 s⁻¹t)
+E. I(t) =1,4 Asin (314 s⁻¹t)
+89. Koji od ponuđenih grafova prikazuje ovisnost elastične sile o vremenu
+za tijelo koje harmonijski titra tijekom jednog perioda?
+[figure:physics-89]
+A. graf I
+B. graf II
+C. graf III
+D. graf IV
+E. graf V

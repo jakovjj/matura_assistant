@@ -1,0 +1,41 @@
+19. U područje u kojem se nalazi nabijena čestica u mirovanju, uključe se
+konstantno električno i magnetno polje. Ako su polja paralelna jedno
+drugome, putanja čestica je:
+
+A. kružnica
+B. parabola
+C. hiperbola
+D. spirala
+
+E. pravac
+
+20. Kroz dva vodiča, prikazana na slici, teku struje jednakog iznosa, a suprot-
+
+nog smjera. U točki T točno u sredini između dva vodiča, magnetno polje je:
+[figure:physics-20]
+
+A. usmjereno prema vrhu stranice
+
+B. usmjereno prema dnu stranice
+
+C. usmjereno ulijevo
+
+D. usmjereno udesno
+
+E. nula
+
+21. LC krug se u radioprijamniku koristi za slušanje radiopostaje koja emi-
+tira program na 100 MHz. Ako je induktivnost zavojnice 1 μH, koliko
+približno iznosi kapacitet primijenjenog kondenzatora?
+
+A. 0,1 nF
+B. 10nF
+C. 2,5 pF
+D. 16 pF
+E. 1,6 mF
+22. Elastična sila:
+A. je stalnog iznosa
+B. kod rastezanja tijela, povećava iznos s produljenjem tijela
+C. je vanjska sila koja održava stalan oblik tijela
+D. obrnuto je proporcionalna konstanti elastičnosti
+E. ovisi o masi tijela

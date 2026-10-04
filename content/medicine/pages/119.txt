@@ -1,0 +1,46 @@
+57. U posudi volumena 100 L nalazi se nepoznati volumen vode temperature
+50 °C. Nakon što smo posudu napunili do vrha hladnom vodom tempe-
+rature 10 °C, izmjerena temperatura kupke je bila 34 °C. Koliko je litara
+hladne vode dodano?
+
+A. 60L
+B. 40L
+C. 55 L
+D. 45L
+E. 50L
+
+58. Izračunajte odbojnu silu između dvije jednake čestice mase 6,64·10⁻²⁷ kg
+i naboja +2e koje su udaljene 2 mm. (ε₀ = 8,85·10⁻¹² C² N⁻¹ m⁻²)
+
+A. 1,15·10⁻²² N
+B. 2,3·10⁻²² N
+C. 4,6·10⁻¹⁰ N
+D. 7,4·10²² N
+E. 3,3·10⁻¹⁹ N
+
+59. Pločasti kondenzator spojimo u strujni krug s baterijom. Ako između
+ploča kondenzatora umetnemo dielektrik (izolator), koja tvrdnja/tvrd-
+nje su istinite?
+
+I. Električno polje kondenzatora se povećava.
+
+II. Kapacitet kondenzatora se povećava.
+
+III. Naboj na pločama kondenzatora se povećava.
+A. II. i III.
+
+B. I. i II.
+
+C. I., II. i III.
+
+D. I. i III.
+
+E. samo II.
+
+60. Žaruljicu s oznakom 0,9 W spojimo na izvor napona od 12 V. Izračunajte
+energiju koju izvor svake sekunde isporuči žaruljici.
+A. 0,075 J
+B. 1,8J
+C. 0,9 J
+D. 10,8 J
+E. 13,3 J

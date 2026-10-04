@@ -1,0 +1,40 @@
+7. Promatrajmo molekulu vodika (H₂) kao kuglicu koja se elastično odbije
+brzinom od 0,1 m/s od nepomične plohe. Koliki je impuls sile molekula
+vodika dobila? (u = 1,66·10⁻²⁷ kg)
+
+A. 0,166·10⁻²⁷ Ns
+
+B. 0,322·10⁻²⁷ kgm/s
+C. 0,664·10⁻²⁷ Ns
+
+D. 16,6·10⁻²⁷ Ns
+
+E. 0 kgm/s
+
+8. Tijelo je potpuno uronjeno u vodi. Izračunajte gustoću tijela volumena
+3800 cm³, ako izmjerena težina tijela u vodi iznosi 95 N! (g = 10 m/s²)
+A. 2500 kg/m³
+
+B. 3500 kg/m³
+C. 0,35 g/cm³
+D. 2400 kg/m³
+E. 1,5 g/cm³
+
+9. Kako se promijeni brzina protjecanja vode kroz cijev uslijed smanjenja
+polumjera od 50 %? Primijenite model idealne tekućine.
+A. poveća se 2 puta
+B. smanji se 2 puta
+C. poveća se za 50 %
+
+D. smanji se za 50 %
+E. poveća se 4 puta
+
+10. Tijelo mase m i volumena V je uronjeno u tekućinu i nalazi se na dubini
+h. Tekućina ima gustoću ρ. Koji izraz točno opisuje ukupnu silu na uro-
+njeno tijelo?
+
+A. mg - ρVg
+B. mg + ρgh - ρVg
+C. ρVg- mg - ρgh
+D. mg + ρVg
+E. mg + ρgh + ρVg

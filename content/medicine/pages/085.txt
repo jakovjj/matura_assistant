@@ -1,0 +1,30 @@
+49. Jedan mol kalcijeva fosfata sadržava:
+A. 1 mol iona kalcija
+B. 6,022·10²³ atoma fosfora
+C. 120,234 g kalcija
+D. 1 mol fosfatnih iona
+E. 4 mola atoma kisika
+50. Izdvojite točnu tvrdnju.
+A. Negativna elektroda u elektroliznom članku naziva se anoda.
+B. Tijekom elektrolize na katodi se odvija oksidacija.
+C. Tijekom elektrolize pozitivno nabijeni ioni putuju prema katodi, a negativ-
+no nabijeni prema anodi.
+D. Pozitivna elektroda u elektroliznom članku naziva se katoda.
+E. Tijekom elektrolize na anodi se odvija redukcija.
+51. Na temelju danih redukcijskih potencijala pri 25°C točna tvrdnja je:
+E°(Mg²⁺/Mg) = -2,36 V
+E°(Zn²⁺/Zn) = -0,76 V
+E°(Fe²⁺/Fe) = -0,44 V
+E°(Pb²⁺/Pb) = -0,13 V
+E°(Cu²⁺/Cu) = +0,34 V
+E°(Ag⁺/Ag) = +0,80 V
+A. Uranjanjem bakrene žice u vodenu otopinu soli srebra(I) spontano se izlu-
+čuje elementarno srebro.
+B. Uranjanjem bakrene žice u vodenu otopinu soli željeza(II) spontano se izlu-
+čuje elementarno željezo.
+C. Uranjanjem bakrene žice u vodenu otopinu soli cinka(II) spontano se izlu-
+čuje elementarni cink.
+D. Uranjanjem bakrene žice u vodenu otopinu soli magnezija spontano se
+izlučuje elementarni magnezij.
+E. Uranjanjem bakrene žice u vodenu otopinu soli olova(II) spontano se izlu-
+čuje elementarno olovo.

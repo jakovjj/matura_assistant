@@ -1,0 +1,33 @@
+73. Koja od sljedećih tvrdnji NIJE točna?
+A. Energija ionizacije opada unutar periode zdesna nalijevo, a unutar skupine
+opada odozgo prema dolje.
+B. Unutar periode, atomski (redni) broj elemenata se povećava slijeva nade-
+sno, a unutar skupine raste odozgo prema dolje.
+C. Atomski polumjer raste unutar periode zdesna nalijevo, a unutar skupine
+raste odozgo prema dolje.
+D. Elektronegativnost raste unutar periode slijeva nadesno, a unutar skupine
+raste odozdo prema gore.
+E. Afinitet za elektrone raste unutar periode zdesna nalijevo, a unutar skupi-
+ne raste odozgo prema dolje.
+74. Jezgra kojeg od navedenih nuklida sadržava 31 neutron?
+A. ⁵⁸Ni
+B. ³¹P
+C. ⁶⁹Ga
+D. ⁵⁷Fe
+E. ⁵⁵Mn
+75. U kojem od sljedećih procesa pucaju kovalentne veze?
+A. C₆H₁₂O₆(s) → C₆H₁₂O₆(l)
+B. NH₄NO₃(s) → NH₄⁺(aq) + NO₃⁻(aq)
+C. C(dijamant) > C(grafit)
+D. I₂(s) → I₂(g)
+E. C₆H₁₂(s) → C₆H₁₂(g)
+76. Acetilsalicilna kiselina (C₉H₈O₄) aktivna je komponenta lijeka Aspirin
+koji se često primjenjuje kao analgetik, antipiretik i protuupalni ne-
+steroidni lijek. Izračunajte brojnost molekula acetilsalicilne kiseline u
+tableti Aspirina mase 500 mg ako maseni udio acetilsalicilne kiseline u
+tableti iznosi 88,5 %.
+A. 1,671·10²¹
+B. 2,665·10²³
+C. 1,889·10²¹
+D. 1,479·10²¹
+E. 4,801·10²⁵

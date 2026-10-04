@@ -23,6 +23,8 @@
     Kemija: "#315f69",
     "Likovna umjetnost": "#6a4f3d",
     Matematika: "#4f4b78",
+    Njemački: "#3e5876",
+    "Njemački jezik": "#3e5876",
     "Politika i gospodarstvo": "#5c4a42",
     Povijest: "#6a4b3d",
     Psihologija: "#5a4968",
@@ -31,20 +33,22 @@
 
   const subjectIcons = {
     Biologija: "dna",
-    Engleski: "book-open-text",
-    "Engleski jezik": "book-open-text",
+    Engleski: "language-english",
+    "Engleski jezik": "language-english",
     Fizika: "atom",
     Filozofija: "lightbulb",
-    Geografija: "earth",
+    Geografija: "globe-hemisphere-west",
     "Hrvatski jezik": "book-open-text",
     Informatika: "binary",
-    Kemija: "flask-conical",
+    Kemija: "flask",
     "Likovna umjetnost": "palette",
     Matematika: "sigma",
-    "Politika i gospodarstvo": "landmark",
-    Povijest: "history",
+    Njemački: "language-german",
+    "Njemački jezik": "language-german",
+    "Politika i gospodarstvo": "bank",
+    Povijest: "scroll",
     Psihologija: "brain",
-    Sociologija: "users-round",
+    Sociologija: "users-three",
   };
 
   const partIcons = {
@@ -62,6 +66,18 @@
     "hrvatski|sazetak": "book-open-text",
     "hrvatski|školski esej": "book-open-text",
     "hrvatski|skolski esej": "book-open-text",
+    "njemački|čitanje": "book-open",
+    "njemacki|citanje": "book-open",
+    "njemački|slušanje": "music-2",
+    "njemacki|slusanje": "music-2",
+    "njemački|pisanje": "book-open-text",
+    "njemacki|pisanje": "book-open-text",
+    "njemački jezik|čitanje": "book-open",
+    "njemacki jezik|citanje": "book-open",
+    "njemački jezik|slušanje": "music-2",
+    "njemacki jezik|slusanje": "music-2",
+    "njemački jezik|pisanje": "book-open-text",
+    "njemacki jezik|pisanje": "book-open-text",
   };
 
   function escapeHtml(value) {
@@ -180,24 +196,25 @@
 
   function icon(iconName, className) {
     if (!iconName) return "";
-    if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
+    if (window.renderPhosphorIcon) return window.renderPhosphorIcon(iconName, className);
 
     return `
       <svg class="${escapeHtml(className)}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-        <use href="./assets/lucide-icons.svg#${escapeHtml(iconName)}"></use>
+        <use href="./assets/phosphor-icons.svg#${escapeHtml(iconName)}"></use>
       </svg>
     `;
   }
 
   function renderDownloads(paperUrl, archiveUrl) {
+    if (!paperUrl && !archiveUrl) return "";
     return `
       <nav class="solver-header__downloads" aria-label="Materijali ispita">
-        <a href="${escapeHtml(paperUrl)}" target="_blank" rel="noreferrer">
+        ${paperUrl ? `<a href="${escapeHtml(paperUrl)}" target="_blank" rel="noreferrer">
           Otvori službeni PDF
-        </a>
-        <a href="${escapeHtml(archiveUrl)}" target="_blank" rel="noreferrer">
+        </a>` : ""}
+        ${archiveUrl ? `<a href="${escapeHtml(archiveUrl)}" target="_blank" rel="noreferrer">
           Preuzmi ZIP
-        </a>
+        </a>` : ""}
       </nav>
     `;
   }
@@ -273,6 +290,96 @@
     `;
   }
 
+  function renderSolverFooter({ navigationAttribute, navigationLabel, buttonClass = "primary-button", buttonContent }) {
+    return `
+      <footer class="solver-sticky-footer">
+        <div class="solver-sticky-footer__inner">
+          <nav class="task-navigation" ${navigationAttribute} aria-label="${escapeHtml(navigationLabel)}"></nav>
+          <div class="solver-sticky-footer__controls">
+            <div class="solver-sticky-footer__status">
+              ${icon("list-checks", "solver-sticky-footer__status-icon")}
+              <div class="solver-sticky-footer__status-copy" aria-live="polite">
+                <strong id="footer-answer-progress" data-answer-progress></strong>
+                <span id="footer-score-summary" data-score-summary></span>
+              </div>
+            </div>
+            <div class="solver-sticky-footer__actions">
+              <button class="${escapeHtml(buttonClass)}" id="check-answers" data-finish type="button">${buttonContent}</button>
+            </div>
+          </div>
+        </div>
+      </footer>`;
+  }
+
+  function renderQuickSelectShell({ navId = "question-quickselect", jumpId, jumpLabel = "Pitanje", actionHtml = "" } = {}) {
+    return `<aside class="question-quickselect${jumpId || actionHtml ? " question-quickselect--with-action" : ""}" aria-label="Brzi odabir pitanja">
+      <div class="question-quickselect__heading"><strong>Brzi odabir</strong><small>Pitanja</small></div>
+      <nav class="question-quickselect__list" id="${escapeHtml(navId)}"></nav>
+      ${jumpId || actionHtml ? `<div class="question-quickselect__tools">${jumpId ? `<label class="question-jump" for="${escapeHtml(jumpId)}"><span>${escapeHtml(jumpLabel)}</span><select id="${escapeHtml(jumpId)}" aria-label="Odaberi ${escapeHtml(jumpLabel.toLocaleLowerCase("hr"))}"></select></label>` : ""}${actionHtml}</div>` : ""}
+    </aside>`;
+  }
+
+  function renderQuickSelectItems(items) {
+    return items.map((item) => {
+      const status = ["answered", "correct", "wrong", "excluded"].includes(item.status) ? item.status : "";
+      const stateClass = status ? ` question-quickselect__link--${status}` : "";
+      return `<a class="question-quickselect__link${stateClass}" href="#pitanje-${escapeHtml(item.target)}" data-quick-question="${escapeHtml(item.target)}" data-quick-group="${escapeHtml(item.group ?? item.target)}" aria-label="${escapeHtml(item.itemLabel || "Pitanje")} ${escapeHtml(item.label)}, ${escapeHtml(item.answerState)}">${escapeHtml(item.label)}</a>`;
+    }).join("");
+  }
+
+  function renderQuickSelectOptions(items) {
+    return items.map((item) => `<option value="${escapeHtml(item.target)}" data-quick-group="${escapeHtml(item.group ?? item.target)}">${escapeHtml(item.label)}</option>`).join("");
+  }
+
+  function bindQuickSelect({ root = document, navId = "question-quickselect", jumpId, onJump }) {
+    const jumpTo = (question) => {
+      const target = root.querySelector(`#pitanje-${question}`);
+      if (!target) return;
+      onJump(question);
+      target.scrollIntoView({ block: "start", behavior: "auto" });
+      history.replaceState(null, "", `#pitanje-${question}`);
+    };
+    const nav = root.querySelector(`#${navId}`);
+    if (nav && !nav.dataset.quickSelectBound) {
+      nav.dataset.quickSelectBound = "true";
+      nav.addEventListener("click", (event) => {
+        const link = event.target.closest("[data-quick-question]");
+        if (!link || !nav.contains(link)) return;
+        event.preventDefault();
+        jumpTo(link.dataset.quickQuestion);
+      });
+    }
+    const jump = jumpId && root.querySelector(`#${jumpId}`);
+    if (jump && !jump.dataset.quickSelectBound) {
+      jump.dataset.quickSelectBound = "true";
+      jump.addEventListener("change", () => jumpTo(jump.value));
+    }
+  }
+
+  function updateQuickSelectActiveState({ root = document, navId = "question-quickselect", jumpId, activeGroup }) {
+    root.querySelectorAll(`#${navId} [data-quick-question]`).forEach((link) => {
+      const active = String(link.dataset.quickGroup) === String(activeGroup);
+      link.classList.toggle("question-quickselect__link--active", active);
+      if (active) link.setAttribute("aria-current", "true");
+      else link.removeAttribute("aria-current");
+    });
+    const jump = jumpId && root.querySelector(`#${jumpId}`);
+    const option = jump && [...jump.options].find((entry) => String(entry.dataset.quickGroup || entry.value) === String(activeGroup));
+    if (option) jump.value = option.value;
+  }
+
+  function activeQuestionFromScroll(selector, attribute = "questionNumber", root = document) {
+    const questions = [...root.querySelectorAll(selector)];
+    if (!questions.length) return null;
+    const focusLine = Math.min(window.innerHeight * 0.28, 240);
+    let active = questions[0];
+    for (const question of questions) {
+      if (question.getBoundingClientRect().top > focusLine) break;
+      active = question;
+    }
+    return active.dataset[attribute];
+  }
+
   let solverFooterResizeObserver = null;
   let observedSolverFooter = null;
 
@@ -309,5 +416,6 @@
   requestAnimationFrame(observeSolverStickyFooter);
 
   window.renderSolverHeader = renderSolverHeader;
+  window.SolverControls = { renderFooter: renderSolverFooter, renderQuickSelectShell, renderQuickSelectItems, renderQuickSelectOptions, bindQuickSelect, updateQuickSelectActiveState, activeQuestionFromScroll };
   window.formatSolverExamTitle = formatExamTitle;
 })();

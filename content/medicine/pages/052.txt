@@ -1,0 +1,31 @@
+53. Elektron koji je ubrzan razlikom potencijala od 1000 V uleti u magnetno
+polje magnetne indukcije 0,3 T. Kolika je energija elektrona nakon što
+izleti iz magnetnog polja, ako mu se putanja zakrene za 23°?
+
+A. 3,4·10⁻¹⁹ J
+B. 0,5·10⁻¹⁵ J
+C. 1,6·10⁻¹⁶ J
+D. 0,8·10⁻¹⁵ J
+E. 1,6·10⁻¹⁹ J
+
+54. Koji od navedenih uređaja rade na principu elektromagnetne indukcije?
+I. transformatori
+II. električni titrajni krugovi
+III. baterije
+A. samo I.
+
+B. samo II.
+C. I. i II.
+
+D. II. i III.
+E. I., II. i III.
+
+55. Koji graf prikazuje jakost struje kao funkciju vremena opisanu izrazom:
+
+I = 0,02A sin(π MHz t)?
+[figure:physics-55]
+A. graf 1
+B. graf 2
+C. graf 3
+D. graf 4
+E. graf 5

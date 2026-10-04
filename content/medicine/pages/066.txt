@@ -1,0 +1,34 @@
+97. Koji se od navedenih valova u danom nizu šire brže od ostalih u vakuumu?
+X-zrake, gama-zrake, radiovalovi, mikrovalovi
+A. X-zrake
+B. gama-zrake
+C. radiovalovi
+D. mikrovalovi
+E. niti jedan od navedenih
+98. Neki radioaktivni izotop ima aktivnost koja je 35 puta veća od dopuštene za
+sigurnost medicinskih djelatnika. Odredite najkraće vrijeme nakon kojeg
+će izotop biti unutar granica za sigurnu primjenu? Nadopunite rečenicu.
+Nakon ___ vremena poluraspada tog izotopa.
+A. 35
+B. 3,5
+C. 18
+D. 5
+E. 6
+99. Izbacite NETOČNU tvrdnju!
+A. Potrebno je utrošiti energiju od (13,6 eV)/n² da bi se elektron iz n-te
+Bohrove putanje oslobodio iz atoma vodika.
+B. Energijski spektri zemnoalkalijskih metala su jednaki.
+C. Apsorpcijski spektar helija karakteriziran je crnim linijama na određenim
+valnim duljinama.
+D. Pomoću spektroskopskih metoda moguće je utvrditi sastav uzorka.
+E. Bohrova jednadžba približno dobro opisuje energijska stanja vodikova atoma.
+100. Izotop urana masenog broja 235 i srednje energije vezanja po nukleonu
+od približno 7,6 MeV podijeljen je u dva fragmenta s masenim brojevima
+92 i 141 koji imaju energije vezanja po nukleonu 8,5 MeV odnosno 8,3
+MeV. Kolika se energija ispusti tijekom ove fisijske reakcije? Zanemarite
+kinetičku energiju neutrona koji sudjeluju u reakciji.
+A. 1952 MeV
+B. 3738 MeV
+C. 166 MeV
+D. 1786 MeV
+E. 186 MeV

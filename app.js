@@ -1,4 +1,7 @@
 const archiveData = window.ASISTENT_ZA_MATURE_DATA;
+const examStatistics = Array.isArray(window.ASISTENT_ZA_MATURE_EXAM_STATISTICS)
+  ? window.ASISTENT_ZA_MATURE_EXAM_STATISTICS
+  : [];
 
 if (!archiveData || !Array.isArray(archiveData.exams)) {
   throw new Error("Nedostaje generirani indeks ispita.");
@@ -7,67 +10,83 @@ if (!archiveData || !Array.isArray(archiveData.exams)) {
 const solverDataSources = {
   englishReading: {
     globalName: "ASISTENT_ZA_MATURE_ENGLISH_READING",
-    src: "./data/english-reading.js",
+    src: "./data/english-reading.js?v=68631b6fa5ba",
   },
   englishListening: {
     globalName: "ASISTENT_ZA_MATURE_ENGLISH_LISTENING",
-    src: "./data/english-listening.js?v=20260608-wma-audio",
+    src: "./data/english-listening.js?v=2a6b4a6750c1",
   },
   englishEssay: {
     globalName: "ASISTENT_ZA_MATURE_ENGLISH_ESSAY",
-    src: "./data/english-essay.js?v=20260602-english-essay",
+    src: "./data/english-essay.js?v=fd428bfad5b8",
+  },
+  germanReading: {
+    globalName: "ASISTENT_ZA_MATURE_GERMAN_READING",
+    src: "./data/german-reading.js?v=e64d2926c65a",
+  },
+  germanListening: {
+    globalName: "ASISTENT_ZA_MATURE_GERMAN_LISTENING",
+    src: "./data/german-listening.js?v=38ec54891fad",
+  },
+  germanEssay: {
+    globalName: "ASISTENT_ZA_MATURE_GERMAN_ESSAY",
+    src: "./data/german-essay.js?v=fb53786d5616",
   },
   croatianWriting: {
     globalName: "ASISTENT_ZA_MATURE_CROATIAN_WRITING",
-    src: "./data/croatian-writing.js?v=20260604-croatian-writing",
+    src: "./data/croatian-writing.js?v=20260909-jesenski-rok",
   },
   physicsChoice: {
     globalName: "ASISTENT_ZA_MATURE_PHYSICS_CHOICE",
-    src: "./data/physics-choice.js",
+    src: "./data/physics-choice.js?v=3265a0563e1a",
   },
   mathChoice: {
     globalName: "ASISTENT_ZA_MATURE_MATH_CHOICE",
-    src: "./data/math-choice.js?v=20260602-math-groups",
+    src: "./data/math-choice.js?v=aba614669c06",
   },
   chemistryChoice: {
     globalName: "ASISTENT_ZA_MATURE_CHEMISTRY_CHOICE",
-    src: "./data/chemistry-choice.js?v=20260605-chemistry-table-crops",
+    src: "./data/chemistry-choice.js?v=1bd709be20ef",
+  },
+  biologyChoice: {
+    globalName: "ASISTENT_ZA_MATURE_BIOLOGY_CHOICE",
+    src: "./data/biology-choice.js?v=8e76b032ca9f",
   },
   croatianChoice: {
     globalName: "ASISTENT_ZA_MATURE_CROATIAN_CHOICE",
-    src: "./data/croatian-choice.js?v=20260608-croatian-legacy",
+    src: "./data/croatian-choice.js?v=eff1993f05e7",
   },
   historyChoice: {
     globalName: "ASISTENT_ZA_MATURE_HISTORY_CHOICE",
-    src: "./data/history-choice.js?v=20260603-history-choice",
+    src: "./data/history-choice.js?v=13b70ae455c6",
   },
   geographyChoice: {
     globalName: "ASISTENT_ZA_MATURE_GEOGRAPHY_CHOICE",
-    src: "./data/geography-choice.js?v=20260604-geography-choice",
+    src: "./data/geography-choice.js?v=b2e6350304e4",
   },
   psychologyChoice: {
     globalName: "ASISTENT_ZA_MATURE_PSYCHOLOGY_CHOICE",
-    src: "./data/psychology-choice.js?v=20260605-psychology-choice",
+    src: "./data/psychology-choice.js?v=a9fd6a92af3c",
   },
   philosophyChoice: {
     globalName: "ASISTENT_ZA_MATURE_PHILOSOPHY_CHOICE",
-    src: "./data/philosophy-choice.js?v=20260609-philosophy-choice",
+    src: "./data/philosophy-choice.js?v=3d5ab9cf5c0f",
   },
   sociologyChoice: {
     globalName: "ASISTENT_ZA_MATURE_SOCIOLOGY_CHOICE",
-    src: "./data/sociology-choice.js?v=20260608-sociology-choice",
+    src: "./data/sociology-choice.js?v=470d6cbf6277",
   },
   artChoice: {
     globalName: "ASISTENT_ZA_MATURE_ART_CHOICE",
-    src: "./data/art-choice.js?v=20260608-art-choice",
+    src: "./data/art-choice.js?v=3eea523d43fc",
   },
   informaticsChoice: {
     globalName: "ASISTENT_ZA_MATURE_INFORMATICS_CHOICE",
-    src: "./data/informatics-choice.js?v=20260609-informatics-choice",
+    src: "./data/informatics-choice.js?v=80faf3686978",
   },
   politicsChoice: {
     globalName: "ASISTENT_ZA_MATURE_POLITICS_CHOICE",
-    src: "./data/politics-choice.js?v=20260604-politics-choice",
+    src: "./data/politics-choice.js?v=3f0a7b1c0df9",
   },
   abcdChoice: {
     globalName: "ASISTENT_ZA_MATURE_ABCD_CHOICE",
@@ -83,31 +102,32 @@ const mandatorySubjects = [
   "Engleski jezik",
 ];
 
-const temporarilyUnavailableSubjects = new Set([
-  "Biologija",
-  "Logika",
-  "Njemački jezik",
-  "Talijanski jezik",
-]);
+const temporarilyUnavailableSubjects = new Set();
+
+// Admission materials are independent of the NCVVO archive. Add exam years only
+// when the complete paper and a verified answer key are available.
+const medicineAdmission = {
+  label: "Prijemni za medicinu",
+  url: "/?predmet=Prijemni%20za%20medicinu",
+
+};
 
 const subjectIcons = {
   Biologija: "dna",
-  "Engleski jezik": "languages",
+  "Engleski jezik": "language-english",
   Filozofija: "lightbulb",
   Fizika: "atom",
-  Geografija: "earth",
+  Geografija: "globe-hemisphere-west",
   "Hrvatski jezik": "book-open-text",
   Informatika: "binary",
-  Kemija: "flask-conical",
+  Kemija: "flask",
   "Likovna umjetnost": "palette",
-  Logika: "workflow",
   Matematika: "sigma",
-  "Njemački jezik": "languages",
-  "Politika i gospodarstvo": "landmark",
-  Povijest: "history",
+  "Njemački jezik": "language-german",
+  "Politika i gospodarstvo": "bank",
+  Povijest: "scroll",
   Psihologija: "brain",
-  Sociologija: "users-round",
-  "Talijanski jezik": "languages",
+  Sociologija: "users-three",
 };
 
 const subjectColors = {
@@ -119,15 +139,13 @@ const subjectColors = {
   "Hrvatski jezik": "#7a3f4a",
   Informatika: "#2e5c72",
   Kemija: "#315f69",
-  "Likovna umjetnost": "#6a4f3d",
-  Logika: "#4c5870",
+  "Likovna umjetnost": "#7e4a58",
   Matematika: "#4f4b78",
   "Njemački jezik": "#3e5876",
   "Politika i gospodarstvo": "#5c4a42",
   Povijest: "#6a4b3d",
   Psihologija: "#5a4968",
   Sociologija: "#4e5960",
-  "Talijanski jezik": "#405e55",
 };
 
 const subjectImages = {
@@ -140,14 +158,12 @@ const subjectImages = {
   Informatika: "informatics",
   Kemija: "chemistry",
   "Likovna umjetnost": "art",
-  Logika: "logic-chess",
   Matematika: "mathematics",
   "Njemački jezik": "german-brandenburg",
   "Politika i gospodarstvo": "civics",
   Povijest: "history-document",
   Psihologija: "psychology-brain",
   Sociologija: "sociology-crowd",
-  "Talijanski jezik": "italian-colosseum",
 };
 
 const subjectAccusativeLabels = {
@@ -160,14 +176,33 @@ const subjectAccusativeLabels = {
   Informatika: "Informatiku",
   Kemija: "Kemiju",
   "Likovna umjetnost": "Likovnu umjetnost",
-  Logika: "Logiku",
   Matematika: "Matematiku",
   "Njemački jezik": "Njemački jezik",
   "Politika i gospodarstvo": "Politiku i gospodarstvo",
   Povijest: "Povijest",
   Psihologija: "Psihologiju",
   Sociologija: "Sociologiju",
-  "Talijanski jezik": "Talijanski jezik",
+};
+
+// Ispitni katalozi (NCVVO) po predmetu za školsku godinu 2025./2026.
+// Izravne poveznice na službene PDF-ove. Predmeti bez URL-a ne prikazuju gumb.
+const NCVVO_CATALOG_BASE = "https://www.ncvvo.hr/wp-content/uploads/2025/09";
+const subjectCatalogs = {
+  Biologija: `${NCVVO_CATALOG_BASE}/BIO-2026.pdf`,
+  "Engleski jezik": `${NCVVO_CATALOG_BASE}/ENG-2026.pdf`,
+  Filozofija: `${NCVVO_CATALOG_BASE}/FIL-2026.pdf`,
+  Fizika: `${NCVVO_CATALOG_BASE}/FIZ-2026.pdf`,
+  Geografija: `${NCVVO_CATALOG_BASE}/GEO-2026.pdf`,
+  "Hrvatski jezik": `${NCVVO_CATALOG_BASE}/HRV-2026.pdf`,
+  Informatika: `${NCVVO_CATALOG_BASE}/INF-2026.pdf`,
+  Kemija: `${NCVVO_CATALOG_BASE}/KEM-2026.pdf`,
+  "Likovna umjetnost": `${NCVVO_CATALOG_BASE}/LIU-2026.pdf`,
+  Matematika: `${NCVVO_CATALOG_BASE}/MAT-2026.pdf`,
+  "Njemački jezik": `${NCVVO_CATALOG_BASE}/NJEM-2026.pdf`,
+  "Politika i gospodarstvo": `${NCVVO_CATALOG_BASE}/PIG-2026.pdf`,
+  Povijest: `${NCVVO_CATALOG_BASE}/POV-2026.pdf`,
+  Psihologija: `${NCVVO_CATALOG_BASE}/PSI-2026.pdf`,
+  Sociologija: `${NCVVO_CATALOG_BASE}/SOC-2026.pdf`,
 };
 
 const termLabels = {
@@ -188,15 +223,15 @@ const legacyTermAliases = {
 };
 
 const termOrder = {
-  "ljetni rok": 0,
-  "jesenski rok": 1,
+  "jesenski rok": 0,
+  "ljetni rok": 1,
 };
 
 const siteOrigin = "https://matura.com.hr";
-const siteName = "Asistent za Mature";
-const homeSeoTitle = "Državna matura: prethodni ispiti i vježba | Asistent za Mature";
+const siteName = "Maturomat";
+const homeSeoTitle = "Državna matura: prethodni ispiti i vježba | Maturomat";
 const homeSeoDescription =
-  "Vježbaj državnu maturu na prethodnim ispitima i preuzmi NCVVO pakete za 2013.-2025. Prati napredak ili pokreni vremenski ograničenu simulaciju.";
+  "Vježbaj državnu maturu na prethodnim ispitima i preuzmi NCVVO pakete od 2015. nadalje. Prati napredak ili pokreni vremenski ograničenu simulaciju.";
 
 const appRoot = document.querySelector("#app-root");
 const homeHeading = document.querySelector("[data-home-heading]");
@@ -313,6 +348,21 @@ const solverDefinitions = {
     page: "./engleski-esej.html",
     storagePrefix: "english-essay",
   },
+  germanReading: {
+    idForTerm: (exam, term) => prefixedExamIdForTerm("njemacki", exam, term),
+    page: "./njemacki-citanje.html",
+    storagePrefix: "german-reading",
+  },
+  germanListening: {
+    idForTerm: (exam, term) => prefixedExamIdForTerm("njemacki", exam, term),
+    page: "./njemacki-slusanje.html",
+    storagePrefix: "german-listening",
+  },
+  germanEssay: {
+    idForTerm: (exam, term) => prefixedExamIdForTerm("njemacki", exam, term),
+    page: "./njemacki-esej.html",
+    storagePrefix: "german-essay",
+  },
   croatianWriting: {
     archiveKey: croatianWritingArchiveKey,
     archiveLookupKey: croatianWritingArchiveLookupKey,
@@ -334,6 +384,11 @@ const solverDefinitions = {
     idForTerm: (exam, term) => `kemija-${exam.year}-${slugPart(term)}`,
     page: "./kemija.html",
     storagePrefix: "chemistry-choice",
+  },
+  biologyChoice: {
+    idForTerm: (exam, term) => `biologija-${exam.year}-${slugPart(term)}`,
+    page: "./biologija.html",
+    storagePrefix: "biology-choice",
   },
   croatianChoice: {
     idForTerm: (exam, term) => prefixedExamIdForTerm("hrvatski", exam, term),
@@ -499,8 +554,19 @@ function solverUrl(solverKey, practiceExam, simulation = false) {
 }
 
 function solverExamForArchive(solverKey, exam, archivePart = undefined) {
+  if (!solverKeysForSubject(exam.subject).includes(solverKey)) return null;
+
   const definition = solverRegistry[solverKey];
-  return definition.byArchive.get(definition.archiveLookupKey(exam, archivePart)) || null;
+  const matched = definition.byArchive.get(definition.archiveLookupKey(exam, archivePart));
+  if (matched) return matched;
+
+  // Archive ZIP names can change after an exam has already been imported.
+  const id = definition.idForTerm(
+    { ...exam, ...(archivePart ? { kind: archivePart } : {}) },
+    normalizeTerm(exam.term),
+  );
+  const candidates = definition.exams.filter((practiceExam) => practiceExam.id === id);
+  return candidates.length === 1 ? candidates[0] : null;
 }
 
 function englishReadingIdForTerm(exam, term) {
@@ -603,6 +669,14 @@ function chemistryOpenScoreStorageKeys(choiceExam) {
   return solverOpenScoreStorageKeys("chemistryChoice", choiceExam);
 }
 
+function biologyChoiceStorageKeys(choiceExam) {
+  return solverStorageKeys("biologyChoice", choiceExam);
+}
+
+function biologyOpenScoreStorageKeys(choiceExam) {
+  return solverOpenScoreStorageKeys("biologyChoice", choiceExam);
+}
+
 function croatianChoiceStorageKeys(choiceExam) {
   return solverStorageKeys("croatianChoice", choiceExam);
 }
@@ -673,6 +747,31 @@ function englishPracticePartsForExam(exam) {
 
   return englishPracticeParts;
 }
+const germanPracticeParts = [
+  {
+    id: "citanje",
+    label: "Čitanje",
+    description: "Razumijevanje pročitanoga teksta.",
+  },
+  {
+    id: "slusanje",
+    label: "Slušanje",
+    description: "Razumijevanje slušanoga teksta.",
+  },
+  {
+    id: "pisanje",
+    label: "Pisanje",
+    description: "Pregled pisanoga sastava iz ispita.",
+    checkingSupported: false,
+  },
+];
+function germanPracticePartsForExam(exam) {
+  if (exam.level === "B") {
+    return germanPracticeParts.filter((part) => part.id !== "pisanje");
+  }
+
+  return germanPracticeParts;
+}
 
 const modernForeignLanguageDurations = {
   "Engleski jezik": {
@@ -684,15 +783,10 @@ const modernForeignLanguageDurations = {
     A: { citanje: 70, slusanje: 35, pisanje: 75 },
     B: { citanje: 100, slusanje: 30, pisanje: 100 },
   },
-  "Talijanski jezik": {
-    A: { citanje: 65, slusanje: 30, pisanje: 55 },
-    B: { citanje: 75, slusanje: 25, pisanje: 75 },
-  },
 };
 const modernForeignLanguageSubjects = new Set([
   "Engleski jezik",
   "Njemački jezik",
-  "Talijanski jezik",
 ]);
 const unavailableForeignLanguageParts = [
   {
@@ -724,7 +818,6 @@ const singleExamDurations = {
   Informatika: 100,
   Kemija: 180,
   "Likovna umjetnost": 120,
-  Logika: 150,
   Matematika: {
     A: 180,
     B: 150,
@@ -758,11 +851,11 @@ const subjectsBySlug = new Map(allSubjects.map((subject) => [slugPart(subject), 
 const examsByPath = new Map(exams.map((exam) => [examPath(exam), exam]));
 
 function icon(iconName, className) {
-  if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
+  if (window.renderPhosphorIcon) return window.renderPhosphorIcon(iconName, className);
 
   return `
     <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="./assets/lucide-icons.svg#${iconName}"></use>
+      <use href="./assets/phosphor-icons.svg#${iconName}"></use>
     </svg>
   `;
 }
@@ -783,11 +876,13 @@ function subjectAccusative(subject) {
   return subjectAccusativeLabels[subject] || subject;
 }
 
+function subjectCatalogUrl(subject) {
+  return subjectCatalogs[subject] || "";
+}
+
 function downloadIcon() {
   return `
-    <svg aria-hidden="true" viewBox="0 0 16 16">
-      <path d="M8 2v8m0 0 3-3m-3 3L5 7M3 13.5h10" />
-    </svg>
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="./assets/phosphor-icons.svg#download-simple"></use></svg>
   `;
 }
 
@@ -959,8 +1054,8 @@ function setHomeSeo() {
 function setSubjectSeo(subject) {
   const canonicalUrl = subjectCanonicalUrl(subject);
   const title = `${subject} državna matura: ispiti i vježba | ${siteName}`;
-  const description = `${subject}: prethodni ispiti državne mature od 2013. do 2025., službeni NCVVO paketi za preuzimanje i dostupne interaktivne vježbe.`;
-  const subjectArchive = subjectExams(subject);
+  const description = `${subject}: prethodni ispiti državne mature od 2015. nadalje, službeni NCVVO paketi za preuzimanje i dostupne interaktivne vježbe.`;
+  const subjectArchive = exams.filter((exam) => exam.subject === subject).sort(compareExams);
 
   setPageSeo({
     canonicalUrl,
@@ -980,7 +1075,7 @@ function setSubjectSeo(subject) {
         name: subject,
       },
       breadcrumb: breadcrumbStructuredData([
-        { name: "Asistent za Mature", url: sitePageUrl() },
+        { name: "Maturomat", url: sitePageUrl() },
         { name: subject, url: canonicalUrl },
       ]),
       mainEntity: {
@@ -1021,7 +1116,7 @@ function setExamSeo(exam) {
       inLanguage: "hr-HR",
       dateModified: archiveData.generatedAt,
       breadcrumb: breadcrumbStructuredData([
-        { name: "Asistent za Mature", url: sitePageUrl() },
+        { name: "Maturomat", url: sitePageUrl() },
         { name: exam.subject, url: subjectCanonicalUrl(exam.subject) },
         { name: examName, url: canonicalUrl },
       ]),
@@ -1078,6 +1173,18 @@ function englishEssayUrl(essayExam, simulation = false) {
   return solverUrl("englishEssay", essayExam, simulation);
 }
 
+function germanReadingUrl(readingExam, simulation = false) {
+  return solverUrl("germanReading", readingExam, simulation);
+}
+
+function germanListeningUrl(listeningExam, simulation = false) {
+  return solverUrl("germanListening", listeningExam, simulation);
+}
+
+function germanEssayUrl(essayExam, simulation = false) {
+  return solverUrl("germanEssay", essayExam, simulation);
+}
+
 function croatianWritingUrl(writingExam, simulation = false) {
   return solverUrl("croatianWriting", writingExam, simulation);
 }
@@ -1092,6 +1199,10 @@ function mathChoiceUrl(choiceExam, simulation = false) {
 
 function chemistryChoiceUrl(choiceExam, simulation = false) {
   return solverUrl("chemistryChoice", choiceExam, simulation);
+}
+
+function biologyChoiceUrl(choiceExam, simulation = false) {
+  return solverUrl("biologyChoice", choiceExam, simulation);
 }
 
 function croatianChoiceUrl(choiceExam, simulation = false) {
@@ -1146,6 +1257,18 @@ function essayExamForArchive(exam) {
   return solverExamForArchive("englishEssay", exam);
 }
 
+function germanReadingExamForArchive(exam) {
+  return solverExamForArchive("germanReading", exam);
+}
+
+function germanListeningExamForArchive(exam) {
+  return solverExamForArchive("germanListening", exam);
+}
+
+function germanEssayExamForArchive(exam) {
+  return solverExamForArchive("germanEssay", exam);
+}
+
 function croatianWritingExamForArchive(exam, kind) {
   return solverExamForArchive("croatianWriting", exam, kind);
 }
@@ -1160,6 +1283,10 @@ function mathChoiceExamForArchive(exam) {
 
 function chemistryChoiceExamForArchive(exam) {
   return solverExamForArchive("chemistryChoice", exam);
+}
+
+function biologyChoiceExamForArchive(exam) {
+  return solverExamForArchive("biologyChoice", exam);
 }
 
 function croatianChoiceExamForArchive(exam) {
@@ -1402,6 +1529,26 @@ function interactiveParts(exam) {
     });
   }
 
+  if (exam.subject === "Njemački jezik") {
+    const readingExam = germanReadingExamForArchive(exam);
+    const listeningExam = germanListeningExamForArchive(exam);
+    const essayExam = germanEssayExamForArchive(exam);
+    const parts = withDurations(exam, germanPracticePartsForExam(exam));
+
+    return parts.map((part) => {
+      if (part.id === "citanje") {
+        return linkedPart(exam, part, readingExam, germanReadingUrl, "germanReading");
+      }
+      if (part.id === "slusanje") {
+        return linkedPart(exam, part, listeningExam, germanListeningUrl, "germanListening");
+      }
+      if (part.id === "pisanje") {
+        return linkedPart(exam, part, essayExam, germanEssayUrl, "germanEssay");
+      }
+      return unavailablePart(exam, part);
+    });
+  }
+
   if (exam.subject === "Hrvatski jezik") {
     return croatianPracticeParts(exam);
   }
@@ -1456,6 +1603,24 @@ function interactiveParts(exam) {
         },
         choiceExam,
         chemistryChoiceUrl,
+      ),
+    ];
+  }
+
+  if (exam.subject === "Biologija") {
+    const choiceExam = biologyChoiceExamForArchive(exam);
+    return [
+      linkedPart(
+        exam,
+        {
+          id: "biologija",
+          label: "Ispit",
+          description: "ABCD zadatci ocjenjuju se automatski, a ostali zadatci ručno prema službenim rješenjima.",
+          durationMinutes: singleExamDuration(exam),
+          requiresManualChecking: true,
+        },
+        choiceExam,
+        biologyChoiceUrl,
       ),
     ];
   }
@@ -1864,6 +2029,56 @@ function chemistryProgress(exam) {
   };
 }
 
+function readBiologyResponses(choiceExam) {
+  return readMergedStorageObjects(biologyChoiceStorageKeys(choiceExam));
+}
+
+function readBiologyOpenScores(choiceExam) {
+  return readMergedStorageObjects(biologyOpenScoreStorageKeys(choiceExam));
+}
+
+function biologyQuestionNumbers(choiceExam) {
+  return (choiceExam.tasks || []).flatMap((task) =>
+    task.questions.map((question) => String(question.number)),
+  );
+}
+
+function biologyOpenQuestions(choiceExam) {
+  return (choiceExam.openTasks || []).flatMap((task) => task.questions);
+}
+
+function biologyProgress(exam) {
+  const choiceExam = biologyChoiceExamForArchive(exam);
+  if (!choiceExam) return null;
+
+  const knownQuestions = new Set(biologyQuestionNumbers(choiceExam));
+  const responses = readBiologyResponses(choiceExam);
+  const answered = Object.entries(responses).filter(
+    ([question, answer]) =>
+      knownQuestions.has(question) && typeof answer === "string" && answer.trim(),
+  ).length;
+  const openQuestions = new Map(
+    biologyOpenQuestions(choiceExam).map((question) => [
+      String(question.number),
+      Number(question.maxPoints),
+    ]),
+  );
+  const openScores = readBiologyOpenScores(choiceExam);
+  const reviewed = Object.entries(openScores).filter(([question, score]) => {
+    const maximum = openQuestions.get(question);
+    return Number.isInteger(maximum)
+      && Number.isInteger(score)
+      && score >= 0
+      && score <= maximum;
+  }).length;
+
+  return {
+    answered: answered + reviewed,
+    id: choiceExam.id,
+    total: knownQuestions.size + openQuestions.size,
+  };
+}
+
 function readCroatianResponses(choiceExam) {
   return readMergedStorageObjects(croatianChoiceStorageKeys(choiceExam));
 }
@@ -2200,6 +2415,7 @@ function abcdChoiceProgress(exam) {
   if (
     exam.subject === "Matematika"
     || exam.subject === "Kemija"
+    || exam.subject === "Biologija"
     || exam.subject === "Povijest"
     || exam.subject === "Geografija"
     || exam.subject === "Psihologija"
@@ -2236,6 +2452,7 @@ function examProgress(exam) {
     physicsProgress(exam),
     mathProgress(exam),
     chemistryProgress(exam),
+    biologyProgress(exam),
     croatianProgress(exam),
     historyProgress(exam),
     geographyProgress(exam),
@@ -2551,8 +2768,13 @@ function route() {
 }
 
 function solverKeysForSubject(subject) {
+  if (subject === medicineAdmission.label) return [];
   if (subject === "Engleski jezik") {
     return ["englishReading", "englishListening", "englishEssay"];
+  }
+
+  if (subject === "Njemački jezik") {
+    return ["germanReading", "germanListening", "germanEssay"];
   }
 
   if (subject === "Hrvatski jezik") {
@@ -2562,6 +2784,7 @@ function solverKeysForSubject(subject) {
   if (subject === "Fizika") return ["physicsChoice"];
   if (subject === "Matematika") return ["mathChoice"];
   if (subject === "Kemija") return ["chemistryChoice"];
+  if (subject === "Biologija") return ["biologyChoice"];
   if (subject === "Povijest") return ["historyChoice"];
   if (subject === "Geografija") return ["geographyChoice"];
   if (subject === "Psihologija") return ["psychologyChoice"];
@@ -2645,6 +2868,10 @@ async function renderApp() {
   }
 
   if (currentRoute.subject) {
+    if (currentRoute.subject === medicineAdmission.label) {
+      renderMedicineAdmissionPage();
+      return;
+    }
     const subject = allSubjects.find((candidate) => candidate === currentRoute.subject);
     if (subject) {
       if (currentRoute.legacyUrl) {
@@ -2748,6 +2975,167 @@ function renderSubjectGrid() {
       </div>
     </section>
   `;
+
+  subjectList.insertAdjacentHTML("beforeend", `
+    <section class="subject-group" aria-label="Prijemni za medicinu">
+      <div class="subject-grid subject-grid--admission">
+        <a class="subject-card" href="${medicineAdmission.url}" style="--subject-color: #315f69; --subject-image: url('./assets/subjects/medicine.webp')">
+          <span class="subject-symbol">${icon("stethoscope", "subject-symbol__icon")}</span>
+          <span class="subject-card__body">
+            <strong>${medicineAdmission.label}</strong>
+            <span class="subject-card__views" data-subject-views="${medicineAdmission.label}" hidden>
+              ${icon("eye", "subject-card__views-icon")}
+              <span class="subject-card__views-count"></span>
+            </span>
+          </span>
+          <span class="subject-card__action" aria-hidden="true">${icon("arrow-right", "subject-card__action-icon")}</span>
+        </a>
+      </div>
+    </section>
+  `);
+
+  startSubjectViews();
+}
+
+function renderMedicineExamRow(set) {
+  const isCollection = set.kind === "collection";
+  let answered = 0;
+  try {
+    const saved = JSON.parse(localStorage.getItem(window.MedicineCore.storageKey(set.id)) || "null");
+    if (saved?.schemaVersion === 1) answered = (set.kind === "random" ? saved.questionIds || [] : set.questionIds).filter((id) => /^[ABCDE]$/.test(saved.answers?.[id] || "")).length;
+  } catch { /* An unavailable browser store must not prevent opening a paper. */ }
+  const url = `./medicina.html?exam=${encodeURIComponent(set.id)}`;
+  return `<article class="practice-exam-row${isCollection ? " practice-exam-row--collection" : ""}">
+    <div class="practice-exam-row__name"><strong>${escapeHtml(isCollection ? set.title.split(" · ")[0] : set.title)}</strong><span class="subject-group__note">${set.expectedCount} zadataka${answered ? ` · odgovoreno ${answered}/${set.expectedCount}` : ""}</span></div>
+    ${isCollection ? "" : `<div class="practice-exam-row__duration">Simulacija ${set.durationMinutes} min</div>`}
+    <div class="practice-exam-row__actions"><a class="primary-button" href="${url}">Otvori vježbu</a>${isCollection ? "" : `<a class="secondary-button" href="${url}&nacin=simulacija">Simuliraj prijemni</a>`}</div>
+  </article>`;
+}
+
+function renderMedicineAdmissionPage() {
+  cleanupYearNavigation();
+  const canonicalUrl = new URL(medicineAdmission.url, siteOrigin).href;
+  const description = "Prijemni za medicinu: nasumični ispit od 120 pitanja te katalozi zadataka iz biologije, fizike i kemije.";
+  setPageSeo({
+    canonicalUrl,
+    description,
+    title: `${medicineAdmission.label} | ${siteName}`,
+    schema: {
+      "@type": "WebPage",
+      url: canonicalUrl,
+      name: medicineAdmission.label,
+      description,
+      inLanguage: "hr-HR",
+    },
+  });
+
+  const medicineSets = window.MEDICINE_CATALOG || [];
+  const renderSets = (kind) => medicineSets.filter((set) => set.kind === kind && set.complete).map(renderMedicineExamRow).join("");
+  appRoot.innerHTML = `
+    <div class="subject-page medicine-admission" style="--subject-color: #315f69">
+      <div class="subject-page__intro">
+        <a class="back-link back-link--home" href="./" aria-label="Svi predmeti">
+          ${icon("house", "back-link__icon back-link__icon--desktop")}
+          ${icon("arrow-left", "back-link__icon back-link__icon--mobile")}
+          <span class="back-link__label">Svi predmeti</span>
+        </a>
+        <div class="subject-title-row">
+          <span class="subject-symbol">${icon("stethoscope", "subject-symbol__icon")}</span>
+          <h2>${medicineAdmission.label}</h2>
+        </div>
+      </div>
+      <div class="medicine-admission__content">
+        <p class="medicine-admission__notice">Neslužbeni projekt · priprema za prijemni Medicinskog fakulteta u Zagrebu.</p>
+        <div class="medicine-admission__layout">
+          <div class="medicine-admission__choices">
+        <section class="medicine-admission__materials" aria-labelledby="admission-random-heading">
+          <div class="medicine-admission__section-heading">
+            <div><p class="eyebrow">Ispit</p><h3 id="admission-random-heading">Nasumični ispit</h3></div>
+            <p>120 pitanja · po 40 iz biologije, fizike i kemije.</p>
+          </div>
+          <div class="practice-exam-selection"><div class="practice-exam-list">${renderSets("random")}</div></div>
+        </section>
+        <section class="medicine-admission__materials" aria-labelledby="admission-catalog-heading">
+          <div class="medicine-admission__section-heading">
+            <div><p class="eyebrow">Vježbanje po predmetu</p><h3 id="admission-catalog-heading">Katalog pitanja</h3></div>
+            <p>108 zadataka iz odabranog predmeta, po redu.</p>
+          </div>
+          <div class="practice-exam-selection"><div class="practice-exam-list">${renderSets("collection")}</div></div>
+        </section>
+          </div>
+          <aside class="medicine-admission__guide" aria-label="Kako rade vježbe i bodovanje">
+            <h3>Kako radi rješavanje</h3>
+            <p><strong>Nasumični ispit</strong> sastavlja 120 pitanja. Vježba sprema odabrani skup i odgovore u ovom pregledniku; brisanjem napretka nastaje novi skup.</p>
+            <p><strong>Simulacija ispita</strong> svaki put bira novi skup, traje 180 minuta, počinje prazna i ne sprema odgovore ni napredak.</p>
+            <p><strong>Katalog pitanja</strong> rješava se po redu, bez vremenskog ograničenja. Odgovori se spremaju; pojedini zadatak možeš provjeriti gumbom „Provjeri”.</p>
+            <h4>Bodovanje</h4>
+            <p>Točan odgovor donosi 5 bodova, a netočan ili neodgovoren 0. Nasumični ispit nosi najviše 600 bodova, a katalog jednog predmeta 540.</p>
+            <p>Usporedni prag prema modelu iz 2020. iznosi 330/600 ukupno i najmanje 16/40 točnih iz svakog predmeta. To nisu aktualni uvjeti upisa. Katalog nema upisni prag.</p>
+          </aside>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Uživo brojač pregleda po predmetu. Vrijednosti dohvaćamo s /api/pageviews i
+// periodički osvježavamo dok je naslovnica vidljiva.
+const subjectViewCounts = new Map();
+const SUBJECT_VIEWS_INTERVAL_MS = 20000;
+let subjectViewsPollTimer = null;
+
+function startSubjectViews() {
+  applySubjectViews();
+  fetchSubjectViews();
+
+  if (subjectViewsPollTimer === null) {
+    subjectViewsPollTimer = window.setInterval(() => {
+      if (document.hidden) return;
+      if (!appRoot.querySelector("[data-subject-views]")) return;
+      fetchSubjectViews();
+    }, SUBJECT_VIEWS_INTERVAL_MS);
+  }
+}
+
+async function fetchSubjectViews() {
+  try {
+    const response = await fetch("/api/pageviews", { headers: { Accept: "application/json" } });
+    if (!response.ok) return;
+
+    const data = await response.json();
+    const subjects = data && data.subjects;
+    if (!subjects || typeof subjects !== "object") return;
+
+    subjectViewCounts.clear();
+    for (const [subject, views] of Object.entries(subjects)) {
+      if (Number.isFinite(views)) subjectViewCounts.set(subject, views);
+    }
+    applySubjectViews();
+  } catch {
+    // Brojač pregleda ne smije srušiti naslovnicu.
+  }
+}
+
+function applySubjectViews() {
+  for (const node of appRoot.querySelectorAll("[data-subject-views]")) {
+    const views = subjectViewCounts.get(node.getAttribute("data-subject-views"));
+    // Brojač prikazujemo samo kad pregleda ima dovoljno (iznad 1000).
+    if (Number.isFinite(views) && views > 1000) {
+      const countNode = node.querySelector(".subject-card__views-count");
+      if (countNode) countNode.textContent = formatViewCount(views);
+      node.hidden = false;
+    } else {
+      node.hidden = true;
+    }
+  }
+}
+
+function formatViewCount(views) {
+  // Namjerno koristimo zarez kao razdjelnik tisućica ("12,259"), iako je u
+  // hrvatskom pravopisu razdjelnik točka — radi traženog izgleda brojača.
+  const number = views.toLocaleString("en-US");
+  const noun = views % 10 === 1 && views % 100 !== 11 ? "pregled" : "pregleda";
+  return `${number} ${noun}`;
 }
 
 function renderSubjectCard(subject) {
@@ -2770,6 +3158,10 @@ function renderSubjectCard(subject) {
       <span class="subject-card__body">
         <strong>${escapeHtml(actionLabel)}</strong>
         ${subjectStatus}
+        <span class="subject-card__views" data-subject-views="${escapeHtml(subject)}" hidden>
+          ${icon("eye", "subject-card__views-icon")}
+          <span class="subject-card__views-count"></span>
+        </span>
       </span>
       <span class="subject-card__action" aria-hidden="true">
         ${icon(actionIcon, "subject-card__action-icon")}
@@ -2782,10 +3174,25 @@ function renderSubjectPage(subject) {
   cleanupYearNavigation();
   setSubjectSeo(subject);
   const colorStyle = ` style="--subject-color: ${subjectColor(subject)}"`;
+  const catalogUrl = subjectCatalogUrl(subject);
+  const catalogButton = catalogUrl
+    ? `
+        <a
+          class="subject-catalog-link"
+          href="${escapeHtml(catalogUrl)}"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Preuzmi ispitni katalog za ${escapeHtml(subject)}"
+        >
+          ${downloadIcon()}
+          <span class="subject-catalog-link__label subject-catalog-link__label--full">Ispitni katalog</span>
+          <span class="subject-catalog-link__label subject-catalog-link__label--short">Katalog</span>
+        </a>`
+    : "";
 
   appRoot.innerHTML = `
     <div class="subject-page"${colorStyle}>
-      <div class="subject-page__intro">
+      <div class="subject-page__intro${catalogUrl ? " subject-page__intro--with-catalog" : ""}">
         <a class="back-link back-link--home" href="./" aria-label="Svi predmeti">
           ${icon("house", "back-link__icon back-link__icon--desktop")}
           ${icon("arrow-left", "back-link__icon back-link__icon--mobile")}
@@ -2797,6 +3204,7 @@ function renderSubjectPage(subject) {
           </span>
           <h2>${escapeHtml(subject)}</h2>
         </div>
+        ${catalogButton}
       </div>
 
       <div class="practice-layout">
@@ -2806,15 +3214,26 @@ function renderSubjectPage(subject) {
           </div>
 
           <nav class="year-jump-list" id="year-jump-list" aria-label="Godine ispita"></nav>
+          ${renderGradeThresholds({ subject })}
         </aside>
 
         <div class="subject-results">
+          ${renderSubjectLevelFilter(subject)}
           <div id="subject-exam-list"></div>
         </div>
       </div>
+      <dialog class="exam-selection-dialog" aria-labelledby="exam-selection-title" data-exam-selection-dialog></dialog>
     </div>
   `;
 
+  const levelFilter = appRoot.querySelector("[data-subject-level-filter]");
+  levelFilter?.addEventListener("change", (event) => {
+    window.AsistentProfile?.setSubjectLevel(subject, event.target.value);
+    cleanupYearNavigation();
+    renderSubjectYearNavigation(subject);
+    renderSubjectExamList(subject);
+    setupYearNavigation();
+  });
   renderSubjectYearNavigation(subject);
   renderSubjectExamList(subject);
   setupYearNavigation();
@@ -2829,7 +3248,7 @@ function cleanupYearNavigation() {
 
 function subjectYears(subject) {
   return [
-    ...new Set(exams.filter((exam) => exam.subject === subject).map((exam) => exam.year)),
+    ...new Set(subjectExams(subject).map((exam) => exam.year)),
   ].sort((a, b) => b - a);
 }
 
@@ -2955,8 +3374,22 @@ function setupYearNavigation() {
   };
 }
 
+function renderSubjectLevelFilter(subject) {
+  if (!exams.some((exam) => exam.subject === subject && exam.level)) return "";
+  const selected = window.AsistentProfile?.getSubjectLevel(subject) || "";
+  return `<div class="subject-level-filter">
+    <span id="subject-level-label">Razina</span>
+    <div class="level-options" role="group" aria-labelledby="subject-level-label" data-subject-level-filter>
+      ${[["", "Sve"], ["A", "A"], ["B", "B"]]
+        .map(([value, label]) => `<label class="level-option"><input type="radio" name="subject-level" value="${value}"${value === selected ? " checked" : ""}><span>${label}</span></label>`).join("")}
+    </div>
+  </div>`;
+}
+
 function subjectExams(subject) {
-  return exams.filter((exam) => exam.subject === subject).sort(compareExams);
+  const level = window.AsistentProfile?.getSubjectLevel(subject) || "";
+  return exams.filter((exam) => exam.subject === subject
+    && (!level || !exam.level || exam.level === level)).sort(compareExams);
 }
 
 function compareExams(a, b) {
@@ -2990,62 +3423,63 @@ function renderSubjectExamList(subject) {
     byYear.get(exam.year).push(exam);
   }
 
-  appRoot.querySelector("#subject-exam-list").innerHTML = [...byYear.entries()]
-    .map(([year, yearExams]) => renderPracticeYearBlock(year, yearExams, simulationAttempts))
-    .join("");
-}
-
-function renderPracticeYearBlock(year, yearExams, simulationAttempts) {
-  const hasLevels = yearExams.some((exam) => exam.level);
-
-  return `
-    <section
-      class="year-block practice-year-block"
-      id="year-${year}"
-      data-year-section="${year}"
-      aria-labelledby="year-${year}-heading"
-    >
-      <div class="year-heading">
-        <h3 id="year-${year}-heading">${year}.</h3>
-        <p>školska godina ${year - 1}./${year}.</p>
-      </div>
-      <div class="practice-table-wrap">
-        <table class="practice-exam-table subject-exam-table">
-          <colgroup>
-            <col class="subject-exam-table__col-term" />
-            <col class="subject-exam-table__col-progress" />
-            <col class="subject-exam-table__col-best" />
-            <col class="subject-exam-table__col-actions" />
-          </colgroup>
-          <thead>
-            <tr>
-              <th><span class="visually-hidden">Rok i razina</span></th>
-              <th>Napredak</th>
-              <th title="Najbolji rezultat virtualne mature">Najbolji rezultat</th>
-              <th>Materijali</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${yearExams
-              .map((exam) => renderSubjectExamRow(exam, hasLevels, simulationAttempts))
-              .join("")}
-          </tbody>
-        </table>
-      </div>
-    </section>
+  appRoot.querySelector("#subject-exam-list").innerHTML = `
+    <div class="practice-table-wrap subject-exam-table-wrap">
+      <table class="practice-exam-table subject-exam-table">
+        <colgroup>
+          <col class="subject-exam-table__col-term" />
+          <col class="subject-exam-table__col-progress" />
+          <col class="subject-exam-table__col-best" />
+          <col class="subject-exam-table__col-actions" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th><span class="visually-hidden">Godina, rok i razina</span></th>
+            <th>Napredak</th>
+            <th title="Najbolji rezultat virtualne mature">Najbolji rezultat</th>
+            <th>Materijali</th>
+          </tr>
+        </thead>
+        ${[...byYear.entries()]
+          .map(([year, yearExams]) => renderPracticeYearRows(year, yearExams, simulationAttempts))
+          .join("")}
+      </table>
+    </div>
   `;
 }
 
-function renderSubjectExamRow(exam, hasLevels, simulationAttempts) {
-  const progress = examProgress(exam);
-  const bestPercentages = bestSimulationPercentages(exam, simulationAttempts);
+function renderPracticeYearRows(year, yearExams, simulationAttempts) {
+  const hasLevels = yearExams.some((exam) => exam.level);
 
   return `
-    <tr>
+    <tbody
+      class="practice-year-group"
+      aria-label="${year}. godina"
+    >
+      ${yearExams
+        .map((exam, index) =>
+          renderSubjectExamRow(exam, hasLevels, simulationAttempts, index === 0 ? year : null),
+        )
+        .join("")}
+    </tbody>
+  `;
+}
+
+function renderSubjectExamRow(exam, hasLevels, simulationAttempts, yearAnchor = null) {
+  const unavailable = !interactiveParts(exam).some((part) => part.available);
+  const progress = examProgress(exam);
+  const bestPercentages = bestSimulationPercentages(exam, simulationAttempts);
+  const yearAttributes = yearAnchor
+    ? ` class="practice-year-row-start" id="year-${yearAnchor}" data-year-section="${yearAnchor}"`
+    : "";
+
+  return `
+    <tr${yearAttributes}${unavailable ? ' data-unavailable="true"' : ""}>
       <td data-label="Rok">
         <div class="subject-exam-table__exam-label">
-          <strong>${escapeHtml(formatTerm(exam.term))}</strong>
+          <strong>${exam.year}. ${escapeHtml(formatTerm(exam.term))}</strong>
           ${hasLevels ? levelBadge(exam.level) : ""}
+          ${exam.year <= 2022 ? '<span class="subject-exam-table__plus-label" role="img" aria-label="Matura Plus" title="Matura Plus"><svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 4v12M4 10h12" fill="none" /></svg></span>' : ""}
         </div>
       </td>
       <td class="subject-exam-table__progress-cell" data-label="Napredak">
@@ -3060,8 +3494,10 @@ function renderSubjectExamRow(exam, hasLevels, simulationAttempts) {
         ${renderBestSimulationPercentages(bestPercentages)}
       </td>
       <td data-label="Materijali">
+        <div class="subject-exam-table__actions-wrap">
+        ${unavailable ? '<span class="subject-exam-table__unavailable-label"><span>Vježba nije dostupna</span></span>' : ""}
         <div class="exam-actions">
-          <a class="primary-button" href="${examUrl(exam)}">Otvori maturu</a>
+          <a class="primary-button" ${unavailable ? 'aria-disabled="true"' : `href="${examUrl(exam)}" data-open-exam="${escapeHtml(exam.id)}"`}>Otvori maturu</a>
           <a
             class="download-icon-link"
             href="${escapeHtml(exam.url)}"
@@ -3073,6 +3509,7 @@ function renderSubjectExamRow(exam, hasLevels, simulationAttempts) {
           >
             ${downloadIcon()}
           </a>
+        </div>
         </div>
       </td>
     </tr>
@@ -3103,9 +3540,119 @@ function renderExamPractice(exam, selectedPartId = "") {
       <div class="practice-detail__content">
         <div class="practice-detail__main">
           ${renderInteractiveArea(exam, selectedPartId)}
+          ${renderExamStatistics(exam)}
         </div>
-        ${renderGradeThresholds(exam)}
       </div>
+    </div>
+  `;
+}
+
+function openExamSelectionDialog(exam) {
+  const dialog = appRoot.querySelector("[data-exam-selection-dialog]");
+  if (!dialog) return;
+
+  dialog.style.setProperty("--subject-color", subjectColor(exam.subject));
+  dialog.innerHTML = `
+    <div class="exam-selection-dialog__header">
+      <div>
+        <p class="eyebrow">Odabir ispitne cjeline</p>
+        <h2 id="exam-selection-title">${escapeHtml(exam.subject)} ${exam.year}.</h2>
+        <p>${escapeHtml(formatLevel(exam.level))}, ${escapeHtml(exam.term)}</p>
+      </div>
+      <button class="exam-selection-dialog__close" type="button" data-close-exam-selection aria-label="Zatvori odabir ispita">×</button>
+    </div>
+    <div class="exam-selection-dialog__body">
+      ${renderInteractiveArea(exam, "")}
+      ${renderExamStatistics(exam)}
+    </div>
+  `;
+  dialog.showModal();
+}
+
+function handleExamSelectionClick(event) {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+
+  const link = target.closest("[data-open-exam]");
+  if (link && appRoot.contains(link)) {
+    if (browserShouldHandleNavigation(event, link)) return;
+    const exam = examsById.get(link.dataset.openExam);
+    if (!exam) return;
+    event.preventDefault();
+    openExamSelectionDialog(exam);
+    return;
+  }
+
+  const dialog = appRoot.querySelector("[data-exam-selection-dialog]");
+  if (dialog?.open && (target === dialog || target.closest("[data-close-exam-selection]"))) {
+    dialog.close();
+  }
+}
+
+function matchingExamStatistics(exam) {
+  return examStatistics.find(
+    (statistics) =>
+      statistics.year === exam.year &&
+      statistics.term === exam.term &&
+      statistics.subject === exam.subject &&
+      (statistics.level || "") === (exam.level || ""),
+  );
+}
+
+function formatExamStatistic(value) {
+  return new Intl.NumberFormat("hr-HR", {
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+function renderExamStatistics(exam) {
+  const statistics = matchingExamStatistics(exam);
+  if (!statistics) return "";
+
+  return `
+    <section class="exam-statistics" aria-label="Službeni rezultati ove mature">
+      <div class="exam-statistics__summary">
+        <p>
+          Prosječna riješenost <strong>${escapeHtml(formatExamStatistic(statistics.mean))} %</strong>
+          <span aria-hidden="true">·</span>
+          Pristupnici <strong>${escapeHtml(formatExamStatistic(statistics.candidates))}</strong>
+        </p>
+        ${renderGradeDistribution(statistics.gradeDistribution)}
+        <a href="${escapeHtml(statistics.source.url)}" target="_blank" rel="noreferrer">
+          NCVVO izvještaj
+          ${icon("arrow-right", "exam-statistics__link-icon")}
+        </a>
+      </div>
+    </section>
+  `;
+}
+
+const gradeDistributionTones = ["poor", "low", "medium", "good", "excellent"];
+
+function renderGradeDistribution(distribution) {
+  if (!Array.isArray(distribution) || distribution.length !== 5) return "";
+
+  return `
+    <div class="exam-grade-chart" aria-label="Raspodjela ocjena od jedan do pet">
+      ${distribution
+        .map((rawValue, index) => {
+          const value = Math.max(0, Math.min(100, Number(rawValue) || 0));
+          const formattedValue = formatExamStatistic(value);
+          const tone = gradeDistributionTones[index];
+          return `
+            <div
+              class="exam-grade-chart__item exam-grade-chart__item--${tone}"
+              aria-label="Ocjena ${index + 1}: ${escapeHtml(formattedValue)} posto"
+              title="Ocjena ${index + 1}: ${escapeHtml(formattedValue)} %"
+            >
+              <span class="exam-grade-chart__track" aria-hidden="true">
+                <span class="exam-grade-chart__bar" style="height: ${value}%"></span>
+              </span>
+              <strong>${index + 1}</strong>
+            </div>
+          `;
+        })
+        .join("")}
     </div>
   `;
 }
@@ -3271,9 +3818,15 @@ function handleSimulationStartLinkClick(event) {
 
   event.preventDefault();
 
+  const examDialog = link.closest("[data-exam-selection-dialog]");
+  if (examDialog?.open) examDialog.close();
+
   window.openExamSimulationStartDialog({
     durationMinutes: link.dataset.simulationDuration,
-    onCancel: () => window.AsistentAnalytics?.track?.("simulation_cancel"),
+    onCancel: () => {
+      window.AsistentAnalytics?.track?.("simulation_cancel");
+      if (examDialog?.isConnected) examDialog.showModal();
+    },
     onConfirm: ({ confirmedAt }) => {
       window.rememberExamSimulationStart?.({
         confirmedAt,
@@ -3287,9 +3840,8 @@ function handleSimulationStartLinkClick(event) {
 function renderSimulationNote() {
   return `
     <p class="simulation-note">
-      <strong>Simulacija mature</strong> ima vremensko ograničenje prema trajanju
-      odabranog ispita. Odgovori i napredak rješavanja iz simulacije ne spremaju se.
-      Provjera svih zadataka odvija se odjednom na kraju (nema međuprovjere zadatak po zadatak).
+      <strong>Simulacija mature:</strong> vremenski je ograničena, odgovori se ne spremaju,
+      a zadatci se provjeravaju na kraju.
     </p>
   `;
 }
@@ -3306,6 +3858,7 @@ function renderMissing(title, message) {
   `;
 }
 
+appRoot.addEventListener("click", handleExamSelectionClick);
 appRoot.addEventListener("click", handleSimulationStartLinkClick);
 window.addEventListener("asistent:practice-progress-synced", renderApp);
 window.AsistentProfile?.ready?.then(renderApp).catch(() => {});

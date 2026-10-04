@@ -1,0 +1,24 @@
+26. Što će se dogoditi ako 2 puta povećamo intenzitet tona na frekvenciji od
+400 Hz kojeg daje zvučnik? Dopuni rečenicu.
+Membrana zvučnika će titrati ______.
+A. 2 puta većom frekvencijom
+B. 2 puta manjom frekvencijom
+C. jednakom frekvencijom kao i prije
+D. 2¹ᐟ² puta većom frekvencijom
+E. 2¹ᐟ² puta manjom frekvencijom
+
+27. Izračunajte valnu duljinu elektromagnetnog vala koji se širi kroz sred-
+stvo indeksa loma 2! Potrebne podatke iščitajte iz oznaka na grafu.
+[figure:physics-27]
+A. 75 cm
+B. 18 cm
+C. 150 μm
+D. 0,75 mm
+E. 1,5cm
+28. Kolika je fazna razlika dva svjetlosna vala koja se šire kroz vodu ako im
+je razlika hoda 4/15 valne duljine?
+A. 48°
+B. nema fazne razlike u vodi
+C. (8/15) π rad
+D. 170°
+E. (4/15) π rad

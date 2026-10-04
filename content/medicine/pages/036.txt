@@ -1,0 +1,22 @@
+1. Izbaci uljeza iz niza mjernih jedinica: kWh, eV, J, kgm²/s, CV!
+A. kWh
+B. eV
+C.J
+D. kgm²/s
+E. CV
+2. Na jednom kraju dvokrake klackalice duljine 3 m sjedi dječak mase 30
+kg, a s druge strane sjedi djevojčica mase 35 kg. Ako je klackalica u rav-
+noteži, kolika je ukupna sila na oslonac kojim je klackalica pričvršćena
+za tlo? Masa klackalice iznosi 2,5 kg. (g = 10 m/s²)
+A. 450 N
+B. 448N
+C. 898 N
+D. 750 N
+E. 675N
+3. Izračunajte rad sile čija je ovisnost o putu prikazana na grafu!
+[figure:physics-3]
+A. 55 J
+B. 0,11 MJ
+C. 65kJ
+D. 110 J
+E. -125 J

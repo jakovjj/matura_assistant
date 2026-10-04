@@ -1,0 +1,29 @@
+77. Četveroatomna molekula je ______ oksid.
+A. dušikov(II)
+B. aluminijev(III)
+C. ugljikov(IV)
+D. fosforov(V)
+E. sumporov(VI)
+78. Do kemijske promjene dolazi prilikom:
+A. taloženja srebrova(I) klorida u vodi
+B. ionizacije klorovodične kiseline u vodi
+C. otapanja kalijeva hidroksida u vodi
+D. disocijacije kalijeva klorida u vodi
+E. isparavanja vode iz vodene otopine glukoze
+79. Koji od sljedećih izraza NEISPRAVNO definira masenu koncentraciju
+otopine u kojoj je otopljena tvar B?
+A. γ_B = n_B · M_B / V_{otopine}
+B. γ_B = c_B · M_B
+C. γ_B = w_B · ρ_{otopine}
+D. γ_B = w_B · m_{otopine} / V_{otopine}
+E. γ_B = m_B / m_{otopine}
+80. Svakoj od sljedećih reakcija pridružite odgovarajuću vrstu reakcije.
+(1) CH₃COOH + NaOH → Na⁺ + CH₃COO⁻ + H₂O
+(2) 3Cu(s) + 8HNO₃(aq) → 3Cu(NO₃)₂(aq) + 2NO(g) + 4H₂O(l)
+(3) 2NaF(aq) + MgCl₂(aq) → 2NaCl(aq) + MgF₂(s)
+(A) izomerizacija; (B) taložna reakcija; (C) neutralizacija; (D) gorenje; (E) esterifikacija; (F) redoks-reakcija; (G) saponifikacija.
+A. 1E, 2F, 3A
+B. 1G, 2C, 3A
+C. 1A, 2D, 3F
+D. 1B, 2A, 3C
+E. 1C, 2F, 3B

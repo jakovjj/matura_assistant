@@ -1,0 +1,191 @@
+{
+  "pdfFile": "assets/zadatci-za-upis-na-medicinski-fakultet-sveucilita-u-zagrebu-3nbsped-9789533680019_compress.pdf",
+  "pdfSha256": "ed1c54e728c04e56ba2c58687eeefba0edadcbd21fbd635f741adda95c940365",
+  "edition": 3,
+  "pageCount": 148,
+  "sections": [
+    {
+      "firstPdfPage": 1,
+      "lastPdfPage": 1,
+      "kind": "cover"
+    },
+    {
+      "firstPdfPage": 2,
+      "lastPdfPage": 2,
+      "kind": "blank"
+    },
+    {
+      "firstPdfPage": 3,
+      "lastPdfPage": 5,
+      "kind": "publication-front-matter"
+    },
+    {
+      "firstPdfPage": 6,
+      "lastPdfPage": 6,
+      "kind": "blank"
+    },
+    {
+      "firstPdfPage": 7,
+      "lastPdfPage": 7,
+      "kind": "third-edition-preface"
+    },
+    {
+      "firstPdfPage": 8,
+      "lastPdfPage": 8,
+      "kind": "second-edition-preface-retained"
+    },
+    {
+      "firstPdfPage": 9,
+      "lastPdfPage": 9,
+      "kind": "contents"
+    },
+    {
+      "firstPdfPage": 10,
+      "lastPdfPage": 10,
+      "kind": "blank"
+    },
+    {
+      "firstPdfPage": 11,
+      "lastPdfPage": 11,
+      "kind": "biology-title"
+    },
+    {
+      "firstPdfPage": 12,
+      "lastPdfPage": 33,
+      "kind": "biology-questions"
+    },
+    {
+      "firstPdfPage": 34,
+      "lastPdfPage": 34,
+      "kind": "biology-key"
+    },
+    {
+      "firstPdfPage": 35,
+      "lastPdfPage": 35,
+      "kind": "physics-title"
+    },
+    {
+      "firstPdfPage": 36,
+      "lastPdfPage": 68,
+      "kind": "physics-questions"
+    },
+    {
+      "firstPdfPage": 69,
+      "lastPdfPage": 69,
+      "kind": "physics-key"
+    },
+    {
+      "firstPdfPage": 70,
+      "lastPdfPage": 70,
+      "kind": "blank"
+    },
+    {
+      "firstPdfPage": 71,
+      "lastPdfPage": 71,
+      "kind": "chemistry-title"
+    },
+    {
+      "firstPdfPage": 72,
+      "lastPdfPage": 101,
+      "kind": "chemistry-questions"
+    },
+    {
+      "firstPdfPage": 102,
+      "lastPdfPage": 102,
+      "kind": "chemistry-key"
+    },
+    {
+      "firstPdfPage": 103,
+      "lastPdfPage": 103,
+      "kind": "exam-2020-cover"
+    },
+    {
+      "firstPdfPage": 104,
+      "lastPdfPage": 104,
+      "kind": "exam-2020-instructions"
+    },
+    {
+      "firstPdfPage": 105,
+      "lastPdfPage": 139,
+      "kind": "exam-2020-questions"
+    },
+    {
+      "firstPdfPage": 140,
+      "lastPdfPage": 140,
+      "kind": "exam-2020-key"
+    },
+    {
+      "firstPdfPage": 141,
+      "lastPdfPage": 145,
+      "kind": "admission-2021-22-appendix"
+    },
+    {
+      "firstPdfPage": 146,
+      "lastPdfPage": 146,
+      "kind": "colophon"
+    },
+    {
+      "firstPdfPage": 147,
+      "lastPdfPage": 147,
+      "kind": "blank"
+    },
+    {
+      "firstPdfPage": 148,
+      "lastPdfPage": 148,
+      "kind": "back-cover"
+    }
+  ],
+  "collections": [
+    {
+      "id": "biology",
+      "questions": 108,
+      "sourceYears": [
+        2016,
+        2018,
+        2019
+      ],
+      "individualQuestionYearsKnown": false
+    },
+    {
+      "id": "physics",
+      "questions": 108,
+      "sourceYears": [
+        2016,
+        2018,
+        2019
+      ],
+      "individualQuestionYearsKnown": false
+    },
+    {
+      "id": "chemistry",
+      "questions": 108,
+      "sourceYears": [
+        2016,
+        2018,
+        2019
+      ],
+      "individualQuestionYearsKnown": false
+    }
+  ],
+  "originalExams": [
+    {
+      "id": "exam-2020",
+      "date": "2020-07-11",
+      "academicYear": "2020/21",
+      "questions": 120,
+      "durationMinutes": 180,
+      "pointsPerCorrect": 5,
+      "maximumPoints": 600,
+      "wrongAnswerPenalty": 0,
+      "thresholdTotalPoints": 330,
+      "thresholdCorrectPerSubject": 16,
+      "instructionsPdfPage": 104,
+      "keyPdfPage": 140
+    }
+  ],
+  "notIncludedAsPapers": [
+    "2015 and 2017 are mentioned only in the retained second-edition preface.",
+    "The 2021/22 appendix contains admission conditions, not exam questions."
+  ],
+  "solutionType": "Answer letters only; no worked solutions."
+}

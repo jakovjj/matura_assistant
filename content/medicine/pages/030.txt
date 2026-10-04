@@ -1,0 +1,31 @@
+90. Ako genotipovi DD i Dd oba pokazuju isti fenotip, to znači da:
+A. je D dominantan gen
+B. je d dominantan gen
+C. je fenotip određen s oba alela
+D. su DD i Dd osobe homozigoti
+E. su DD i Dd osobe heterozigoti
+91. Test-križanje u trihibridnom križanju dat će rezultat:
+A. 1:1
+B. 1:1:1
+C. 1:1:1:1
+D. 1:1:1:1:1:1
+E. 1:1:1:1:1:1:1:1
+92. U dihibridnom križanju parentalnu (P) generaciju čine:
+A. AaBb x AABB
+B. AABB x aabb
+C. AaBb x AaBb
+D. AaBb x aabb
+E. sve navedene roditeljske kombinacije
+93. Koja je svrha test-križanja?
+A. utvrditi je li križanje među bliskim rođacima vijabilno
+B. utvrditi fenotip potomaka
+C. odrediti nepoznati genotip roditelja
+D. odrediti genotipove svih potomaka
+E. utvrditi jesu li geni vezani
+94. Hetrozigotni smeđi bik pari se s bijelom kravom (smeđa boja je domi-
+nantna nad bijelom). Kakve potomke očekujete?
+A. 100 % smeđe
+B. 100 % bijele
+C. 50 % smeđih i 50 % bijelih
+D. 100 % oker
+E. 75 % smeđih i 25 % bijelih

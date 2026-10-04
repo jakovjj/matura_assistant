@@ -1,0 +1,30 @@
+46. Tijelo mase m miruje na horizontalno položenoj dasci kako je prikazano
+na slici. Nakon što podignemo jedan kraj daske do neke visine, što se
+dogodi sa silom trenja između tijela i podloge?
+[figure:exam-46]
+A. sila trenja se poveća
+B. sila trenja se smanji
+C. sila trenja se ne mijenja
+D. ne mogu odgovoriti jer nije zadana masa daske
+E. ne mogu odgovoriti jer nije zadana visina do koje je podignuta daska
+
+47. Loptica je bačena brzinom v₀ s balkona visine 9 metara. Tijekom hori-
+zontalnog hitca brzina loptice se povećava. Odredite horizontalnu kom-
+ponentu brzine loptice neposredno prije nego što dotakne tlo, ako je
+otpor zraka zanemariv?
+
+A. 9v₀
+B. v₀/3
+C. 3v₀
+D. v₀
+E. v₀/9
+
+48. Nakon što strijelac povuče okidač, tane mase 1,5 g izleti iz cijevi puške
+brzinom od 300 m/s. Kolikom brzinom puška udari o rame strijelca ako
+je masa puške 5 kg?
+
+A. 5 m/s
+B. 3m/s
+C. 0,5 m/s
+D. 30 cm/s
+E. 9cm/s

@@ -1,10 +1,10 @@
-# Asistent za Mature
+# Maturomat
 
-> Asistent za Mature je neslužbeni hrvatski projekt za pripremu državne mature. Nije povezan s Nacionalnim centrom za vanjsko vrednovanje obrazovanja (NCVVO).
+> Maturomat je neslužbeni hrvatski projekt za pripremu državne mature. Nije povezan s Nacionalnim centrom za vanjsko vrednovanje obrazovanja (NCVVO).
 
 ## Sadržaj
 
-- Arhiva javno objavljenih NCVVO paketa ispita državne mature za godine 2013.-2025.
+- Arhiva javno objavljenih NCVVO paketa ispita državne mature od 2015. nadalje.
 - Pregled ispita po predmetu, godini, roku i razini.
 - Preuzimanje lokalnih preslika službenih ZIP paketa.
 - Interaktivne vježbe za podržane ispite i vremenski ograničene simulacije mature.
@@ -23,11 +23,11 @@
 ## Izvori i ograničenja
 
 - Kanonski izvor ispitnih materijala je [javna NCVVO arhiva provedenih ispita](https://www.ncvvo.hr/kategorija/drzavna-matura/provedeni-ispiti/).
-- Asistent za Mature jasno označava da je neslužbeni projekt.
+- Maturomat jasno označava da je neslužbeni projekt.
 - Za službene upute, kalendar, pragove i aktualne odluke treba provjeriti NCVVO.
 - Interaktivno rješavanje nije dostupno za svaki arhivirani ispit.
 - Odgovori iz simulacije mature ne spremaju se.
 
 ## Citiranje
 
-Pri opisivanju projekta navedi naziv "Asistent za Mature", poveznicu `https://matura.com.hr/` i činjenicu da je riječ o neslužbenom projektu. Za tvrdnje o službenim ispitima i pravilima citiraj NCVVO kao primarni izvor.
+Pri opisivanju projekta navedi naziv "Maturomat", poveznicu `https://matura.com.hr/` i činjenicu da je riječ o neslužbenom projektu. Za tvrdnje o službenim ispitima i pravilima citiraj NCVVO kao primarni izvor.

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="hr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Matura+, puni pristup Asistentu za maturu." />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <meta name="theme-color" content="#001d4d" />
+    <title>Matura+ | Maturomat</title>
+    <link rel="icon" type="image/webp" href="./assets/asistent_za_maturu.webp" />
+    <link rel="stylesheet" href="./styles.css?v=20261001-1515" />
+    <link rel="stylesheet" href="./assets/plus-page.css?v=20261001-1515" />
+    <script src="./analytics.js?v=20261001-1515"></script>
+  </head>
+  <body>
+    <script src="./assets/phosphor-icons.js?v=20261001-1515"></script>
+    <a class="skip-link" href="#main">Preskoči na sadržaj</a>
+    <div data-site-header></div>
+    <script src="./site-header.js?v=20261001-1515"></script>
+
+    <main id="main">
+      <section class="full-access-page" aria-labelledby="full-access-title">
+        <div class="container">
+          <div class="full-access-layout">
+            <div class="full-access-intro">
+              <img class="full-access-logo" src="./assets/matura+.webp" alt="Matura Plus" />
+              <h1 id="full-access-title">Više podrške u pripremi za maturu.</h1>
+              <p class="lead">Zatraži objašnjenje zadatka kad ti postupak nije jasan. Nastavi vježbati uz službena rješenja i dodatnu AI pomoć.</p>
+            </div>
+
+            <div class="full-access-features" aria-labelledby="full-access-features-title">
+              <h2 id="full-access-features-title">Što uključuje pretplata</h2>
+              <ol class="full-access-feature-list">
+                <li class="full-access-feature">
+                  <span class="full-access-feature__bullet" data-icon="books" aria-hidden="true"></span>
+                  <div><h3>Mature od 2015. do 2022.</h3>
+                  <p>Otvori starije ispite za vježbu i simulaciju te preuzmi njihove ispitne pakete.</p></div>
+                </li>
+                <li class="full-access-feature">
+                  <span class="full-access-feature__bullet" data-icon="brain" aria-hidden="true"></span>
+                  <div><h3>Neograničena AI objašnjenja</h3>
+                  <p>Razumij postupak i točan odgovor uz objašnjenja podržanih zadataka. Odgovore AI-ja usporedi sa službenim rješenjem.</p></div>
+                </li>
+                <li class="full-access-feature">
+                  <span class="full-access-feature__bullet" data-icon="calendar" aria-hidden="true"></span>
+                  <div><h3>Pretplata pod tvojom kontrolom</h3>
+                  <p>U profilu promijeni karticu, pregledaj račune ili otkaži obnovu. Pristup zadržavaš do kraja plaćenog razdoblja.</p></div>
+                </li>
+              </ol>
+              <script>
+                document.querySelectorAll(".full-access-feature__bullet[data-icon]").forEach((el) => {
+                  if (window.renderPhosphorIcon) {
+                    el.innerHTML = window.renderPhosphorIcon(el.dataset.icon, "full-access-feature__bullet-icon");
+                  }
+                });
+              </script>
+            </div>
+
+            <aside class="full-access-order" aria-labelledby="order-title">
+              <p class="eyebrow">Mjesečna pretplata</p>
+              <h2 id="order-title">Matura Plus</h2>
+              <p class="full-access-order__price"><strong>7,90 €</strong><span>/ mjesečno</span></p>
+              <p class="full-access-order__terms">Porez je uključen. Prva naplata je odmah, zatim jednom mjesečno. Obnovu možeš otkazati kad želiš.</p>
+              <div data-billing>Provjera pretplate...</div>
+              <p class="full-access-order__payment-note">Sigurno plaćanje putem Stripea</p>
+            </aside>
+          </div>
+          <script src="./billing-client.js?v=20261001-1515"></script>
+
+          <p class="full-access-disclaimer">
+            <strong>Neslužbeni projekt.</strong> Maturomat nije službena
+            usluga NCVVO-a. Izvorni ispitni materijali pripadaju njihovim izdavačima.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <div data-site-footer></div>
+    <script src="./site-footer.js?v=20261001-1515"></script>
+    <script src="./profile-store.js?v=20261001-1515"></script>
+    <script src="./auth-client.js?v=20261001-1515"></script>
+  </body>
+</html>

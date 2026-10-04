@@ -1,0 +1,23 @@
+60. Tijekom dijagnostičke pretrage oslikavanja magnetnom rezonancijom
+pacijentica čuje zvuk intenziteta od 0, 1 W/m² u trajanju od 0,1 sekundi,
+50 puta u minuti. Pretraga traje 20 minuta. Koliku energiju pri tome
+pacijentica primi ako je površina bubnjića oko 1 cm²?
+A. 1J
+B. 10J
+C. 50 kJ
+D. 5 kJ
+E. 1 mJ
+61. Dopuni izjavu. Dva vala mogu biti u protufazi ako ______.
+A. razlika hoda iznosi 5λ
+B. razlika u fazi iznosi 3π/2
+C. razlika u fazi iznosi 225°
+D. razlika hoda iznosi 2λ
+E. razlika u fazi iznosi 5π
+62. Koliku minimalnu duljinu mora imati zrcalo 1 da bi ukupno bilo 7 reflek-
+sija na zrcalima?
+[figure:physics-62]
+A. 255 cm
+B. 510cm
+C. 239 cm
+D. 397 cm
+E. 70cm

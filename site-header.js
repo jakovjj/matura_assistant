@@ -48,15 +48,13 @@
     icon.className = "site-notice__icon";
     icon.setAttribute("aria-hidden", "true");
 
-    if (typeof window.renderLucideIcon === "function") {
-      icon.innerHTML = window.renderLucideIcon(iconName || "wrench", "site-notice__icon-svg");
+    if (typeof window.renderPhosphorIcon === "function") {
+      icon.innerHTML = window.renderPhosphorIcon(iconName || "wrench", "site-notice__icon-svg");
       return icon;
     }
 
     icon.innerHTML = `
-      <svg class="site-notice__icon-svg" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94z" />
-      </svg>
+      <svg class="site-notice__icon-svg" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="./assets/phosphor-icons.svg#wrench"></use></svg>
     `;
     return icon;
   };
@@ -125,7 +123,7 @@
     }
   };
 
-  const activePage = siteHeaderRoot.dataset.activePage || "";
+  const activePage = location.pathname === "/plus" ? "plus" : siteHeaderRoot.dataset.activePage || "";
   const navItems = [
     {
       id: "home",
@@ -134,19 +132,15 @@
     },
     {
       id: "profile",
-      href: "./profil.html",
+      href: "/profil",
       label: "profil",
-      // Shown only when the link collapses on mobile (see styles.css main-nav__icon).
-      icon: `
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <circle cx="12" cy="8" r="3.25" />
-          <path d="M5.5 19.5a6.5 6.5 0 0 1 13 0" />
-        </svg>
-      `,
+    },
+    {
+      id: "plus",
+      href: "/plus",
+      label: "Matura Plus",
     },
   ];
-  const hasActiveNavItem = navItems.some((item) => item.id === activePage);
-  const navClass = hasActiveNavItem ? "main-nav" : "main-nav main-nav--no-active";
 
   siteHeaderRoot.outerHTML = `
     <header class="site-header">
@@ -164,26 +158,12 @@
               aria-pressed="false"
               title="Uključi tamni prikaz"
             >
-              <svg class="topbar__theme-icon topbar__theme-icon--moon" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-                <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-              </svg>
-              <svg class="topbar__theme-icon topbar__theme-icon--sun" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="4" />
-                <path d="M12 2v2" />
-                <path d="M12 20v2" />
-                <path d="m4.93 4.93 1.41 1.41" />
-                <path d="m17.66 17.66 1.41 1.41" />
-                <path d="M2 12h2" />
-                <path d="M20 12h2" />
-                <path d="m6.34 17.66-1.41 1.41" />
-                <path d="m19.07 4.93-1.41 1.41" />
-              </svg>
+              <svg class="topbar__theme-icon topbar__theme-icon--moon" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="./assets/phosphor-icons.svg#moon"></use></svg>
+              <svg class="topbar__theme-icon topbar__theme-icon--sun" aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="./assets/phosphor-icons.svg#sun"></use></svg>
             </button>
             <a href="https://www.ncvvo.hr/" target="_blank" rel="noreferrer">
               ncvvo.hr
-              <svg aria-hidden="true" viewBox="0 0 16 16">
-                <path d="M6 3h7v7M13 3 5 11M3 6v7h7" />
-              </svg>
+              <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><use href="./assets/phosphor-icons.svg#arrow-square-out"></use></svg>
             </a>
             <div class="auth-widget" data-auth-widget></div>
           </div>
@@ -193,44 +173,43 @@
       <div class="site-notice" data-site-notice role="status" aria-live="polite" hidden></div>
 
       <div class="container masthead">
-        <a class="brand" href="./" aria-label="Asistent za maturu naslovnica">
+        <a class="brand" href="./" aria-label="Maturomat naslovnica">
           <img
             class="brand__mark"
             src="./assets/asistent_za_maturu.webp"
             alt=""
-            width="56"
-            height="56"
+            width="42"
+            height="42"
             draggable="false"
             decoding="async"
           />
           <span>
-            <strong>Asistent za maturu</strong>
-            <small>vježba za državnu maturu</small>
+            <strong>Maturomat</strong>
+            <small>Neslužbeni projekt · vježba za državnu maturu</small>
           </span>
         </a>
 
         <div class="masthead__actions">
-          <nav class="${navClass}" aria-label="Glavna navigacija">
+          <nav class="main-nav" aria-label="Glavna navigacija">
             ${navItems
               .map((item) => {
                 const isActive = item.id === activePage;
                 const linkClass = [
                   "main-nav__link",
-                  item.icon ? "main-nav__link--icon" : "",
+                  item.id === "plus" ? "main-nav__link--plus" : "",
                   isActive ? "main-nav__link--active" : "",
                 ]
                   .filter(Boolean)
                   .join(" ");
-                const iconMarkup = item.icon
-                  ? `<span class="main-nav__icon" aria-hidden="true">${item.icon}</span>`
-                  : "";
                 return `
                   <a
                     class="${linkClass}"
                     href="${item.href}"
                     ${isActive ? 'aria-current="page"' : ""}
                   >
-                    ${iconMarkup}<span class="main-nav__label">${item.label}</span>
+                    ${item.id === "plus"
+                      ? '<img class="main-nav__plus-logo" src="/assets/matura+.webp" alt="Matura Plus" width="1536" height="330" />'
+                      : `<span class="main-nav__label">${item.label}</span>`}
                   </a>
                 `;
               })

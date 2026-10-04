@@ -1,0 +1,35 @@
+75. Koja je od navedenih struktura u stanici izravno uključena u proizvodnju
+proteina?
+A. Golgijev aparat
+B. centrosom
+C. centromera
+D. ribosom
+E. lizosom
+76. Koja je od navedenih izjava o jezgrinoj ovojnici POGREŠNA?
+A. to je dvostruka membrana
+B. ima pore kroz koje se odvija transport
+C. nastavlja se na endoplazmatski retikulum
+D. ima nabore koje zovemo kriste
+E. obavija kromatin
+77. Što od navedenog NIJE karakteristika prokariota?
+A. DNA
+B. RNA
+C. stanična membrana
+D. stanična stijenka
+E. endoplazmatski retikulum
+78. Koja od navedenih tvrdnji o mitozi u sisavaca NIJE točna?
+A. Jezgrina ovojnica se razgrađuje u profazi.
+B. Homologni kromosomi se sparuju u profazi.
+C. Za vrijeme profaze svaki je kromosom izgrađen od dvije kromatide.
+D. Anafaza neće započeti dok se svi kromosomi ne poredaju u ekvatorijalnu
+ravninu.
+E. Jezgre stanica kćeri su genetički identične roditeljskoj jezgri.
+79. Što od navedenog NIJE razlika između anafaze I i anafaze II?
+A. Svaki je kromosom izgrađen od dvije kromatide u anafazi I, a od jedne u
+anafazi II.
+B. Anafaza I se događa u haploidnoj stanici, a anafaza II u diploidnoj.
+C. Sestrinske kromatide se odvajaju u anafazi II, a homologni kromosomi u
+anafazi I.
+D. Stanica koja prolazi kroz anafazu II genetički je drugačija od stanice koja
+prolazi kroz anafazu I
+E. Genetički materijal putuje prema polovima stanice u anafazi I i u anafazi II.

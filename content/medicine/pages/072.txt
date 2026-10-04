@@ -1,0 +1,32 @@
+1. U kojem od navedenih parova vrste NEMAJU istu elektronsku konfigu-
+raciju?
+A. hidridni ion i berilijev ion
+B. titanijev(IV) ion i fosfidni ion
+C. oksidni ion i aluminijev ion
+D. kalij i kloridni ion
+E. rubidijev ion i kripton
+2. Koja je od navedenih molekula linearna?
+A. OF₂
+B. NH₃
+C. O₃
+D. C₂H₂
+E. H₂S
+3. Diklofenak (C₁₄H₁₁Cl₂NO₂) djelatna je tvar Voltaren tableta. Izračunajte
+masu ugljika, dušika i vodika u diklofenaku sadržanom u tableti mase
+50,00 mg koja sadržava 84,00 % čistog diklofenaka.
+A. m(C) =33,79 mg, m(N) = 2,82 mg i m(H) = 2,23 mg
+B. m(C) = 23,85 mg, m(N) = 1,99 mg i m(H) = 1,57 mg
+C. m(C) = 2,03 mg, m(N) = 2,37 mg i m(H) = 0,17 mg
+D. m(C) = 28,39 mg, m(N) = 2,37 mg i m(H) = 1,87 mg
+E. m(C) =1,71 mg, m(N) = 1,99 mg i m(H) = 0,14 mg
+4. Litijev hidroksid se upotrebljava u svemirskim letjelicama i podmorni-
+cama za uklanjanje izdahnutog ugljikova(IV) oksida iz zraka.
+2LiOH(s) + CO₂(g) → Li₂CO₃(g) + H₂O(l)
+Izračunajte masu litijeva hidroksida koja je potrebna za vezanje 4500
+dm³ izdahnutog ugljikova(IV) oksida pri temperaturi od 20°C i tlaku od
+101325 Pa.
+A. 131,3 kg
+B. 4,48 kg
+C. 2,24 kg
+D. 65,7 kg
+E. 8,96 kg

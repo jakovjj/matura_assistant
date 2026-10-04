@@ -1,0 +1,27 @@
+90. Tijelo harmonijski titra. Koje od navedenih fizikalnih veličina imaju ra-
+zliku u fazi π?
+A. brzina i akceleracija
+B. elongacija i akceleracija
+C. elastična sila i akceleracija
+D. elongacija i brzina
+E. elastična sila i brzina
+91. Izvor emitira valove određene valne duljine i amplitude. Poveća-
+njem valne duljine emitiranih valova iz istog izvora amplituda vala se ______.
+A. poveća 2 puta
+B. smanji 2 puta
+C. ne mijenja
+D. poveća 4 puta
+E. smanji 4 puta
+92. Koja je tvrdnja točna?
+A. Brzina zvuka u zraku na razini mora i sobnoj temperaturi približno je
+430 m/s.
+B. Zvučni valovi se brže šire u plinovima nego u tekućinama.
+C. Intenzitet zvučnih valova eksponencijalno se smanjuje u vakuumu.
+D. Ljudske uši su osjetljive na zvuk frekvencija između 20000 i 30000 Hz.
+E. Granica boli za čovjeka je intenzitet zvuka od 1 W/m².
+93. Od dolje ponuđenih odgovara najveću energiju ima ______.
+A. mikrovalno zračenje
+B. rendgensko zračenje
+C. ultraljubičasto zračenje
+D. vidljiva svjetlost
+E. infracrvena svjetlost

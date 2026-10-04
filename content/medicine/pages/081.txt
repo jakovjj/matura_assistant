@@ -1,0 +1,32 @@
+34. Za koji od navedenih biopolimera NISU točno navedene monomerna je-
+dinica i tip veze kojim su monomerne jedinice međusobno povezane?
+A. jednolančana deoksiribonukleinska kiselina: deoksiribonukleotid, fosfo-
+diesterska veza
+B. škrob: glukoza, glikozidna veza
+C. ribonukleinska kiselina: ribonukleotid, fosfodiesterska veza
+D. protein: aminokiselina, peptidna veza
+E. celuloza: fruktoza, glikozidna veza
+35. Enzimi kao biokatalizatori strukturno su većinom:
+A. proteini
+B. polisaharidi
+C. deoksiribonukleinske kiseline
+D. dipeptidi
+E. ribonukleinske kiseline
+36. Koji od sljedećih spojeva NIJE optički aktivan?
+A. 5-klorpentan-1-ol
+B. 4-klorpentan-1-ol
+C. 3-klorpentan-1-ol
+D. 2-klorpentan-1-ol
+E. 1-klorpentan-1-ol
+37. Izbacite pogrešnu tvrdnju!
+A. Elektronska konfiguracija fluoridnog iona je [He]2s²2p⁶.
+B. Elektronska konfiguracija elementarnog kobalta je [Ar]3d⁷4s².
+C. Elektronska konfiguracija kalcijeva iona je [Ar].
+D. Elektronska konfiguracija sulfidnog iona je [Ne]3s²3p².
+E. Elektronska konfiguracija elementarnog broma je [Ar]3d¹⁰4s²4p⁵.
+38. U molekuli kojeg od navedenih plinova NIJE prisutna trostruka veza?
+A. cijanovodik
+B. sumporov(IV) oksid
+C. dušik
+D. ugljikov(II) oksid
+E. etin

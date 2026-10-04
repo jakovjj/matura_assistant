@@ -1,0 +1,19 @@
+41. Koliko mm³ vode ima u 0,5 L?
+A. 5·10⁵
+B. 0,5·10⁷
+C. 5·10⁹
+D. 5·10⁻⁵
+E. 5·10⁻⁷
+42. Kvadratnom funkcijom prikazana je ovisnost ______.
+A. tlaka plina o volumenu kod izotermnih procesa
+B. kinetičke energije o masi tijela
+C. kapaciteta kondenzatora o razmaku između ploča
+D. gravitacijske sile o udaljenosti između tijela
+E. elastične potencijalne energije opruge o njezinu produljenju
+43. Odredite jednadžbu pravca:
+[figure:exam-43]
+A. v(t) = 15t − 5
+B. v(t) = 5t + 15
+C. v(t) = −5t − 15
+D. v(t) = −10t + 15
+E. t(v) = 1,5v + 15

@@ -60,11 +60,11 @@ function escapeHtml(value) {
 }
 
 function icon(iconName, className) {
-  if (window.renderLucideIcon) return window.renderLucideIcon(iconName, className);
+  if (window.renderPhosphorIcon) return window.renderPhosphorIcon(iconName, className);
 
   return `
     <svg class="${className}" aria-hidden="true" focusable="false" viewBox="0 0 24 24">
-      <use href="./assets/lucide-icons.svg#${iconName}"></use>
+      <use href="./assets/phosphor-icons.svg#${iconName}"></use>
     </svg>
   `;
 }
@@ -377,7 +377,7 @@ function renderMissingExam() {
 }
 
 function renderSolver(exam, taskTypeId = "visestruki-izbor") {
-  document.title = `Asistent za Mature - Matematika ${exam.level ? `${exam.level} razina` : ""}`.trim();
+  document.title = `Maturomat - Matematika ${exam.level ? `${exam.level} razina` : ""}`.trim();
   document.body.classList.add("solver-page", "math-solver-page");
   app.classList.add("math-solver-active");
   solverExam = exam;
@@ -418,29 +418,12 @@ function renderSolver(exam, taskTypeId = "visestruki-izbor") {
 
     <div id="section-content"></div>
 
-    <footer class="solver-sticky-footer">
-      <div class="solver-sticky-footer__inner">
-        <nav
-          class="task-navigation"
-          data-task-type-navigation
-          aria-label="Vrste zadataka u ispitu"
-        ></nav>
-        <div class="solver-sticky-footer__controls">
-          <div class="solver-sticky-footer__status">
-            ${icon("list-checks", "solver-sticky-footer__status-icon")}
-            <div class="solver-sticky-footer__status-copy">
-              <strong id="footer-answer-progress"></strong>
-              <span id="footer-score-summary"></span>
-            </div>
-          </div>
-          <div class="solver-sticky-footer__actions">
-            <button class="${checkButtonClass()}" id="check-answers" type="button">
-              ${renderCheckButtonContent()}
-            </button>
-          </div>
-        </div>
-      </div>
-    </footer>
+    ${window.SolverControls.renderFooter({
+      navigationAttribute: "data-task-type-navigation",
+      navigationLabel: "Vrste zadataka u ispitu",
+      buttonClass: checkButtonClass(),
+      buttonContent: renderCheckButtonContent(),
+    })}
 
     <div class="exam-results-dialog" id="exam-results-dialog" role="dialog" aria-modal="true" aria-labelledby="exam-results-title" hidden>
       <div class="exam-results-dialog__backdrop"></div>
@@ -612,31 +595,11 @@ function renderTaskTypeContent() {
         <section class="task-content-panel physics-task-content-panel" id="task-content-panel"></section>
         <div id="task-type-pager-slot"></div>
       </div>
-      <aside class="question-quickselect question-quickselect--with-action" aria-label="Brzi odabir pitanja">
-        <div class="question-quickselect__heading">
-          <strong>Brzi odabir</strong>
-          <small>Pitanja</small>
-        </div>
-        <nav class="question-quickselect__list" id="question-quickselect"></nav>
-        <div class="question-quickselect__tools">
-          <label class="question-jump" for="question-jump-select">
-            <span>${jumpLabel}</span>
-            <select id="question-jump-select" aria-label="Odaberi ${jumpLabel.toLocaleLowerCase("hr")}"></select>
-          </label>
-          <a
-            class="question-quickselect__action"
-            href="${formulaSheetUrl}"
-            target="_blank"
-            rel="noreferrer"
-            aria-label="Otvori knjižicu formula"
-            title="Otvori knjižicu formula"
-            data-math-formulas-link
-          >
-            ${icon("book-open-text", "question-quickselect__action-icon")}
-            <span>Formule</span>
-          </a>
-        </div>
-      </aside>
+      ${window.SolverControls.renderQuickSelectShell({
+        jumpId: "question-jump-select",
+        jumpLabel,
+        actionHtml: `<a class="question-quickselect__action" href="${formulaSheetUrl}" target="_blank" rel="noreferrer" aria-label="Otvori knjižicu formula" title="Otvori knjižicu formula" data-math-formulas-link>${icon("book-open-text", "question-quickselect__action-icon")}<span>Formule</span></a>`,
+      })}
     </div>
   `;
 
@@ -881,7 +844,16 @@ function bindResponseListeners() {
     input.addEventListener("change", () => updateResponse(input.dataset.question, input.value));
   });
   document.querySelectorAll("[data-open-score]").forEach((input) => {
-    input.addEventListener("input", () => updateOpenScore(input.dataset.openScore, input.value, input));
+    const markFullScore = () =>
+      input.classList.toggle(
+        "physics-open-score__input--full",
+        input.value !== "" && Number(input.max) > 0 && Number(input.value) === Number(input.max),
+      );
+    markFullScore();
+    input.addEventListener("input", () => {
+      updateOpenScore(input.dataset.openScore, input.value, input);
+      markFullScore();
+    });
   });
   document.querySelectorAll("[data-open-solution]").forEach((button) => {
     button.addEventListener("click", () => toggleOpenSolution(button));
@@ -913,65 +885,26 @@ function renderQuickSelect() {
       items.length <= 2 && !quickSelectPanel.querySelector("[data-math-formulas-link]");
   }
 
-  quickSelect.innerHTML = items
+  quickSelect.innerHTML = window.SolverControls.renderQuickSelectItems(items
     .map((item) => {
       const isAnswered = item.questions.every((question) =>
         isChoiceTaskType ? responses[question] : hasOpenScore(question),
       );
-      const stateClass = isAnswered
-        ? " question-quickselect__link--answered"
-        : "";
-      const resultClass = isChoiceTaskType && item.questions.every((question) => isChecked(question))
+      const result = isChoiceTaskType && item.questions.every((question) => isChecked(question))
         ? item.questions.every((question) => isCorrectAnswer(question, responses[question]))
-          ? " question-quickselect__link--correct"
-          : " question-quickselect__link--wrong"
+          ? "correct"
+          : "wrong"
         : "";
-      const answerState = quickSelectAnswerState(item, isChoiceTaskType);
-      const itemLabel = item.questions.length > 1 ? "Zadatak" : "Pitanje";
-      return `
-        <a
-          class="question-quickselect__link${stateClass}${resultClass}"
-          href="#pitanje-${item.target}"
-          data-quick-question="${item.target}"
-          data-quick-group="${item.group}"
-          aria-label="${itemLabel} ${item.label}, ${answerState}"
-        >
-          ${item.label}
-        </a>
-      `;
-    })
-    .join("");
+      return { ...item, status: result || (isAnswered ? "answered" : ""), answerState: quickSelectAnswerState(item, isChoiceTaskType), itemLabel: item.questions.length > 1 ? "Zadatak" : "Pitanje" };
+    }));
 
   if (jumpSelect) {
-    jumpSelect.innerHTML = items
-      .map((item) => `
-          <option value="${escapeHtml(item.target)}" data-quick-group="${escapeHtml(item.group)}">
-            ${escapeHtml(item.label)}
-          </option>
-        `)
-      .join("");
-
-    jumpSelect.addEventListener("change", () => {
-      const questionNumber = jumpSelect.value;
-      const target = document.getElementById(`pitanje-${questionNumber}`);
-      activeQuestionNumber = questionNumber;
-      updateQuickSelectActiveState();
-      target?.scrollIntoView({ block: "start", behavior: "auto" });
-      if (target) history.replaceState(null, "", `#pitanje-${questionNumber}`);
-    });
+    jumpSelect.innerHTML = window.SolverControls.renderQuickSelectOptions(items);
   }
-
-  quickSelect.querySelectorAll("[data-quick-question]").forEach((link) => {
-    link.addEventListener("click", (event) => {
-      event.preventDefault();
-      const questionNumber = link.dataset.quickQuestion;
-      const target = document.getElementById(`pitanje-${questionNumber}`);
-      activeQuestionNumber = questionNumber;
-      updateQuickSelectActiveState();
-      target?.scrollIntoView({ block: "start", behavior: "auto" });
-      if (target) history.replaceState(null, "", `#pitanje-${questionNumber}`);
-    });
-  });
+  window.SolverControls.bindQuickSelect({ jumpId: "question-jump-select", onJump: (questionNumber) => {
+    activeQuestionNumber = questionNumber;
+    updateQuickSelectActiveState();
+  } });
   updateQuickSelectActiveState();
 }
 
@@ -988,39 +921,15 @@ function queueActiveQuestionUpdate() {
 
 function updateActiveQuestionFromScroll() {
   quickSelectFrame = undefined;
-  const questions = [...document.querySelectorAll("[data-question-number]")];
-  if (!questions.length) return;
-
-  const focusLine = Math.min(window.innerHeight * 0.28, 240);
-  let activeQuestion = questions[0];
-  for (const question of questions) {
-    if (question.getBoundingClientRect().top > focusLine) break;
-    activeQuestion = question;
-  }
-
-  const nextQuestionNumber = activeQuestion.dataset.questionNumber;
+  const nextQuestionNumber = window.SolverControls.activeQuestionFromScroll("[data-question-number]");
+  if (nextQuestionNumber === null) return;
   if (String(nextQuestionNumber) === String(activeQuestionNumber)) return;
   activeQuestionNumber = nextQuestionNumber;
   updateQuickSelectActiveState();
 }
 
 function updateQuickSelectActiveState() {
-  const activeGroup = activeQuickSelectGroup();
-  document.querySelectorAll("[data-quick-question]").forEach((link) => {
-    const linkGroup = link.dataset.quickGroup || link.dataset.quickQuestion;
-    const isActive = String(linkGroup) === String(activeGroup);
-    link.classList.toggle("question-quickselect__link--active", isActive);
-    if (isActive) link.setAttribute("aria-current", "true");
-    else link.removeAttribute("aria-current");
-  });
-
-  const jumpSelect = document.querySelector("#question-jump-select");
-  if (jumpSelect) {
-    const activeOption = [...jumpSelect.options].find(
-      (option) => String(option.dataset.quickGroup || option.value) === String(activeGroup),
-    );
-    if (activeOption) jumpSelect.value = activeOption.value;
-  }
+  window.SolverControls.updateQuickSelectActiveState({ jumpId: "question-jump-select", activeGroup: activeQuickSelectGroup() });
 }
 
 function renderQuestionResponse(question) {
@@ -1126,15 +1035,13 @@ function renderFeedback(question, answer) {
 
 function renderOpenSolution(question) {
   const solutionImage = renderSolutionImage(question);
-  if (!solutionImage) {
-    return `
-      <div class="physics-open-solution">
-        <p>Službeno rješenje nije pronađeno u ključu za odgovore.</p>
-      </div>
-    `;
-  }
-
   const bodyId = `rjesenje-${question.number}`;
+  // Some official keys leave an answer box empty (e.g. matematika A 2020.
+  // ljetni rok 21.1, 21.2, 27.1). Keep the task fully scorable, but reveal a
+  // short note instead of an empty crop.
+  const solutionBody = solutionImage
+    ? solutionImage
+    : `<p class="physics-open-solution__missing">Službeni ključ za ovaj ispit ne navodi rješenje ove stavke.</p>`;
   return `
     <div class="physics-open-solution">
       <div class="physics-open-solution__controls">
@@ -1148,10 +1055,10 @@ function renderOpenSolution(question) {
           Otvori rješenje
         </button>
         ${renderOpenScoreInput(question)}
-        ${simulation.active ? "" : aiExplainButton(question.number)}
+        ${simulation.active || !solutionImage ? "" : aiExplainButton(question.number)}
       </div>
       <div class="physics-open-solution__body" id="${bodyId}" hidden>
-        ${solutionImage}
+        ${solutionBody}
       </div>
     </div>
   `;

@@ -1,0 +1,20 @@
+119. Acetonitril (A), metanol (M) i pentan (P) su otapala kojima gustoće pri
+20 °C iznose ρ(C₅H₁₂) = 0,626 g/mL, ρ(CH₃CN) = 0,786 g/mL i ρ(CH₃OH)
+= 0,792 g/mL. Metanol i acetonitril se međusobno miješaju, dok se pen-
+tan ne miješa ni s acetonitrilom ni s metanolom. Koja od sljedećih slika
+prikazuje smjesu pripravljenu miješanjem 1 mL pentana, 1 mL metanola
+i 1 mL acetonitrila nakon njezina izmućkivanja?
+[figure:exam-119]
+A. I
+B. II
+C. III
+D. IV
+E. V
+120. Koja od navedenih tvrdnji NIJE točna?
+
+[figure:exam-120]
+A. A i B su geometrijski izomeri.
+B. A i C su dijastereoizomeri.
+C. A i D su enantiomeri.
+D. A i E su konstitucijski izomeri.
+E. E ima točno dva kiralna centra.

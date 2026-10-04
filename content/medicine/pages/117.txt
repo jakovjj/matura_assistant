@@ -1,0 +1,26 @@
+52. Idealna tekućina protječe sustavom cijevi različitih polumjera.
+Dopunite rečenicu. Volumni tok ______.
+[figure:exam-52]
+A. jednak je u svim točkama
+B. najveći je u točki E
+C. najveći je u točki A
+D. najveći je u točki B
+E. najveći je u točki D
+53. Valjak visine 1 m do vrha je napunjen vodom. Na dnu leži tijelo volume-
+na 2 dm³, a klip ploštine 0,5 m² zatvara valjak. Sila uzgona koja djeluje
+na potonulo tijelo nakon što na klip postavimo uteg mase 100 kg se
+______. (g = 10 m/s²)
+A. poveća za 500 N
+B. poveća za 300 N
+C. poveća za 200 N
+D. ne mijenja
+E. smanji za 500 N
+54. Na kojoj će dubini u vodi zračni mjehur imati dva puta manji promjer u
+odnosu na promjer koji ima zračni mjehur na samoj površini vode? Pret-
+postavite da se temperatura vode ne mijenja s dubinom. (p_{atm} = 10⁵ Pa,
+g = 10 m/s²)
+A. 10m
+B. 20m
+C. 30m
+D. 70m
+E. 80m

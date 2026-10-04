@@ -1,0 +1,43 @@
+55. Ako muškarac koji boluje od autosomno-dominantne bolesti (gen A,a) i žena
+koja boluje od autosomno-recesivne bolesti (gen B,b) dobiju zdravu kćer,
+onda su genotipovi roditelja najvjerojatnije sljedeći (geni za navedene bole-
+sti nisu vezani):
+
+A. otac AaBB, majka aabb
+B. otac AABB, majka aabb
+C. otac aAbb, majka aabB
+D. otac AAbb, majka AAbb
+E. otac aabb, majka AaBB
+
+56. Rezultat dihibridnog test-križanja daje omjer fenotipova:
+A. 1 : 1 : 1 : 1
+B. 1:1
+C. 9 : 3 : 3 : 1
+D. 3 : 1
+E. 1:2:1
+
+57. Sin hemofiličar:
+
+A. ne može imati majku hemofiličarku
+B. ima oca hemofiličara
+C. ne može imati sestru hemofiličarku
+D. mora imati brata hemofiličara
+E. može imati zdravu majku
+58. Inzulin i glukagon se proizvode u:
+A. hipotalamusu i štitnjači
+B. jetri i paratireoidnoj žlijezdi
+C. Langerhansovim otocima i gušterači
+D. adenohipofizi i neurohipofizi
+E. nadbubrežnoj žlijezdi i hipotalamusu
+
+59. Ako promatramo ljudsku stanicu u metafazi mejoze II, kakve kromoso-
+me možemo vidjeti?
+
+A. 23 kromosoma s jednom kromatidom koji se nalaze u sredini stanice
+B. 46 maksimalno spiralizirana kromosoma s dvije kromatide
+
+C. 46 kromosoma s dvije kromatide koji se nalaze u sredini stanice
+
+D. 23 kromosoma s dvije kromatide
+
+E. odvojene homologne kromosome koji su još uvijek spojeni hijazmama

@@ -2,7 +2,7 @@
 
 ## Lucide Icons
 
-Icons in `assets/lucide-icons.svg` are selected from Lucide Static v1.17.0.
+The previous icon set used Lucide Static v1.17.0. This notice is retained for legacy material; the compatibility files now contain Phosphor icons.
 
 ISC License
 
@@ -41,11 +41,11 @@ by the license, but the original photos and photographers are listed here:
 - `history-document.webp`: [Alessio Fiorentino](https://unsplash.com/photos/a-close-up-of-a-handwriting-on-a-piece-of-paper-MiNq1Mjikfw)
 - `hungarian-budapest.webp`: [Jason Mavrommatis](https://unsplash.com/photos/hungarian-parliament-building-at-night--9Ap357MJ8s)
 - `informatics.webp`: [Paul Zoetemeijer](https://unsplash.com/photos/close-up-photography-of-keyboard-KAZy5R2ZOV0)
-- `italian-colosseum.webp`: [Spencer Davis](https://unsplash.com/photos/aerial-view-of-colosseum-at-rome-italy-ckotRXopwRM)
 - `latin-rome.webp`: [iam_os](https://unsplash.com/photos/a-statue-of-a-man-holding-a-staff-veHGlVkU4qQ)
 - `literature-book.webp`: [Yannick Pulver](https://unsplash.com/photos/open-book-on-brown-wooden-table-hopX_jpVtRM)
 - `logic-chess.webp`: [Randy Fath](https://unsplash.com/photos/selective-focus-photography-of-chess-pieces-G1yhU1Ej-9A)
 - `mathematics.webp`: [Artturi Jalli](https://unsplash.com/photos/a-chalkboard-with-some-writing-on-it-gYrYa37fAKI)
+- `medicine.webp`: [Hush Naidoo Jade Photography](https://unsplash.com/photos/black-and-gray-stethoscope-yo01Z-9HQAw)
 - `music.webp`: [Coppa Cover](https://unsplash.com/photos/a-close-up-view-of-a-piano-keyboard-NS75bGBMRaE)
 - `philosophy-thinker.webp`: [Avery Evans](https://unsplash.com/photos/man-sitting-statue-NOm4f0xx2bU)
 - `physics.webp`: [Artem](https://unsplash.com/photos/a-prism-refracts-light-into-a-rainbow-spectrum-a18lCneoV4E)
@@ -54,3 +54,34 @@ by the license, but the original photos and photographers are listed here:
 - `serbian-typewriter.webp`: [Patrick Fore](https://unsplash.com/photos/black-corona-typewriter-on-brown-wood-planks-0gkw_9fy0eQ)
 - `sociology-crowd.webp`: [Jacek Dylag](https://unsplash.com/photos/group-of-people-walking-on-pedestrian-lane-PMxT0XtQ--A)
 - `spanish-madrid.webp`: [Álvaro Bernal](https://unsplash.com/photos/yellow-and-red-flag-hanging-on-white-building-d5vpK2XFF5E)
+
+## Phosphor Icons
+
+The local subset in `assets/phosphor-icons.js` and `assets/phosphor-icons.svg` uses
+Phosphor Icons, Duotone, from [phosphor-icons/core](https://github.com/phosphor-icons/core)
+at commit `2b75f3ad12b420c9504ef05df8d2564a28f8500e`.
+`lucide-icons.js` and `assets/lucide-icons.svg` provide the same Phosphor assets for cached pages.
+The EN and DE badges adapt `chat-circle` with custom vector lettering.
+Regenerate with `python3 scripts/build_phosphor_icons.py`.
+
+MIT License
+
+Copyright (c) 2023 Phosphor Icons
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

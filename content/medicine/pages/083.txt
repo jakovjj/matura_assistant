@@ -1,0 +1,19 @@
+43. Prikazan je fazni dijagram čiste tvari. Točka T na dijagramu opisuje tre-
+nutačno stanje tvari. Kako će se mijenjati faza tvari ako se tvar zagrijava
+do 80°C pri konstantnom tlaku?
+[figure:chemistry-43]
+A. iz tekuće, preko čvrste, u plinsku fazu
+B. iz čvrste u tekuću fazu
+C. iz čvrste, preko tekuće, u plinsku fazu
+D. iz plinske, preko čvrste, u tekuću fazu
+E. iz plinske, preko tekuće, u čvrstu fazu
+
+44. Za reakciju bromatnih iona s bromidnim ionima u kiseloj otopini,
+BrO₃⁻(aq) + 5Br⁻(aq) + 6H⁺(aq) → 3Br₂(aq) + 3H₂O(l),
+brzina reakcije bit će:
+
+A. brzina = −(1/5) · Δ[Br⁻]/Δt
+B. brzina = (1/3) · Δ[Br₂]/Δt
+C. brzina = −(1/6) · Δ[H⁺]/Δt
+D. brzina = −Δ[BrO₃⁻]/Δt
+E. svi su odgovori točni

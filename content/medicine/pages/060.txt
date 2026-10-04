@@ -1,0 +1,21 @@
+79. Osim o temperaturi, unutrašnja energija idealnog plina ovisi još i o:
+A. masi čestice plina
+B. specifičnom toplinskom kapacitetu plina
+C. vrsti plina
+D. međudjelovanju čestica plina
+E. broju čestica plina
+80. Koji od ponuđenih crteža prikazuje silnice homogenog električnog polja?
+[figure:physics-80]
+A. samo A
+B. samo B
+C. AiB
+D. A, B i C
+E. samo C
+81. Tri točkasta naboja jednakih iznosa q₁, −q₂ i q₃ smještena su kao što je
+prikazano na slici. U kojem smjeru djeluje rezultantna sila na naboj q₃?
+[figure:physics-81]
+A. smjer A
+B. smjer B
+C. smjer C
+D. smjer D
+E. smjer E

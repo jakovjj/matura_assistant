@@ -1,0 +1,30 @@
+1. Što od navedenog NIJE funkcija proteina u staničnoj membrani?
+A. omogućuju ulaz molekula u stanicu
+B. bitni su u prepoznavanju i interakciji s drugim stanicama
+C. mogu služiti vezivanju specifičnih hormona
+D. doprinose odvijanju specifičnih enzimskih reakcija
+E. stvaraju lipidne molekule
+2. Transport glukoze kroz staničnu membranu omogućuje:
+A. fosfolipid
+B. protein
+C. šećer
+D. molekula u obliku kanala
+E. glikolipid
+3. Koju molekulu NE možemo naći u jezgri?
+A. rRNA jer se ona nalazi u ribosomima
+B. tRNA jer ona prenosi aminokiseline u citoplazmi
+C. nukleoidnu DNA
+D. ATP
+E. sve navedeno možemo naći u jezgri
+4. Lizosomska membrana građena je od:
+A. dvosloja fosfolipida, kolesterola i proteina
+B. isključivo od dvosloja fosfolipida
+C. od dvosloja glikoproteina i glikolipida
+D. dva lipidna dvosloja s glikoproteinima
+E. istih lipida i protena kao i unutarnja membrana mitohondrija
+5. Kako bakteriofagi parazitiraju u bakterijskoj stanici?
+A. umnažaju se izvan stanice dok im broj ne naraste da unište bakteriju
+B. ubacuju svoju nukleinsku kiselinu u bakteriju i onda se umnažaju
+C. unište DNA u bakteriji nakon čega se stanica razgradi
+D. vezuju se na RNA u ribosomima bakterijske stanice te je razgrađuju
+E. sve navedeno je točno

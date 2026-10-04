@@ -1,0 +1,25 @@
+106. Koliko različitih tripeptida može nastati međusobnim povezivanjem
+prikazanih triju aminokiselina?
+[figure:chemistry-106]
+A. 1
+B. 3
+C. 4
+D. 5
+E. 6
+107. Miriocin (prikazan na slici) rabi se kao preteča lijeka Fingolimoda koji se
+primjenjuje u liječenju multiple skleroze. Sam miriocin ima i antibiotska
+svojstva. Koji broj asimetričnih ugljikovih atoma nalazimo u molekuli
+miriocina?
+[figure:chemistry-107]
+A. 1
+B. 2
+C. 3
+D. 4
+E. 5
+108. Optički neaktivnu racemičnu smjesu predstavlja smjesa ______ i ______
+prisutnih u jednakim količinama.
+A. D-glukoze i D-galaktoze
+B. stearinske i oleinske kiseline
+C. D-ribofuranoze i D-2-deoksiribofuranoze
+D. D-glukoze i D-fruktoze
+E. L-mliječne i D-mliječne kiseline
