@@ -6,6 +6,7 @@ var/
 /var/*.sqlite*
 files/ncvvo/
 files/interactive/english-listening/**/audio/
+files/interactive/german-listening/**/audio/
 scripts/__pycache__/
 *.pyc
 
