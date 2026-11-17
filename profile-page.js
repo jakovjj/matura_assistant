@@ -389,6 +389,7 @@
 
   function renderSettings() {
     const isDark = currentTheme() === "dark";
+    const cookiesAccepted = window.AsistentConsent?.get() === "granted";
     return `
       <section class="profile-panel" aria-labelledby="profile-settings-title">
         <div class="profile-section-heading">
@@ -416,6 +417,25 @@
               <span class="theme-switch__knob" aria-hidden="true"></span>
             </button>
           </div>
+          <div class="profile-settings__row">
+            <div>
+              <p class="profile-settings__label">
+                ${window.renderPhosphorIcon ? window.renderPhosphorIcon("cookie", "profile-settings__icon") : ""}
+                <span>Kolačići</span>
+              </p>
+              <p class="profile-settings__hint">Analitički kolačići za praćenje posjeta. Postavka se sprema u ovom pregledniku.</p>
+            </div>
+            <button
+              type="button"
+              class="theme-switch"
+              data-cookie-toggle
+              role="switch"
+              aria-checked="${cookiesAccepted ? "true" : "false"}"
+              aria-label="Kolačići"
+            >
+              <span class="theme-switch__knob" aria-hidden="true"></span>
+            </button>
+          </div>
         </div>
         ${renderLevelPreferences()}
       </section>
@@ -430,6 +450,17 @@
       const next = window.AsistentTheme.get() === "dark" ? "light" : "dark";
       window.AsistentTheme.set(next);
       toggle.setAttribute("aria-checked", next === "dark" ? "true" : "false");
+    });
+  }
+
+  function wireCookieToggle() {
+    const toggle = root.querySelector("[data-cookie-toggle]");
+    if (!toggle || !window.AsistentConsent) return;
+
+    toggle.addEventListener("click", () => {
+      const next = window.AsistentConsent.get() === "granted" ? "denied" : "granted";
+      window.AsistentConsent.set(next);
+      toggle.setAttribute("aria-checked", next === "granted" ? "true" : "false");
     });
   }
 
@@ -608,6 +639,7 @@
     renderProfile({ localProfile, serverSimulations, user });
     wireAnsweredBreakdown();
     wireThemeToggle();
+    wireCookieToggle();
     root.querySelectorAll("[data-preferred-level]").forEach((select) => {
       select.addEventListener("change", () => {
         profileStore?.setSubjectLevel(select.dataset.preferredLevel, select.value);

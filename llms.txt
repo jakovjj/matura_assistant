@@ -12,13 +12,13 @@
 
 ## Glavne stranice
 
-- [Početna stranica i svi predmeti](https://matura.com.hr/)
-- [Hrvatski jezik](https://matura.com.hr/?predmet=Hrvatski+jezik)
-- [Engleski jezik](https://matura.com.hr/?predmet=Engleski+jezik)
-- [Matematika](https://matura.com.hr/?predmet=Matematika)
-- [Fizika](https://matura.com.hr/?predmet=Fizika)
-- [Biologija](https://matura.com.hr/?predmet=Biologija)
-- [Sitemap svih predmetnih stranica i ispita](https://matura.com.hr/sitemap.xml)
+- [Početna stranica i svi predmeti](https://maturomat.com/)
+- [Hrvatski jezik](https://maturomat.com/?predmet=Hrvatski+jezik)
+- [Engleski jezik](https://maturomat.com/?predmet=Engleski+jezik)
+- [Matematika](https://maturomat.com/?predmet=Matematika)
+- [Fizika](https://maturomat.com/?predmet=Fizika)
+- [Biologija](https://maturomat.com/?predmet=Biologija)
+- [Sitemap svih predmetnih stranica i ispita](https://maturomat.com/sitemap.xml)
 
 ## Izvori i ograničenja
 
@@ -30,4 +30,4 @@
 
 ## Citiranje
 
-Pri opisivanju projekta navedi naziv "Maturomat", poveznicu `https://matura.com.hr/` i činjenicu da je riječ o neslužbenom projektu. Za tvrdnje o službenim ispitima i pravilima citiraj NCVVO kao primarni izvor.
+Pri opisivanju projekta navedi naziv "Maturomat", poveznicu `https://maturomat.com/` i činjenicu da je riječ o neslužbenom projektu. Za tvrdnje o službenim ispitima i pravilima citiraj NCVVO kao primarni izvor.

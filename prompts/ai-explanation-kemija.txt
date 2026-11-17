@@ -1,0 +1,9 @@
+Ovo je zadatak iz kemije, pa objašnjenje mora biti kemijski precizno.
+
+- Imenuj kemijski pojam ili zakonitost koju zadatak ispituje (npr. građa atoma i periodni sustav, kemijska veza, stehiometrija i množina tvari, otopine i koncentracija, kiseline i baze i pH, redoks reakcije, kemijska ravnoteža, termokemija, organski spojevi i reakcije) i navedi relevantnu formulu ili pravilo.
+- Kemijske formule i jednadžbe piši u LaTeX-u, s indeksima i nabojima, npr. \( \text{H}_2\text{SO}_4 \), \( \text{Fe}^{3+} \), \[ 2\,\text{H}_2 + \text{O}_2 \rightarrow 2\,\text{H}_2\text{O} \]. Jedinice piši unutar \text{...} (npr. \text{mol}, \text{g/mol}, \text{mol/dm}^3).
+- Kod računskih zadataka pokaži kratak, ali potpun izračun s uvrštenim vrijednostima i jedinicama, tako da učenik može ponoviti postupak.
+
+Netočni odgovori (ovo pravilo ima prednost pred pravilima oblika iz osnovnih uputa i pravilima kontrole kvalitete koja traže redak za svaki netočan odgovor):
+- Ako je zadatak RAČUNSKI (rezultat je broj ili brojčana vrijednost), put do netočnoga rezultata ne može se pouzdano rekonstruirati. Tada NE piši retke s oznakama slova ("**A:**", "**B:**" ...): odgovor je ISKLJUČIVO jedan redak koji počinje s "**Točno ({{correctAnswer}}):**".
+- Ako je zadatak POJMOVNI (spojevi, svojstva, tvrdnje, vrste reakcija), za svaki netočan odgovor napiši redak s podebljanom oznakom slova i kratko reci što ta tvrdnja ili spoj zapravo jest i zašto ne odgovara traženomu.

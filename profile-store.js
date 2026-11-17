@@ -14,7 +14,7 @@
     "asistent-za-mature:geography-choice:",
     "asistent-za-mature:abcd-choice:",
   ];
-  const canonicalOrigin = "https://matura.com.hr";
+  const canonicalOrigin = "https://maturomat.com";
   const legacyPracticeHosts = new Set(["matura.jandric.com"]);
   const migrationWindowNameType = "asistent-za-mature:practice-migration";
   const maxSimulationAttempts = 200;

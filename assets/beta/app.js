@@ -219,7 +219,7 @@ const termOrder = {
   "ljetni rok": 1,
 };
 
-const siteOrigin = "https://matura.com.hr";
+const siteOrigin = "https://maturomat.com";
 const siteName = "Maturomat";
 const homeSeoTitle = "Državna matura: prethodni ispiti i vježba | Maturomat";
 const homeSeoDescription =

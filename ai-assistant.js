@@ -173,7 +173,7 @@
     reported = false;
 
     element.querySelector("[data-ai-subtitle]").textContent =
-      `${context.subject} · zadatak ${context.question}`;
+      `${context.subject} · zadatak ${context.label || context.question}`;
     element.querySelector("[data-ai-body]").innerHTML = thinkingHtml();
     startThinkingTimer();
     element.querySelector("[data-ai-report-status]").textContent = "";
@@ -263,7 +263,7 @@
     const value = inner.trim();
     if (/^neto[čc]no/i.test(value)) return "ai-wrong";
     if (/^to[čc]no/i.test(value)) return "ai-correct";
-    if (/^[A-D]\s*[:.)]/.test(value)) return "ai-wrong";
+    if (/^[A-E]\s*[:.)]/.test(value)) return "ai-wrong";
     return "";
   }
 
@@ -388,7 +388,7 @@
   function showRemaining(remaining, unlimited) {
     const subtitle = drawer?.querySelector("[data-ai-subtitle]");
     if (!subtitle || !currentContext) return;
-    const base = `${currentContext.subject} · zadatak ${currentContext.question}`;
+    const base = `${currentContext.subject} · zadatak ${currentContext.label || currentContext.question}`;
     if (unlimited) {
       subtitle.textContent = `${base} · neograničeno`;
     } else if (Number.isFinite(remaining)) {
@@ -671,6 +671,18 @@
     explain(context);
   }
 
+  // Delegirani klik za rješavače koji često iscrtavaju samo red odgovora
+  // (npr. prijemni za medicinu), pa bind() nakon svakoga iscrtavanja ne bi pratio.
+  function bindDelegated(root, getContext, options) {
+    if (!isAvailable(options) || !root || typeof getContext !== "function") return;
+    root.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-ai-explain]");
+      if (!button || !root.contains(button)) return;
+      const context = getContext(button.dataset.aiExplain);
+      if (context) handleButtonClick(context);
+    });
+  }
+
   window.AsistentAI = {
     enabled(options) {
       return isAvailable(options);
@@ -698,5 +710,6 @@
         });
       });
     },
+    bindDelegated,
   };
 })();

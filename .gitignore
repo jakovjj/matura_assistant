@@ -19,3 +19,17 @@ pretplata.html
 
 # Supplied medicine source scan is local reference material, not a public asset.
 assets/zadatci-za-upis-na-medicinski-fakultet-sveucilita-u-zagrebu-3nbsped-9789533680019_compress.pdf
+
+# Matura+ and billing (kept local, out of the repo)
+billing.js
+billing-client.js
+docs/billing.md
+tests/billing-browser.cjs
+tests/test_billing.js
+private/
+assets/matura+.png
+assets/matura+.webp
+assets/plus-page.css
+assets/plus-subject-strips.webp
+assets/plus-subject-strips-mobile.webp
+scripts/build_plus_background.py

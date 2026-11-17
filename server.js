@@ -57,6 +57,11 @@ const config = {
   port: Number(process.env.PORT || 8080),
   openAiApiKey: normalizeOpenAiApiKey(process.env.OPENAI_API_KEY || ""),
   publicBaseUrl: String(process.env.PUBLIC_BASE_URL || "").replace(/\/+$/, ""),
+  // Dodatne domene (npr. https://matura.com.hr) na kojima stranica radi kao alias.
+  publicBaseUrlAliases: String(process.env.PUBLIC_BASE_URL_ALIASES || "")
+    .split(",")
+    .map((value) => value.trim().replace(/\/+$/, ""))
+    .filter((value) => /^https?:\/\/[^/]+$/i.test(value)),
   sessionTtlMs: readPositiveNumber(process.env.SESSION_TTL_DAYS, 30) * 24 * 60 * 60 * 1000,
   databaseFile: path.resolve(rootDir, process.env.DATABASE_FILE || "var/asistent-za-mature.sqlite"),
   feedbackFile: path.resolve(rootDir, process.env.FEEDBACK_FILE || "var/feedback/messages.jsonl"),
@@ -383,7 +388,7 @@ async function handleRequest(request, response) {
     const user = session ? store.users[session.userId] : null;
     if (!userIsAdmin(user)) return sendJson(response, user ? 403 : 401, { error: "Samo administratori mogu uređivati izreze." });
     if (request.method !== "POST") return sendJson(response, 405, { error: "Metoda nije dopuštena." }, { Allow: "POST" });
-    if (request.headers['sec-fetch-site'] === 'cross-site' || (request.headers.origin && request.headers.origin !== new URL(config.publicBaseUrl || requestBaseUrl(request)).origin)) return sendJson(response, 403, { error: "Pristup nije dopušten." });
+    if (request.headers['sec-fetch-site'] === 'cross-site' || (request.headers.origin && request.headers.origin !== new URL(publicBaseUrlFor(request)).origin)) return sendJson(response, 403, { error: "Pristup nije dopušten." });
     if (!String(request.headers['content-type']).startsWith('application/json')) return sendJson(response, 415, { error: "Potreban je JSON zapis." });
     try {
       const body = await readJsonBody(request, 4096);
@@ -578,14 +583,14 @@ async function handleBilling(request, response, url) {
   const session = currentSession(request);
   const user = session && store.users[session.userId];
   if (!user) return sendJson(response, 401, { error: "Prijava je potrebna." });
-  if (!isStatus && (request.headers.origin !== config.publicBaseUrl || request.headers["sec-fetch-site"] === "cross-site")) {
+  if (!isStatus && (request.headers.origin !== publicBaseUrlFor(request) || request.headers["sec-fetch-site"] === "cross-site")) {
     return sendJson(response, 403, { error: "Pristup nije dopušten." });
   }
   if (!billingRateLimit.check(user.id)) return sendJson(response, 429, { error: "Previše zahtjeva. Pokušaj za minutu." });
   if (!billing.configured) return sendJson(response, 503, { error: "Pretplate trenutačno nisu dostupne." });
   try {
     if (isStatus) return sendJson(response, 200, await billing.status(user));
-    const result = url.pathname.endsWith("/checkout") ? await billing.checkout(user) : await billing.portal(user);
+    const result = url.pathname.endsWith("/checkout") ? await billing.checkout(user, publicBaseUrlFor(request)) : await billing.portal(user, publicBaseUrlFor(request));
     sendJson(response, 200, { url: result.url });
   } catch (error) {
     console.error("Billing request failed:", error.stripeCode || error.message);
@@ -623,7 +628,7 @@ async function appendPurchaseLogLine(line) {
 async function sendProtectedHtml(response, filePath, headOnly = false) {
   let body;
   try {
-    body = await fsp.readFile(filePath);
+    body = await versionHtmlAssets(await fsp.readFile(filePath, "utf8"), "/plus");
   } catch {
     response.writeHead(404, { "Cache-Control": "no-store" });
     response.end("Stranica nije dostupna.");
@@ -632,7 +637,7 @@ async function sendProtectedHtml(response, filePath, headOnly = false) {
 
   response.writeHead(200, {
     "Cache-Control": "no-store, private",
-    "Content-Length": body.length,
+    "Content-Length": Buffer.byteLength(body),
     "Content-Type": "text/html; charset=UTF-8",
     "Referrer-Policy": "no-referrer",
     "X-Content-Type-Options": "nosniff",
@@ -677,7 +682,7 @@ function sendPuniPristupGate(response, hasError, statusCode = 200, headOnly = fa
     <script src="./lucide-icons.js?v=20260604-inline-paths"></script>
     <a class="skip-link" href="#main">Preskoči na sadržaj</a>
     <div data-site-header></div>
-    <script src="./site-header.js?v=20260616-nav-icons"></script>
+    <script src="./site-header.js?v=20261025-1"></script>
     <main id="main" class="preview-gate">
       <div class="container">
         <section class="preview-gate__panel" aria-labelledby="preview-title">
@@ -1546,18 +1551,43 @@ async function handleAiExplanation(request, response) {
     return;
   }
 
-  const subject = stringOrEmpty(body?.subject) || "Hrvatski jezik";
+  let subject = stringOrEmpty(body?.subject) || "Hrvatski jezik";
   const solver = normalizeAiSolver(body?.solver);
-  const examId = stringOrEmpty(body?.examId);
+  let examId = stringOrEmpty(body?.examId);
   const question = stringOrEmpty(body?.question);
-  const kind = normalizeAiKind(body?.kind);
-  const correctAnswer = normalizeCorrectAnswer(body?.correctAnswer);
-  const image = normalizeEssayImage(body?.image);
+  let kind = normalizeAiKind(body?.kind);
+  let correctAnswer = normalizeCorrectAnswer(body?.correctAnswer);
+  let image = normalizeEssayImage(body?.image);
+  let questionText = "";
+  let medicineImages = [];
+  // Prijemni za medicinu ima digitalan sadržaj: tekst, ključ i crteže uzimamo iz
+  // data/medicine.js na serveru, ne od klijenta. Pitanje se pojavljuje u više
+  // skupova (katalog, ispit 2020., nasumični), pa je spremište zajedničko.
+  if (solver === "medicine") {
+    const medicineQuestion = medicineAiQuestion(question);
+    if (!medicineQuestion) {
+      sendJson(response, 400, { error: "Nedostaju podaci o zadatku." });
+      return;
+    }
+    if (medicineQuestion.reviewIssue) {
+      sendJson(response, 400, { error: "Za ovo pitanje objašnjenje nije dostupno." });
+      return;
+    }
+    subject = medicineQuestion.subject;
+    examId = "prijemni-medicina";
+    kind = "choice";
+    correctAnswer = normalizeCorrectAnswer(medicineQuestion.answer);
+    image = null;
+    questionText = medicineAiQuestionText(medicineQuestion);
+    medicineImages = medicineAiImages(medicineQuestion);
+  }
   // Otvoreni zadatci nemaju ABCD odgovor, nego priloženu sliku službenoga rješenja.
   const solutionImage = kind === "open" ? normalizeEssayImage(body?.solutionImage) : null;
-  const contextImages = Array.isArray(body?.contextImages)
-    ? body.contextImages.map(normalizeEssayImage).filter(Boolean).slice(0, 3)
-    : [];
+  const contextImages = solver === "medicine"
+    ? medicineImages
+    : Array.isArray(body?.contextImages)
+      ? body.contextImages.map(normalizeEssayImage).filter(Boolean).slice(0, 3)
+      : [];
   if (!solver || !examId || !question) {
     sendJson(response, 400, { error: "Nedostaju podaci o zadatku." });
     return;
@@ -1587,8 +1617,15 @@ async function handleAiExplanation(request, response) {
     return;
   }
 
-  const cached = regenerate ? null : readAiExplanationCache(solver, examId, question);
-  if (!cached && !image) {
+  // Objašnjenje spremljeno drugim modelom generira se nanovo trenutnim modelom
+  // (pa prepiše spremište). Ručno potvrđena ("verified") ostaju, a ako klijent
+  // nije poslao slike potrebne za generiranje, prikaže se staro.
+  let cached = regenerate ? null : readAiExplanationCache(solver, examId, question);
+  const canGenerate = Boolean(image || questionText) && (kind !== "open" || solutionImage);
+  if (cached && !cached.verified && cached.model !== config.aiExplanationModel && canGenerate) {
+    cached = null;
+  }
+  if (!cached && !image && !questionText) {
     sendJson(response, 400, { error: "Nedostaje slika zadatka za objašnjenje." });
     return;
   }
@@ -1636,6 +1673,7 @@ async function handleAiExplanation(request, response) {
         question,
         kind,
         image,
+        questionText,
         contextImages,
         solutionImage,
         signal: clientSignal,
@@ -1661,6 +1699,7 @@ async function handleAiExplanation(request, response) {
               correctAnswer,
               question,
               image,
+              questionText,
               contextImages,
               draft: draftText,
               signal: clientSignal,
@@ -1686,6 +1725,7 @@ async function handleAiExplanation(request, response) {
         question,
         kind,
         image,
+        questionText,
         contextImages,
         solutionImage,
         signal: clientSignal,
@@ -1960,6 +2000,76 @@ function writeNdjson(response, event) {
   response.write(`${JSON.stringify(event)}\n`);
 }
 
+// data/medicine.js se ponovno čita kad se promijeni, bez restarta servisa.
+let medicineAiData = { mtimeMs: 0, data: null, questions: new Map() };
+
+function loadMedicineAiData() {
+  const file = path.join(rootDir, "data", "medicine.js");
+  try {
+    const { mtimeMs } = fs.statSync(file);
+    if (medicineAiData.data && medicineAiData.mtimeMs === mtimeMs) return medicineAiData;
+    const source = fs.readFileSync(file, "utf8");
+    const data = JSON.parse(source.slice(source.indexOf("{"), source.lastIndexOf("}") + 1));
+    medicineAiData = { mtimeMs, data, questions: new Map(data.questions.map((q) => [q.id, q])) };
+  } catch (error) {
+    console.error("Učitavanje data/medicine.js za AI asistenta nije uspjelo:", error.message);
+  }
+  return medicineAiData;
+}
+
+function medicineAiQuestion(id) {
+  return loadMedicineAiData().questions.get(id) || null;
+}
+
+function medicineAiBlocksText(blocks) {
+  const { data } = loadMedicineAiData();
+  return (blocks || [])
+    .map((block) => {
+      if (block.type === "text") return block.text;
+      if (block.type === "table") {
+        const table = data?.tables?.[block.id];
+        if (!table) return "";
+        return [
+          `Tablica: ${table.caption}`,
+          `| ${table.headers.join(" | ")} |`,
+          ...table.rows.map((row) => `| ${row.join(" | ")} |`),
+        ].join("\n");
+      }
+      return "[crtež]";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function medicineAiQuestionText(question) {
+  return [
+    medicineAiBlocksText(question.prompt),
+    ...question.options.map((option) => `${option.id}. ${medicineAiBlocksText(option.content)}`),
+  ].join("\n");
+}
+
+// Crteži iz pitanja i odgovora (WebP u files/medicine/) kao data URL-ovi.
+function medicineAiImages(question) {
+  const { data } = loadMedicineAiData();
+  const ids = [question.prompt, ...question.options.map((option) => option.content)]
+    .flat()
+    .filter((block) => block.type === "figure")
+    .map((block) => block.id);
+  return [...new Set(ids)]
+    .slice(0, 6)
+    .map((id) => {
+      const url = data?.figures?.[id]?.url || "";
+      const file = path.join(rootDir, url.replace(/^\.\//, ""));
+      if (!/^\.\/files\/medicine\/[a-z0-9_-]+\.webp$/i.test(url)) return null;
+      try {
+        return { dataUrl: `data:image/webp;base64,${fs.readFileSync(file).toString("base64")}`, mimeType: "image/webp" };
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
 function buildAiExplanationSystemPrompt(subject, correctAnswer, kind = "choice") {
   const fill = (text) =>
     text.replaceAll("{{subject}}", subject).replaceAll("{{correctAnswer}}", correctAnswer);
@@ -1994,15 +2104,38 @@ function buildAiExplanationVerifySystemPrompt(subject, correctAnswer) {
 function aiSubjectSlug(subject) {
   return (
     {
+      biologija: "biologija",
       fizika: "fizika",
       "hrvatski jezik": "hrvatski",
+      kemija: "kemija",
       matematika: "matematika",
       "politika i gospodarstvo": "politika",
     }[String(subject || "").trim().toLowerCase()] || ""
   );
 }
 
-function buildAiExplanationUserPrompt({ subject, correctAnswer, question, kind = "choice" }) {
+// Tekst pitanja s prijemnoga dolazi kao tekst (nema skena), a priložene slike
+// samo su crteži iz zadatka. Ova napomena ima prednost pred opisom slika u
+// sustavnom promptu.
+function medicineAiPromptText(questionText) {
+  return [
+    "Ovo je pitanje s prijemnoga ispita za medicinski fakultet (ne s državne mature). Ova napomena ima prednost pred dijelom uputa koji opisuje sken ili sliku zadatka. Tekst zadatka i ponuđeni odgovori (A do E) dani su u nastavku kao tekst, a ne na slici; priložene slike, ako ih ima, samo su crteži, sheme ili strukture koje zadatak spominje ([crtež]). Indeksi su zapisani kao _{...}. Gradivo je srednjoškolsko, na razini prijemnoga ispita.",
+    "",
+    "TEKST ZADATKA:",
+    questionText,
+  ].join("\n");
+}
+
+function buildAiExplanationUserPrompt({ subject, correctAnswer, question, kind = "choice", questionText = "" }) {
+  if (questionText) {
+    return [
+      `Predmet: ${subject}.`,
+      `Točan odgovor: ${correctAnswer}.`,
+      medicineAiPromptText(questionText),
+      "",
+      "Objasni rješenje prema uputama.",
+    ].join("\n");
+  }
   if (kind === "open") {
     return [
       `Predmet: ${subject}.`,
@@ -2024,6 +2157,7 @@ async function* streamOpenAiExplanation({
   question,
   kind = "choice",
   image,
+  questionText = "",
   contextImages = [],
   solutionImage = null,
   signal,
@@ -2031,14 +2165,16 @@ async function* streamOpenAiExplanation({
   const userContent = [
     {
       type: "input_text",
-      text: buildAiExplanationUserPrompt({ subject, correctAnswer, question, kind }),
+      text: buildAiExplanationUserPrompt({ subject, correctAnswer, question, kind, questionText }),
     },
-    { type: "input_image", image_url: image.dataUrl, detail: "high" },
   ];
+  if (image) userContent.push({ type: "input_image", image_url: image.dataUrl, detail: "high" });
   if (contextImages.length) {
     userContent.push({
       type: "input_text",
-      text: "Sljedeće slike su polazni tekst na koji se zadatak odnosi (za razumijevanje):",
+      text: questionText
+        ? "Sljedeće slike su crteži iz zadatka, redom kojim se spominju:"
+        : "Sljedeće slike su polazni tekst na koji se zadatak odnosi (za razumijevanje):",
     });
     for (const contextImage of contextImages) {
       userContent.push({ type: "input_image", image_url: contextImage.dataUrl, detail: "high" });
@@ -2055,7 +2191,7 @@ async function* streamOpenAiExplanation({
 
   // gpt-5 i o-modeli su reasoning modeli: ne podržavaju temperature, a tokeni za
   // razmišljanje troše max_output_tokens, pa im dajemo nisko zalaganje i više tokena.
-  const isReasoningModel = /^(gpt-5|o\d)/i.test(config.aiExplanationModel);
+  const isReasoningModel = /^(gpt-[5-9]|o\d)/i.test(config.aiExplanationModel);
   const requestBody = {
     model: config.aiExplanationModel,
     stream: true,
@@ -2159,6 +2295,7 @@ async function verifyAiExplanation({
   correctAnswer,
   question,
   image,
+  questionText = "",
   contextImages = [],
   draft,
   signal,
@@ -2169,22 +2306,24 @@ async function verifyAiExplanation({
         type: "input_text",
         text: [
           `Predmet: ${subject}.`,
-          `Zadatak broj: ${question}.`,
+          ...(questionText ? [] : [`Zadatak broj: ${question}.`]),
           `Pouzdano točan odgovor: ${correctAnswer}.`,
-          "Na priloženoj slici je tekst zadatka i ponuđeni odgovori. Provjeri nacrt objašnjenja u nastavku prema uputama i vrati konačno objašnjenje.",
+          questionText
+            ? `${medicineAiPromptText(questionText)}\n\nProvjeri nacrt objašnjenja u nastavku prema uputama i vrati konačno objašnjenje.`
+            : "Na priloženoj slici je tekst zadatka i ponuđeni odgovori. Provjeri nacrt objašnjenja u nastavku prema uputama i vrati konačno objašnjenje.",
           "",
           "NACRT OBJAŠNJENJA:",
           draft,
         ].join("\n"),
       },
-      { type: "input_image", image_url: image.dataUrl, detail: "high" },
     ];
+    if (image) userContent.push({ type: "input_image", image_url: image.dataUrl, detail: "high" });
     for (const contextImage of contextImages) {
       userContent.push({ type: "input_image", image_url: contextImage.dataUrl, detail: "high" });
     }
 
     const model = config.aiExplanationVerifyModel;
-    const isReasoningModel = /^(gpt-5|o\d)/i.test(model);
+    const isReasoningModel = /^(gpt-[5-9]|o\d)/i.test(model);
     const requestBody = {
       model,
       stream: false,
@@ -2386,7 +2525,23 @@ async function serveStaticFile(request, response, url) {
     return;
   }
 
-  if (/^\/data\/[a-z-]+\.js$/.test(pathname)) {
+  // Cloudflare/browser cache scripts and styles for several hours. Give each
+  // local dependency a URL tied to its file version on every HTML response.
+  // HTML itself is revalidated, so an ordinary reload picks up edited assets.
+  if (path.extname(filePath).toLowerCase() === ".html") {
+    const html = await fsp.readFile(filePath, "utf8");
+    const source = await versionHtmlAssets(html, pathname);
+    response.writeHead(200, {
+      "Cache-Control": "no-cache, must-revalidate",
+      "Content-Length": Buffer.byteLength(source),
+      "Content-Type": "text/html; charset=UTF-8",
+      "X-Content-Type-Options": "nosniff",
+    });
+    response.end(request.method === "HEAD" ? undefined : source);
+    return;
+  }
+
+  if (/^\/data\/[a-z-]+\.js$/.test(pathname) && pathname !== "/data/exam-statistics.js") {
     const original = await fsp.readFile(filePath, "utf8");
     const transformed = cropStore.parse(original, path.basename(filePath));
     if (transformed || pathname !== "/data/exams.js") {
@@ -2394,7 +2549,7 @@ async function serveStaticFile(request, response, url) {
       if (pathname !== "/data/exams.js" && !hasMaturaPlus(request)) {
         source = redactLegacyExamData(source);
       }
-      response.writeHead(200, { "Content-Type": "text/javascript; charset=UTF-8", "Cache-Control": "private, no-store", "Content-Length": Buffer.byteLength(source), "X-Content-Type-Options": "nosniff" });
+      response.writeHead(200, { "Content-Type": "text/javascript; charset=UTF-8", "Cache-Control": pathname === "/data/exams.js" ? "private, max-age=300" : "private, no-store", "Content-Length": Buffer.byteLength(source), "X-Content-Type-Options": "nosniff" });
       response.end(request.method === "HEAD" ? undefined : source);
       return;
     }
@@ -2420,17 +2575,15 @@ async function serveStaticFile(request, response, url) {
   }
 
   const headers = {
-    "Cache-Control": plusProtected ? "private, no-store" : cacheHeaderFor(filePath),
+    "Cache-Control": plusProtected
+      ? "private, no-store"
+      : pathname === "/data/exams.js"
+        ? "private, max-age=300"
+        : cacheHeaderFor(filePath),
     "Content-Length": stat.size,
     "Content-Type": contentType(filePath),
     "X-Content-Type-Options": "nosniff",
   };
-  // One-time browser cache reset after the October 2026 site update. Keep
-  // cookies and localStorage (including saved practice answers) untouched.
-  if (path.extname(filePath).toLowerCase() === ".html" && !parseCookies(request.headers.cookie || "").azm_cache_reset_20261004_1100) {
-    headers["Clear-Site-Data"] = '"cache"';
-    headers["Set-Cookie"] = `azm_cache_reset_20261004_1100=1; Path=/; Max-Age=31536000; SameSite=Lax${config.cookieSecure ? "; Secure" : ""}; HttpOnly`;
-  }
   if (negotiated) {
     headers.Vary = "Accept";
   }
@@ -2476,7 +2629,7 @@ function archiveYearForPath(pathname) {
   if (mtime !== archiveAccessMtime) {
     const source = fs.readFileSync(indexPath, "utf8");
     const archive = JSON.parse(source.replace(/^window\.ASISTENT_ZA_MATURE_DATA\s*=\s*/, "").replace(/;\s*$/, ""));
-    archiveAccessIndex = new Map(archive.exams.map((exam) => [new URL(exam.url, "https://matura.com.hr/").pathname, Number(exam.year)]));
+    archiveAccessIndex = new Map(archive.exams.map((exam) => [new URL(exam.url, "https://maturomat.com/").pathname, Number(exam.year)]));
     archiveAccessMtime = mtime;
   }
   return archiveAccessIndex.get(pathname);
@@ -4111,6 +4264,8 @@ function googleAuthEnabled() {
 }
 
 function googleRedirectUri(request) {
+  const alias = publicBaseUrlAliasFor(request);
+  if (alias) return `${alias}/api/auth/google/callback`;
   if (config.googleRedirectUri) return config.googleRedirectUri;
   return `${config.publicBaseUrl || requestBaseUrl(request)}/api/auth/google/callback`;
 }
@@ -4767,6 +4922,19 @@ function createRateLimiter({ max, windowMs }) {
   };
 }
 
+// Alias domena na kojoj je zahtjev stigao, ili "" ako je stigao na glavnu domenu.
+function publicBaseUrlAliasFor(request) {
+  const host = String(request.headers["x-forwarded-host"] || request.headers.host || "")
+    .split(",")[0]
+    .trim()
+    .toLowerCase();
+  return config.publicBaseUrlAliases.find((alias) => new URL(alias).host === host) || "";
+}
+
+function publicBaseUrlFor(request) {
+  return publicBaseUrlAliasFor(request) || config.publicBaseUrl || requestBaseUrl(request);
+}
+
 function requestBaseUrl(request) {
   const proto = request.headers["x-forwarded-proto"] || "http";
   const host = request.headers["x-forwarded-host"] || request.headers.host || `localhost:${config.port}`;
@@ -4841,6 +5009,7 @@ function isPublicPath(pathname) {
     "/german-reading.js",
     "/history-choice.js",
     "/home-news.js",
+    "/study-streak.js",
     "/hrvatski.html",
     "/hrvatski-pisanje.html",
     "/index.html",
@@ -4899,8 +5068,53 @@ function isGeneratedSeoDirectoryPath(pathname) {
   );
 }
 
+async function versionHtmlAssets(html, pathname) {
+  const baseHref = html.match(/<base\s+href=["']([^"']+)["']/i)?.[1];
+  const baseUrl = new URL(baseHref || pathname, "https://maturomat.com");
+  const assetTags = /<(?:script\b[^>]*\bsrc|link\b(?=[^>]*\brel=["']stylesheet["'])[^>]*\bhref)=["'][^"']+["'][^>]*>/gi;
+  const urlAttribute = /\b(src|href)=["']([^"']+)["']/i;
+  const revisions = new Map();
+  const matches = [...html.matchAll(assetTags)];
+
+  for (const match of matches) {
+    const attribute = match[0].match(urlAttribute);
+    if (!attribute) continue;
+    const reference = attribute[2];
+    const assetUrl = new URL(reference, baseUrl);
+    if (assetUrl.origin !== baseUrl.origin || !/\.(?:js|css)$/i.test(assetUrl.pathname)) continue;
+    const assetPath = path.resolve(rootDir, `.${decodeURIComponent(assetUrl.pathname)}`);
+    if (!assetPath.startsWith(rootDir + path.sep)) continue;
+    if (!revisions.has(assetPath)) {
+      try {
+        const assetStat = await fsp.stat(assetPath);
+        revisions.set(assetPath, assetStat.isFile() ? `${Math.trunc(assetStat.mtimeMs)}-${assetStat.size}` : null);
+      } catch {
+        revisions.set(assetPath, null);
+      }
+    }
+  }
+
+  return html.replace(assetTags, (tag) => {
+    const attribute = tag.match(urlAttribute);
+    if (!attribute) return tag;
+    const reference = attribute[2];
+    const assetUrl = new URL(reference, baseUrl);
+    if (assetUrl.origin !== baseUrl.origin || !/\.(?:js|css)$/i.test(assetUrl.pathname)) return tag;
+    const assetPath = path.resolve(rootDir, `.${decodeURIComponent(assetUrl.pathname)}`);
+    const revision = revisions.get(assetPath);
+    if (!revision) return tag;
+    const originalUrl = new URL(reference, baseUrl);
+    originalUrl.searchParams.set("v", revision);
+    const versioned = `${reference.startsWith("/") ? originalUrl.pathname : reference.split("?")[0].split("#")[0]}${originalUrl.search}${originalUrl.hash}`;
+    return tag.replace(attribute[0], `${attribute[1]}="${versioned}"`);
+  });
+}
+
 function cacheHeaderFor(filePath) {
   const relativePath = path.relative(rootDir, filePath).replaceAll(path.sep, "/");
+  if (relativePath === "data/exam-statistics.js") {
+    return "public, max-age=300";
+  }
   if (
     relativePath.startsWith("files/") ||
     relativePath.startsWith("assets/") ||

@@ -76,7 +76,7 @@ def structured_data(page_schema: dict) -> str:
 def app_body() -> str:
     source = INDEX_FILE.read_text(encoding="utf-8")
     body_start = source.index("  <body>")
-    return source[body_start:]
+    return source[body_start:].rstrip("\n")
 
 
 def app_shell_page(*, title: str, description: str, canonical_url: str, page_schema: dict) -> str:

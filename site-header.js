@@ -3,7 +3,7 @@
 
   if (!siteHeaderRoot) return;
 
-  const noticeConfigPaths = ["./site-notice.txt", "./data/site-notice.txt"];
+  const noticeConfigPaths = ["/site-notice.txt"];
 
   // Variants control the banner colour and default icon.
   const ANNOUNCEMENT_VARIANTS = ["announcement", "info", "blue", "svijetloplava"];
@@ -138,7 +138,7 @@
     {
       id: "plus",
       href: "/plus",
-      label: "Matura Plus",
+      label: "MATURA+",
     },
   ];
 
@@ -147,7 +147,7 @@
       <div class="topbar">
         <div class="container topbar__inner">
           <span class="topbar__label">
-            matura.com.hr
+            maturomat.com
           </span>
           <div class="topbar__actions">
             <button
@@ -185,7 +185,7 @@
           />
           <span>
             <strong>Maturomat</strong>
-            <small>Neslužbeni projekt · vježba za državnu maturu</small>
+            <small>vježba za državnu maturu</small>
           </span>
         </a>
 
@@ -207,9 +207,7 @@
                     href="${item.href}"
                     ${isActive ? 'aria-current="page"' : ""}
                   >
-                    ${item.id === "plus"
-                      ? '<img class="main-nav__plus-logo" src="/assets/matura+.webp" alt="Matura Plus" width="1536" height="330" />'
-                      : `<span class="main-nav__label">${item.label}</span>`}
+                    <span class="main-nav__label">${item.label}</span>
                   </a>
                 `;
               })

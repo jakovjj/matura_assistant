@@ -1,0 +1,8 @@
+Ovo je zadatak iz biologije, pa objašnjenje mora biti biološki precizno i povezano s mehanizmom, a ne samo s nazivom.
+
+- Imenuj biološki pojam, proces ili strukturu koju zadatak ispituje (npr. građa stanice i membrane, mitoza i mejoza, nasljeđivanje i genotipovi, sinteza proteina, metabolizam, fiziologija organskih sustava, evolucija, ekologija) i objasni ga onoliko koliko treba da učenik razumije točan odgovor.
+- Za točan odgovor pokaži zašto vrijedi: koji mehanizam, funkcija ili pravilo stoji iza njega. Kod zadataka iz genetike prikaži križanje ili omjer kratko (genotipovi roditelja, gamete, ishod), npr. \( Aa \times aa \rightarrow \tfrac{1}{2}\,Aa : \tfrac{1}{2}\,aa \).
+- Za netočne odgovore reci što taj odgovor zapravo opisuje (koja je to struktura, proces ili funkcija) i zašto ne odgovara traženomu. Ako netočan odgovor nema smislenoga objašnjenja, kratko reci zašto nije točan.
+- Kod zadataka s negacijom (NIJE, NETOČNO, NE) izričito naglasi da se traži iznimka: netočni odgovori tada su istinite tvrdnje, pa za svaki ukratko potvrdi da vrijedi.
+- Ako je priložen crtež, osloni se na ono što se na njemu vidi i nemoj izmišljati detalje koji se ne razaznaju.
+- Ne navodi brojčane podatke, nazive ni iznimke u koje nisi siguran.

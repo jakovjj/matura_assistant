@@ -1,6 +1,6 @@
 # Exam list beta
 
-Preview: https://matura.com.hr/assets/beta/index.html
+Preview: https://maturomat.com/assets/beta/index.html
 
 The existing server already serves `/assets/`, including HTML. This preview
 requires no DNS changes, allowlist changes, service restart, or links from the
@@ -52,7 +52,7 @@ node tests/beta-preview.cjs
 
 Requires Playwright and Chromium. If they are installed outside the repository,
 set `PLAYWRIGHT_MODULE` to the module path and optionally `CHROMIUM_PATH` to the
-browser executable. Set `BETA_ORIGIN=https://matura.com.hr` to check the deployed
+browser executable. Set `BETA_ORIGIN=https://maturomat.com` to check the deployed
 preview. The test uses a fresh browser context and stores screenshots in `/tmp`.
 
 Coverage includes removal of controls and stale filter behavior, shared subject

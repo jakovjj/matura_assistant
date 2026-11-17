@@ -26,8 +26,7 @@
           </div>
         </div>
         <div class="footer-meta">
-          <p>Neslužbeni projekt.</p>
-          <p>Copyright &copy; 2026 Maturomat. Odgovorna osoba: Jakov Jandrić.</p>
+          <p>Copyright &copy; 2026 Maturomat.</p>
           ${isMedicinePage ? "" : `<p>
             Ispitni materijali:
             <a

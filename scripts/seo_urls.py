@@ -10,7 +10,7 @@ from urllib.parse import urlencode
 ROOT = Path(__file__).resolve().parents[1]
 DATA_FILE = ROOT / "data" / "exams.js"
 DATA_PREFIX = "window.ASISTENT_ZA_MATURE_DATA="
-SITE_ORIGIN = "https://matura.com.hr"
+SITE_ORIGIN = "https://maturomat.com"
 
 TERM_ALIASES = {
     "prvi rok": "ljetni rok",

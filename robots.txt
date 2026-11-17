@@ -3,4 +3,4 @@ Allow: /
 Disallow: /api/
 Disallow: /files/interactive/
 
-Sitemap: https://matura.com.hr/sitemap.xml
+Sitemap: https://maturomat.com/sitemap.xml

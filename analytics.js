@@ -45,10 +45,9 @@
   const measurementId = "G-3W2D6EJZ94";
   const clarityTagId = "x0a1kkmiqz";
   const loginPendingKey = "azm_analytics_login_pending";
-  const clarityConsent = {
-    ad_Storage: "granted",
-    analytics_Storage: "granted",
-  };
+  const consentKey = "asistent-za-mature:cookie-consent";
+  // Holds the choice for this page view when localStorage is unavailable.
+  let consentOverride = "";
   const solverContextByPage = {
     "abcd.html": { examPart: "višestruki izbor" },
     "engleski-citanje.html": { examPart: "Čitanje", subject: "Engleski jezik" },
@@ -83,8 +82,30 @@
     }
   }
 
+  // Cookie consent is all-or-nothing: "granted" loads GA + Clarity, "denied"
+  // (or no choice yet) loads neither. The first-party /api/pageview counter
+  // sets no cookies and always runs.
+  function readConsent() {
+    try {
+      const value = localStorage.getItem(consentKey);
+      if (value === "granted" || value === "denied") return value;
+    } catch {
+      // Fall through to the in-memory choice.
+    }
+    return consentOverride;
+  }
+
+  function hasConsent() {
+    return readConsent() === "granted";
+  }
+
+  function clarityConsentState() {
+    const state = hasConsent() ? "granted" : "denied";
+    return { ad_Storage: state, analytics_Storage: state };
+  }
+
   function applyClarityConsent() {
-    window.clarity("consentv2", clarityConsent);
+    window.clarity("consentv2", clarityConsentState());
   }
 
   function setAnalyticsConsentDefaults() {
@@ -92,12 +113,28 @@
       ad_personalization: "denied",
       ad_storage: "denied",
       ad_user_data: "denied",
-      analytics_storage: "granted",
+      analytics_storage: hasConsent() ? "granted" : "denied",
       functionality_storage: "granted",
       personalization_storage: "denied",
       security_storage: "granted",
     });
     applyClarityConsent();
+  }
+
+  function clearAnalyticsCookies() {
+    const host = window.location.hostname;
+    const domains = ["", host, `.${host.replace(/^www\./, "")}`];
+    const names = document.cookie
+      .split(";")
+      .map((part) => part.split("=")[0].trim())
+      .filter((name) => /^(_ga|_gid|_gat|_clck|_clsk|CLID|MUID|ANONCHK)/.test(name));
+
+    for (const name of names) {
+      for (const domain of domains) {
+        const domainAttribute = domain ? `; Domain=${domain}` : "";
+        document.cookie = `${name}=; Path=/; Max-Age=0; SameSite=Lax${domainAttribute}`;
+      }
+    }
   }
 
   function pageName() {
@@ -154,6 +191,7 @@
   }
 
   function track(eventName, parameters = {}) {
+    if (!hasConsent()) return;
     if (!/^[a-z][a-z0-9_]{0,39}$/.test(eventName)) return;
 
     window.gtag("event", eventName, {
@@ -315,6 +353,53 @@
     window.setTimeout(loadGoogleAnalytics, 0);
   }
 
+  function startThirdPartyAnalytics() {
+    setClarityContext();
+    loadClarity();
+    scheduleGoogleAnalytics();
+  }
+
+  function setConsent(value) {
+    const next = value === "granted" ? "granted" : "denied";
+    const wasGranted = hasConsent();
+    try {
+      localStorage.setItem(consentKey, next);
+    } catch {
+      // Without storage the choice holds only for this page view.
+    }
+    consentOverride = next;
+
+    window.gtag("consent", "update", { analytics_storage: next });
+    applyClarityConsent();
+    if (next === "granted" && !wasGranted) startThirdPartyAnalytics();
+    if (next === "denied") clearAnalyticsCookies();
+    document.querySelector(".cookie-consent")?.remove();
+    return next;
+  }
+
+  function renderConsentPrompt() {
+    if (readConsent() || document.querySelector(".cookie-consent")) return;
+
+    const prompt = document.createElement("div");
+    prompt.className = "cookie-consent";
+    prompt.setAttribute("role", "region");
+    prompt.setAttribute("aria-label", "Kolačići");
+    prompt.innerHTML = `
+      <p>Koristimo kolačiće za analitiku posjeta.</p>
+      <div class="cookie-consent__actions">
+        <button type="button" data-cookie-consent="denied">Odbij</button>
+        <button type="button" data-cookie-consent="granted">Prihvati</button>
+      </div>
+    `;
+    prompt.addEventListener("click", (event) => {
+      const button = event.target instanceof Element
+        ? event.target.closest("[data-cookie-consent]")
+        : null;
+      if (button) setConsent(button.dataset.cookieConsent);
+    });
+    document.body.append(prompt);
+  }
+
   clearLegacyConsentCookie();
   setAnalyticsConsentDefaults();
   window.gtag("set", "ads_data_redaction", true);
@@ -327,11 +412,15 @@
     content_group: context.azm_page_type,
     send_page_view: true,
   });
-  setClarityContext();
 
   window.AsistentAnalytics = {
     completeLogin,
     track,
+  };
+  window.AsistentConsent = {
+    STORAGE_KEY: consentKey,
+    get: readConsent,
+    set: setConsent,
   };
 
   recordPageview();
@@ -339,6 +428,11 @@
   document.addEventListener("play", (event) => {
     if (event.target instanceof HTMLAudioElement) track("audio_play");
   }, true);
-  loadClarity();
-  scheduleGoogleAnalytics();
+
+  if (hasConsent()) startThirdPartyAnalytics();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", renderConsentPrompt, { once: true });
+  } else {
+    renderConsentPrompt();
+  }
 })();

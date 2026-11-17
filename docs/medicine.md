@@ -125,6 +125,14 @@ or invent a year for it.
   selected question IDs with the first saved action, so reloads preserve the paper.
   Simulation samples afresh and stays transient.
 
+Questions use the same markup and classes as the NCVVO solvers
+(`physics-source-question`, `physics-source-options`, `physics-inline-response`,
+`choice-list`/`answer-choice`, `response-feedback`): numbered prompt, listed
+options, then the A–E answer row with `Provjeri`. After an answer or a check
+only the answer row (`[data-response]`) is re-rendered; never replace the
+prompt/figure DOM on interaction, because that shifted the page. The final
+button toggles `Provjeri rješenja` / `Sakrij rješenja` like the other solvers.
+
 `medicine-core.js` is pure scoring/answer validation. `medicine.js` uses
 `createTaskSelfCheck()` and `createExamSimulation()`. It also calls
 `SolverControls` from `solver-header.js` for the same footer, quick selection,
